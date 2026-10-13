@@ -1,4 +1,4 @@
-import { Product } from '@/types/product';
+import { Product, ProductStats } from '@/types/product';
 import { ApiResponse, PaginationResult } from '@/types/response';
 import apiClient from './apiClient';
 import { API_ENDPOINTS } from '@/constants';
@@ -18,7 +18,7 @@ export const getProductsByOrgID = async ({
   sort?: string;
 }) => {
   const res = await apiClient.get<ApiResponse<PaginationResult<Product>>>(
-    PRODUCTS_ENDPOINT.GET_PRODUCTS,
+    PRODUCTS_ENDPOINT.GET_ALL,
     {
       params: {
         search: search,
@@ -44,6 +44,14 @@ export type CreateProductPayload = {
 };
 
 export const createProduct = async (payload: CreateProductPayload) => {
-  const res = await apiClient.post<ApiResponse<Product>>(PRODUCTS_ENDPOINT.GET_PRODUCTS, payload);
+  const res = await apiClient.post<ApiResponse<Product>>(PRODUCTS_ENDPOINT.CREATE, payload);
+  return res.data.data;
+};
+
+/** Thống kê tổng quan sản phẩm/kho của salon. */
+export const getProductStats = async () => {
+  const res = await apiClient.get<ApiResponse<ProductStats>>(
+    PRODUCTS_ENDPOINT.GET_STATS,
+  );
   return res.data.data;
 };

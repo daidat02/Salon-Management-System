@@ -18,7 +18,7 @@ export const getServicesByOrgID = async ({
   sort?: string;
 }) => {
   const res = await apiClient.get<ApiResponse<PaginationResult<Service>>>(
-    SERVICES_ENDPOINT.GET_SERVICES,
+    SERVICES_ENDPOINT.GET_ALL,
     {
       params: {
         search: search,
@@ -44,6 +44,6 @@ export type CreateServicePayload = {
 };
 
 export const createService = async (payload: CreateServicePayload) => {
-  const res = await apiClient.post<ApiResponse<Service>>(SERVICES_ENDPOINT.GET_SERVICES, payload);
+  const res = await apiClient.post<ApiResponse<Service>>(SERVICES_ENDPOINT.CREATE, payload);
   return res.data.data;
 };

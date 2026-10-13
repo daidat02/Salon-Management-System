@@ -1,6 +1,7 @@
 package order
 
 import (
+	"log"
 	"strconv"
 
 	domain "github.com/daidat02/server/internal/domain/order"
@@ -145,37 +146,46 @@ func (h *OrderHandler) RefundOrder(c *gin.Context) {
 	response.Success(c, 200, "Hoàn đơn hàng thành công", result)
 }
 
-// ServeOrder godoc
-// @Summary      Bắt đầu phục vụ đơn đã thanh toán (trừ kho + sinh phiếu xuất)
+// UpdateOrderCustomer godoc
+// @Summary      Gán/đổi khách hàng cho đơn chưa khóa
 // @Tags         Orders
+// @Accept       json
 // @Produce      json
 // @Security     BearerAuth
-// @Param        id   path      string  true  "ID đơn hàng"
-// @Success      200  {object}  response.SuccessResponse  "Bắt đầu phục vụ, đã sinh phiếu xuất"
-// @Failure      400  {object}  response.ErrorResponse    "Chưa thanh toán / tồn kho không đủ"
-// @Failure      401  {object}  response.ErrorResponse    "Thiếu token / token không hợp lệ"
-// @Failure      404  {object}  response.ErrorResponse    "Không tìm thấy đơn hàng"
-// @Router       /orders/{id}/serve [post]
-func (h *OrderHandler) ServeOrder(c *gin.Context) {
+// @Param        id    path      string  true  "ID đơn hàng"
+// @Param        body  body      domain.UpdateOrderCustomerRequest  true  "customer_id hoặc new_customer"
+// @Success      200   {object}  response.SuccessResponse  "Gán khách hàng thành công"
+// @Failure      400   {object}  response.ErrorResponse    "Dữ liệu không hợp lệ / đơn đã khóa"
+// @Failure      401   {object}  response.ErrorResponse    "Thiếu token / token không hợp lệ"
+// @Failure      404   {object}  response.ErrorResponse    "Không tìm thấy đơn/khách hàng"
+// @Router       /orders/{id}/customer [patch]
+func (h *OrderHandler) UpdateOrderCustomer(c *gin.Context) {
 	id := c.Param("id")
+	var req domain.UpdateOrderCustomerRequest
 
-	result, err := h.uc.ServeOrder(c.Request.Context(), id)
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, apperror.New(400, "Dữ liệu không hợp lệ", err))
+		c.Abort()
+		return
+	}
+
+	result, err := h.uc.UpdateOrderCustomer(c.Request.Context(), id, &req)
 	if err != nil {
 		response.Error(c, err)
 		c.Abort()
 		return
 	}
-	response.Success(c, 200, "Bắt đầu phục vụ đơn hàng thành công", result)
+	response.Success(c, 200, "Gán khách hàng thành công", result)
 }
 
 // CompleteOrder godoc
-// @Summary      Hoàn tất phục vụ đơn hàng
+// @Summary      Chốt đơn (trừ kho + sinh phiếu bán hàng)
 // @Tags         Orders
 // @Produce      json
 // @Security     BearerAuth
 // @Param        id   path      string  true  "ID đơn hàng"
-// @Success      200  {object}  response.SuccessResponse  "Hoàn tất đơn hàng thành công"
-// @Failure      400  {object}  response.ErrorResponse    "Trạng thái không cho hoàn tất"
+// @Success      200  {object}  response.SuccessResponse  "Chốt đơn thành công, đã sinh phiếu bán hàng"
+// @Failure      400  {object}  response.ErrorResponse    "Trạng thái không cho chốt / tồn kho không đủ"
 // @Failure      401  {object}  response.ErrorResponse    "Thiếu token / token không hợp lệ"
 // @Failure      404  {object}  response.ErrorResponse    "Không tìm thấy đơn hàng"
 // @Router       /orders/{id}/complete [post]
@@ -188,7 +198,7 @@ func (h *OrderHandler) CompleteOrder(c *gin.Context) {
 		c.Abort()
 		return
 	}
-	response.Success(c, 200, "Hoàn tất đơn hàng thành công", result)
+	response.Success(c, 200, "Chốt đơn hàng thành công", result)
 }
 
 // CreatePayment godoc
@@ -209,6 +219,8 @@ func (h *OrderHandler) CreatePayment(c *gin.Context) {
 
 	var req domain.CreatePaymentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Println("Error creating payment:", err)
+
 		response.Error(c, apperror.New(400, "Dữ liệu không hợp lệ", err))
 		c.Abort()
 		return
@@ -216,6 +228,7 @@ func (h *OrderHandler) CreatePayment(c *gin.Context) {
 
 	result, err := h.uc.CreatePayment(c.Request.Context(), id, &req)
 	if err != nil {
+		log.Println("Error creating payment:", err)
 		response.Error(c, err)
 		c.Abort()
 		return
@@ -223,7 +236,74 @@ func (h *OrderHandler) CreatePayment(c *gin.Context) {
 	response.Success(c, 200, "Ghi nhận thanh toán thành công", result)
 }
 
+// ReplaceStaffOrderItems godoc
+// @Summary      Gán lại NV thực hiện cho 1 dòng đơn (thay toàn bộ)
+// @Tags         Orders
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        itemId  path      string                          true  "ID dòng đơn hàng"
+// @Param        body    body      []domain.StaffOrderItemInput    true  "Danh sách NV (type: percent|fixed|profit, tổng share = 100, hoa hồng tự nhập ở UI)"
+// @Success      200     {object}  response.SuccessResponse        "Danh sách NV đã gán kèm hoa hồng đã chốt"
+// @Failure      400     {object}  response.ErrorResponse          "Thiếu id / type-share sai / trùng NV"
+// @Failure      401     {object}  response.ErrorResponse          "Thiếu token / token không hợp lệ"
+// @Failure      404     {object}  response.ErrorResponse          "Không tìm thấy dòng đơn / nhân viên"
+// @Router       /orders/items/{itemId}/staff [post]
+func (h *OrderHandler) ReplaceStaffOrderItems(c *gin.Context) {
+	itemID := c.Param("itemId")
 
+	var req []domain.StaffOrderItemInput
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, apperror.New(400, "Dữ liệu không hợp lệ", err))
+		c.Abort()
+		return
+	}
+	inputs := make([]*domain.StaffOrderItemInput, 0, len(req))
+	for i := range req {
+		inputs = append(inputs, &req[i])
+	}
+
+	result, err := h.uc.ReplaceStaffOrderItems(c.Request.Context(), itemID, inputs)
+	if err != nil {
+		response.Error(c, err)
+		c.Abort()
+		return
+	}
+	response.Success(c, 200, "Gán nhân viên cho dòng đơn thành công", result)
+}
+
+// ReplaceOrderMaterials godoc
+// @Summary      Gán lại vật tư tiêu hao cho nhiều đơn + chỉnh giữ chỗ kho theo delta
+// @Tags         Orders
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        body  body      []domain.OrderMaterialInput     true  "Danh sách vật tư theo order_item_id, server tự suy đơn (mảng rỗng = không làm gì)"
+// @Success      200   {object}  response.SuccessResponse        "Danh sách vật tư vừa lưu"
+// @Failure      400   {object}  response.ErrorResponse          "Thiếu order_id / vật tư không thuộc đơn / số lượng sai"
+// @Failure      401   {object}  response.ErrorResponse          "Thiếu token / token không hợp lệ"
+// @Failure      404   {object}  response.ErrorResponse          "Không tìm thấy đơn hàng / sản phẩm"
+// @Router       /orders/materials [post]
+func (h *OrderHandler) ReplaceOrderMaterials(c *gin.Context) {
+	var req []domain.OrderMaterialInput
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, apperror.New(400, "Dữ liệu không hợp lệ", err))
+		c.Abort()
+		return
+	}
+	inputs := make([]*domain.OrderMaterialInput, 0, len(req))
+	for i := range req {
+		inputs = append(inputs, &req[i])
+	}
+
+	result, err := h.uc.ReplaceOrderMaterials(c.Request.Context(), inputs)
+	if err != nil {
+		response.Error(c, err)
+		c.Abort()
+		return
+	}
+	response.Success(c, 200, "Lưu vật tư đơn hàng thành công", result)
+}
 
 // GetPosItemsByOrgID godoc
 // @Summary      Lấy danh sách sản phẩm/dịch vụ cho màn POS (tìm kiếm + lọc danh mục + phân trang cursor)

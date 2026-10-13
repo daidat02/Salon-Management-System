@@ -64,6 +64,7 @@ func (h *ServiceHandler) CreateService(c *gin.Context) {
 		materials[i] = &domain.ServiceMaterialInput{
 			ProductID: m.ProductID,
 			Quantity:  m.Quantity,
+			Unit:      m.Unit,
 		}
 	}
 	result, err := h.uc.CreateService(c.Request.Context(), service,materials)

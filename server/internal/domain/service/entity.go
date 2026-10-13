@@ -25,6 +25,8 @@ type ServiceMaterial struct {
     ServiceID      string     `json:"service_id"`
     ProductID      string     `json:"product_id"`
     Quantity       float64    `json:"quantity"`
+    // Unit đơn vị của Quantity (VD tuýp, can, ml).
+    Unit           string     `json:"unit"`
     CreatedAt      *time.Time `json:"created_at"`
     UpdatedAt      *time.Time `json:"updated_at"`
 

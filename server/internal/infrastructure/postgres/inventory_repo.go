@@ -106,6 +106,28 @@ func fetchProductSnapshots(ctx context.Context, tx pgx.Tx, orgID string, product
 	return products, nil
 }
 
+// productUnitsMap lấy đơn vị + hệ số quy đổi theo batch (phục vụ convert ở tầng repo).
+func (r *PostgresInventoryRepository) productUnitsMap(ctx context.Context, orgID string, productIDs []string) (map[string]prodomain.Product, error) {
+	rows, err := r.db.Query(ctx, productUnitsQuery, orgID, productIDs)
+	if err != nil {
+		return nil, fmt.Errorf("lỗi khi lấy đơn vị sản phẩm: %w", err)
+	}
+	defer rows.Close()
+	units := make(map[string]prodomain.Product, len(productIDs))
+	for rows.Next() {
+		var id string
+		var p prodomain.Product
+		if err := rows.Scan(&id, &p.Unit, &p.NetUnit, &p.NetAmount); err != nil {
+			return nil, fmt.Errorf("lỗi khi đọc đơn vị sản phẩm: %w", err)
+		}
+		units[id] = p
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("lỗi trong quá trình đọc đơn vị: %w", err)
+	}
+	return units, nil
+}
+
 // insertDocumentItemsCopy ghi chi tiết phiếu hàng loạt bằng CopyFrom.
 func insertDocumentItemsCopy(ctx context.Context, tx pgx.Tx, documentID string, items []*domain.DocumentItemInput, products map[string]prodomain.Product) error {
 	_, err := tx.CopyFrom(
@@ -116,13 +138,17 @@ func insertDocumentItemsCopy(ctx context.Context, tx pgx.Tx, documentID string, 
 			it := items[i]
 			p := products[it.ProductID]
 			lineTotal := it.Quantity * it.UnitPrice
+			unit := strings.TrimSpace(it.Unit)
+			if unit == "" {
+				unit = p.Unit
+			}
 			return []any{
 				utils.NewID(),
 				documentID,
 				p.ID,
 				p.Name,
 				p.SKU,
-				p.Unit,
+				unit,
 				p.NetUnit,
 				p.NetAmount,
 				it.Quantity,
@@ -166,6 +192,30 @@ func (r *PostgresInventoryRepository) BulkCreateDocumentItems(ctx context.Contex
 	productIDs, err := validateDocumentItems(items, domain.TypeImport)
 	if err != nil {
 		return err
+	}
+
+	// Quy từng dòng về đơn vị nhỏ nhất (giữ giá nhập user theo unit gửi, quy về base).
+	// Dùng chung core productdomain.ToBase với usecase (fetch trực tiếp ở đây vì
+	// hàm này chạy ở tầng repo, không qua usecase).
+	units, err := r.productUnitsMap(ctx, orgID, productIDs)
+	if err != nil {
+		return err
+	}
+	for _, it := range items {
+		pu, ok := units[it.ProductID]
+		if !ok {
+			return fmt.Errorf("không tìm thấy sản phẩm trong tổ chức: %s", it.ProductID)
+		}
+		baseQty, basePrice, convErr := prodomain.ToBase(pu.Unit, it.Unit, pu.NetUnit, pu.NetAmount, it.Quantity, it.UnitPrice)
+		if convErr != nil {
+			return convErr
+		}
+		it.Quantity, it.UnitPrice = baseQty, basePrice
+		if strings.TrimSpace(it.Unit) == "" {
+			it.Unit = pu.Unit
+		} else {
+			it.Unit = strings.TrimSpace(it.Unit)
+		}
 	}
 
 	dbTx, err := r.db.Begin(ctx)

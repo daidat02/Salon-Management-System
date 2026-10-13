@@ -9,15 +9,14 @@ export type CustomerLookup = (
 
 const statusMeta: Record<
   OrderStatus,
-  { label: string; variant: 'success' | 'warning' | 'purple' | 'teal' | 'blue' | 'gray' | 'slate' }
+  { label: string; variant: 'success' | 'warning' | 'purple' | 'teal' | 'gray' | 'error' }
 > = {
-  paid: { label: 'Đã thanh toán', variant: 'success' },
-  pending_payment: { label: 'Chưa thanh toán', variant: 'warning' },
-  draft: { label: 'Nháp', variant: 'slate' },
-  serving: { label: 'Đang phục vụ', variant: 'blue' },
-  completed: { label: 'Hoàn tất', variant: 'teal' },
+  pending: { label: 'Chờ xử lý', variant: 'warning' },
+  confirm: { label: 'Đã xác nhận', variant: 'teal' },
+  delivery: { label: 'Đang giao', variant: 'purple' },
+  completed: { label: 'Hoàn tất', variant: 'success' },
   cancelled: { label: 'Đã hủy', variant: 'gray' },
-  refunded: { label: 'Đã hoàn tiền', variant: 'purple' },
+  refunded: { label: 'Đã hoàn tiền', variant: 'error' },
 };
 
 function formatVND(value: number): string {

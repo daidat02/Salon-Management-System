@@ -15,7 +15,11 @@ type Dependencies struct {
 func NewDependencies(dbPool *pgxpool.Pool) *Dependencies {
 	orderRepo := repo.NewPostgresOrderRepository(dbPool)
 	serviceRepo := repo.NewPostgresServiceRepository(dbPool)
-	useCase := uc.NewOrderUsecase(orderRepo, serviceRepo)
+	productRepo := repo.NewPostgresProductRepository(dbPool)
+	customerRepo := repo.NewPostgresCustomerRepository(dbPool)
+	appointmentRepo := repo.NewPostgresAppointmentRepository(dbPool)
+	staffRepo := repo.NewPostgresStaffRepository(dbPool)
+	useCase := uc.NewOrderUsecase(orderRepo, serviceRepo, productRepo, serviceRepo, customerRepo, appointmentRepo, staffRepo)
 	handler := NewOrderHandler(useCase)
 
 	return &Dependencies{

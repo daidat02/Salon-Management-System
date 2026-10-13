@@ -7,6 +7,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import useProduct from '@/hooks/use-product';
 import { TableSkeleton } from '@/components/dashboard/DashboardSkeletons';
 import { getApiErrorMessage } from '@/services/apiClient';
+import type { Product } from '@/types/product';
+import { ProductDrawer } from './ProductDrawer';
 
 export default function ProductsTable() {
   const router = useRouter();
@@ -36,6 +38,9 @@ export default function ProductsTable() {
   );
   const total = data?.total || 0;
 
+  const [drawerOpen, setDrawerOpen] = React.useState(false);
+  const [selected, setSelected] = React.useState<Product | null>(null);
+
   const handlePageChange = (newPage: number) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set('page', newPage.toString());
@@ -56,17 +61,28 @@ export default function ProductsTable() {
   }
 
   return (
-    <DashTable
-      columns={productColumns}
-      data={products}
-      getRowId={(r) => r.id}
-      pagination={{
-        page,
-        pageSize: initialPageSize,
-        total: total,
-        itemLabel: 'sản phẩm',
-        onPageChange: handlePageChange,
-      }}
-    />
+    <>
+      <DashTable
+        columns={productColumns}
+        data={products}
+        getRowId={(r) => r.id}
+        onRowClick={(row) => {
+          setSelected(row);
+          setDrawerOpen(true);
+        }}
+        pagination={{
+          page,
+          pageSize: initialPageSize,
+          total: total,
+          itemLabel: 'sản phẩm',
+          onPageChange: handlePageChange,
+        }}
+      />
+      <ProductDrawer
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+        product={selected}
+      />
+    </>
   );
 }

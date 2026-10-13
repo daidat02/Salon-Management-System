@@ -62,7 +62,7 @@ export function DashSelect({
       </SelectTrigger>
       <SelectContent>
         {normalized.map(({ label, value }) => (
-          <SelectItem key={value} value={value} className="text-sm">
+          <SelectItem key={value} value={value} className="text-xs">
             {label}
           </SelectItem>
         ))}

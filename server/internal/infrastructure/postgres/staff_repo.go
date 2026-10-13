@@ -181,3 +181,28 @@ func (r *PostgresStaffRepository) DeleteStaff(ctx context.Context, orgID, id str
 
 	return nil
 }
+func (r *PostgresStaffRepository) StaffsExistInOrg(ctx context.Context, orgID string, staffIDs []string) ([]string, error) {
+	rows, err := r.db.Query(ctx, staffsExistInOrgQuery, orgID, staffIDs)
+	if err != nil {
+		return nil, fmt.Errorf("lỗi khi kiểm tra nhân viên: %w", err)
+	}
+	defer rows.Close()
+	found := map[string]struct{}{}
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("lỗi khi đọc nhân viên: %w", err)
+		}
+		found[id] = struct{}{}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("lỗi trong quá trình duyệt nhân viên: %w", err)
+	}
+	var missing []string
+	for _, id := range staffIDs {
+		if _, ok := found[id]; !ok {
+			missing = append(missing, id)
+		}
+	}
+	return missing, nil
+}

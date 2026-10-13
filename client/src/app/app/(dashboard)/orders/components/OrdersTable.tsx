@@ -8,10 +8,17 @@ import { getApiErrorMessage } from '@/services/apiClient';
 import useOrders from '@/hooks/use-order';
 import useCustomer from '@/hooks/use-customer';
 import { buildOrderColumns, type CustomerLookup } from './columns';
+import { TERMINAL_STATUSES } from './ActiveOrdersSection';
 
 const PAGE_SIZE = 10;
+const HISTORY_FETCH_SIZE = 50;
 
-export default function OrdersTable() {
+type OrdersTableProps = {
+  /** Khi true: mặc định chỉ hiện lịch sử (completed/cancelled/refunded). Backend chưa hỗ trợ lọc OR nhiều status nên fetch rộng rồi lọc client. */
+  historyOnly?: boolean;
+};
+
+export default function OrdersTable({ historyOnly = false }: OrdersTableProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const search = searchParams.get('search') || '';
@@ -20,9 +27,13 @@ export default function OrdersTable() {
 
   const page = pageFromUrl || 1;
 
+  // Chế độ lịch sử + chưa chọn status cụ thể: fetch rộng rồi lọc terminal ở client
+  // (tránh trùng với card active phía trên mà vẫn giữ phân trang đúng).
+  const useClientHistory = historyOnly && !status;
+
   const { data, isLoading, isError, error } = useOrders({
-    page,
-    pageSize: PAGE_SIZE,
+    page: useClientHistory ? 1 : page,
+    pageSize: useClientHistory ? HISTORY_FETCH_SIZE : PAGE_SIZE,
     status,
   });
 
@@ -44,13 +55,24 @@ export default function OrdersTable() {
   const serverRows = (data?.data || []).filter(
     (r): r is NonNullable<typeof r> => r !== null && r !== undefined,
   );
-  const serverTotal = data?.total || 0;
 
-  // Backend chưa hỗ trợ search đơn → lọc theo mã đơn trong trang hiện tại.
-  const query = search.trim().toLowerCase();
-  const displayed = query
-    ? serverRows.filter((row) => row.code.toLowerCase().includes(query))
+  // Lịch sử mặc định: loại đơn active (đã hiện ở card phía trên).
+  const historyRows = useClientHistory
+    ? serverRows.filter((row) => TERMINAL_STATUSES.includes(row.status))
     : serverRows;
+  const serverTotal = useClientHistory ? historyRows.length : data?.total || 0;
+
+  // Backend chưa hỗ trợ search đơn → lọc theo mã đơn trong dữ liệu đã fetch.
+  const query = search.trim().toLowerCase();
+  const searched = query
+    ? historyRows.filter((row) => row.code.toLowerCase().includes(query))
+    : historyRows;
+
+  // Chế độ lịch sử mặc định: phân trang ở client trên tập đã lọc.
+  const displayed = useClientHistory
+    ? searched.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+    : searched;
+  const total = query && !useClientHistory ? displayed.length : useClientHistory ? searched.length : serverTotal;
 
   const handlePageChange = (newPage: number) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -77,9 +99,9 @@ export default function OrdersTable() {
       data={displayed}
       getRowId={(r) => r.id}
       pagination={{
-        page: query ? 1 : page,
+        page: query && !useClientHistory ? 1 : page,
         pageSize: PAGE_SIZE,
-        total: query ? displayed.length : serverTotal,
+        total,
         itemLabel: 'đơn hàng',
         onPageChange: handlePageChange,
       }}

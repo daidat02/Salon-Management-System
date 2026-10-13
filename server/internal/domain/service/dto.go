@@ -5,6 +5,9 @@ import "time"
 type ServiceMaterialInput struct {
 	ProductID string  `json:"product_id" binding:"required,uuid"`
 	Quantity  float64 `json:"quantity" binding:"required,gt=0"` // Định lượng tiêu hao (vd: 0.75 tuýp, 150 gram)
+	// Unit đơn vị của Quantity (rỗng = đơn vị lớn của SP).
+	// Chỉ chấp nhận unit lớn hoặc net_unit của sản phẩm, server tự mặc định khi rỗng.
+	Unit *string `json:"unit"`
 }
 
 type CreateServiceRequest struct {

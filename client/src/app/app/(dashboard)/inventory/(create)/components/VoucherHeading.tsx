@@ -1,8 +1,7 @@
 'use client';
 
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, CheckCircle2, Save, X } from 'lucide-react';
+import { CheckCircle2, Save, X } from 'lucide-react';
 import PageHeading from '@/components/dashboard/PageHeading';
 import { VOUCHER_META, type VoucherType } from './voucherData';
 
@@ -18,14 +17,8 @@ export default function VoucherHeading({ type, onSaveDraft, onComplete }: Vouche
 
   return (
     <div className="space-y-3">
-      <Link
-        href="/app/inventory"
-        className="inline-flex items-center gap-1.5 rounded-md p-1.5 text-xs font-medium text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        <span>Quay lại kho hàng</span>
-      </Link>
       <PageHeading
+        backButton={{ label: 'Quay lại kho hàng', href: '/app/inventory' }}
         breadcrumbs={[
           { label: 'Trang chủ', href: '#' },
           { label: 'Quản lý kho', href: '#' },

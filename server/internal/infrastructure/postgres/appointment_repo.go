@@ -402,3 +402,11 @@ func (r *PostgresAppointmentRepository) DeleteAppointment(ctx context.Context, o
 	}
 	return nil
 }
+
+func (r *PostgresAppointmentRepository) AppointmentExistsInOrg(ctx context.Context, orgID, appointmentID string) (bool, error) {
+	var exists bool
+	if err := r.db.QueryRow(ctx, appointmentExistsInOrgQuery, orgID, appointmentID).Scan(&exists); err != nil {
+		return false, fmt.Errorf("lỗi khi kiểm tra lịch hẹn: %w", err)
+	}
+	return exists, nil
+}

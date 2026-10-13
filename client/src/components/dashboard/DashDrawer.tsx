@@ -25,26 +25,11 @@ export function DashDrawer({
   badge,
   children,
   footer,
-  widthClass = 'max-w-[680px] w-[680px]',
+  widthClass,
 }: DashDrawerProps) {
   // Map width sang class có !important để thắng Sheet mặc định w-3/4 + sm:max-w-sm
   // Thêm comment safelist để Tailwind JIT sinh ra các class này
   // w-[480px] max-w-[480px] !w-[480px] !max-w-[480px] sm:!max-w-[480px] data-[side=right]:!w-[480px] w-[680px] max-w-[680px] !w-[680px] !max-w-[680px] sm:!max-w-[680px] data-[side=right]:!w-[680px] w-[720px] max-w-[720px] !w-[720px] !max-w-[720px] sm:!max-w-[720px] data-[side=right]:!w-[720px] w-[800px] max-w-[800px] !w-[800px] !max-w-[800px] sm:!max-w-[800px] data-[side=right]:!w-[800px]
-  const widthMap: Record<string, string> = {
-    '480px':
-      '!w-[480px] !max-w-[480px] sm:!max-w-[480px] data-[side=right]:!w-[480px] data-[side=right]:!max-w-[480px]',
-    '680px':
-      '!w-[680px] !max-w-[680px] sm:!max-w-[680px] data-[side=right]:!w-[680px] data-[side=right]:!max-w-[680px]',
-    '720px':
-      '!w-[720px] !max-w-[720px] sm:!max-w-[720px] data-[side=right]:!w-[720px] data-[side=right]:!max-w-[720px]',
-    '800px':
-      '!w-[800px] !max-w-[800px] sm:!max-w-[800px] data-[side=right]:!w-[800px] data-[side=right]:!max-w-[800px]',
-    '900px':
-      '!w-[900px] !max-w-[900px] sm:!max-w-[900px] data-[side=right]:!w-[900px] data-[side=right]:!max-w-[900px]',
-  };
-  const match = widthClass.match(/(\d+)px/);
-  const widthPx = match ? `${match[1]}px` : '680px';
-  const widthClasses = widthMap[widthPx] ?? `!w-[${widthPx}] !max-w-[${widthPx}]`;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -53,7 +38,7 @@ export function DashDrawer({
         showCloseButton={false}
         className={cn(
           'p-0 gap-0 bg-surface border-l border-outline flex flex-col h-dvh max-h-dvh',
-          widthClasses,
+          widthClass,
         )}
       >
         {/* Header - code.html:732-748 */}

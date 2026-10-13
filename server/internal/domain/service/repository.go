@@ -19,4 +19,13 @@ type ServiceRepository interface {
 	ProductsExistInOrg(ctx context.Context, orgID string, productIDs []string) ([]string, error)
 	ServicesExistInOrg(ctx context.Context, orgID string, serviceIDs []string) ([]string, error)
 	GetServiceDetails(ctx context.Context, orgID, serviceID string) (*ServiceResponse,[]*ServiceMaterial, error)
+	// GetProductUnits lấy đơn vị lớn + net của sản phẩm (để validate/mặc định unit định mức).
+	GetProductUnits(ctx context.Context, orgID string, productIDs []string) (map[string]ProductUnit, error)
+}
+
+// ProductUnit đơn vị của 1 sản phẩm (mirror order.ProductUnit, tránh import chéo domain).
+type ProductUnit struct {
+	Unit      string
+	NetUnit   *string
+	NetAmount *float64
 }

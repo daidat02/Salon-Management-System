@@ -30,7 +30,7 @@ func NewRouter(cfg *config.Config, dbPool *pgxpool.Pool) *gin.Engine {
 	// Cấu hình CORS để cho phép các yêu cầu từ các nguồn được chỉ định
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     allowedOrigins,
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE","PATCH" },
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,

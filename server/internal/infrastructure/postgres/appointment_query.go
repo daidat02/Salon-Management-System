@@ -41,4 +41,7 @@ const (
 		WHERE organization_id = $1 AND appointment_id = $2
 		ORDER BY id
 	`
+	appointmentExistsInOrgQuery = `
+		SELECT EXISTS(SELECT 1 FROM appointments WHERE organization_id = $1 AND id = $2)
+	`
 )

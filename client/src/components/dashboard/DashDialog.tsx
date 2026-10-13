@@ -74,7 +74,7 @@ export function DashDialog({
         </div>
 
         {/* Body - code.html:931-994 */}
-        <div className="px-6 py-5 space-y-4 text-xs max-h-[70vh] overflow-y-auto custom-scroll">
+        <div className="px-6 py-0 space-y-4 text-xs max-h-[70vh] overflow-y-auto custom-scroll">
           {children}
         </div>
 

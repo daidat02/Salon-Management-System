@@ -68,6 +68,8 @@ CREATE TABLE customers (
     note TEXT,
     total_spent NUMERIC(14,2) NOT NULL DEFAULT 0 CHECK (total_spent >= 0),
     total_visits INTEGER NOT NULL DEFAULT 0 CHECK (total_visits >= 0),
+    reward_points INTEGER NOT NULL DEFAULT 0 CHECK (reward_points >= 0),
+    is_flagged_risk BOOLEAN NOT NULL DEFAULT false,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     deleted_at TIMESTAMPTZ,
@@ -189,6 +191,8 @@ CREATE TABLE service_materials (
     service_id UUID NOT NULL REFERENCES services(id) ON DELETE CASCADE,
     product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
     quantity NUMERIC(12,2) NOT NULL DEFAULT 1 CHECK (quantity > 0),
+    -- Đơn vị của quantity (VD tuýp/can khi recipe theo đơn vị lớn, ml/g khi theo đơn vị nhỏ nhất).
+    unit VARCHAR(20),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE (organization_id, service_id, product_id)
@@ -352,7 +356,7 @@ CREATE TABLE orders (
     subtotal_amount NUMERIC(14,2) NOT NULL DEFAULT 0 CHECK (subtotal_amount >= 0),
     discount_amount NUMERIC(14,2) NOT NULL DEFAULT 0 CHECK (discount_amount >= 0),
     total_amount NUMERIC(14,2) NOT NULL DEFAULT 0 CHECK (total_amount >= 0),
-    status VARCHAR(20) NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'pending_payment', 'paid', 'serving', 'completed', 'cancelled', 'refunded')),
+    status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'confirm', 'delivery', 'completed', 'cancelled', 'refunded')),
     created_by UUID REFERENCES users(id) ON DELETE SET NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -378,6 +382,7 @@ CREATE TABLE order_items (
     product_id UUID REFERENCES products(id) ON DELETE SET NULL,
     staff_id UUID REFERENCES staff(id) ON DELETE SET NULL,
     quantity NUMERIC(12,2) NOT NULL DEFAULT 1 CHECK (quantity > 0),
+    unit VARCHAR(20),
     unit_price NUMERIC(14,2) NOT NULL CHECK (unit_price >= 0),
     line_total NUMERIC(14,2) NOT NULL CHECK (line_total >= 0),
     CHECK (
@@ -393,7 +398,29 @@ CREATE TABLE order_item_materials (
     order_item_id UUID REFERENCES order_items(id),
     product_id UUID REFERENCES products(id),
     quantity NUMERIC(12, 2) NOT NULL,       -- Số lượng thực tế dùng (gram, ml)
-    unit_cost_at_time NUMERIC(12, 2) NOT NULL -- GIÁ VỐN TẠI THỜI ĐIỂM DÙNG (Cực kỳ quan trọng để tính chính xác lợi nhuận đơn đó)
+    unit_cost_at_time NUMERIC(12, 2) NOT NULL, -- GIÁ VỐN TẠI THỜI ĐIỂM DÙNG (Cực kỳ quan trọng để tính chính xác lợi nhuận đơn đó)
+    -- Đơn vị của quantity (đơn vị nhỏ nhất sau quy đổi ở luồng gán lại;
+    -- đơn vị định mức ở snapshot tự động từ dịch vụ).
+    unit VARCHAR(20)
+);
+
+-- ===========================================
+-- 14.2 ORDER_ITEM_STAFF (NV thực hiện từng món + chia hoa hồng)
+-- 1 món có thể nhiều NV. type = loại hoa hồng: percent (% doanh thu),
+-- fixed (số tiền cố định), profit (% lợi nhuận). Tổng share_pct của các
+-- dòng percent/profit trong 1 món = 100 (validate ở usecase).
+-- order_items.staff_id giữ lại để backward-compat.
+-- ===========================================
+CREATE TABLE order_item_staff (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    order_item_id UUID NOT NULL REFERENCES order_items(id) ON DELETE CASCADE,
+    staff_id UUID REFERENCES staff(id) ON DELETE SET NULL,
+    type VARCHAR(20) NOT NULL DEFAULT 'percent' CHECK (type IN ('percent', 'fixed', 'profit')),
+    share_pct NUMERIC(5,2) NOT NULL DEFAULT 0 CHECK (share_pct >= 0 AND share_pct <= 100),
+    commission_amount NUMERIC(14,2) NOT NULL DEFAULT 0 CHECK (commission_amount >= 0), -- tiền hoa hồng UI tự nhập, chốt tại lúc lưu
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (order_item_id, staff_id)
 );
 
 -- ==========================================
@@ -485,6 +512,9 @@ CREATE INDEX idx_orders_status ON orders(organization_id, status);
 CREATE INDEX idx_order_items_org_id ON order_items(organization_id);
 CREATE INDEX idx_order_items_order_id ON order_items(order_id);
 CREATE INDEX idx_order_items_staff ON order_items(staff_id);
+
+CREATE INDEX idx_order_item_staff_item ON order_item_staff(order_item_id);
+CREATE INDEX idx_order_item_staff_staff ON order_item_staff(organization_id, staff_id);
 
 CREATE INDEX idx_payments_org_id ON payments(organization_id);
 CREATE INDEX idx_payments_order_id ON payments(order_id);

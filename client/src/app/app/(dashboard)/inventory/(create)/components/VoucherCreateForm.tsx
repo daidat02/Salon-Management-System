@@ -169,10 +169,11 @@ export default function VoucherCreateForm({ initialType }: { initialType: Vouche
         reason: form.reason || null,
         items: lines.map((l) => ({
           product_id: l.productId,
-          // Gửi số lượng đã quy đổi ra đơn vị nhỏ nhất (khớp tồn kho backend),
-          // kèm đơn giá đã quy về 1 đơn vị nhỏ nhất để total = quantity × unit_price đúng
-          quantity: l.convertedQty,
-          unit_price: l.pricePerNet,
+          // Gửi số theo đơn vị hiển thị + unit, server tự quy về đơn vị
+          // nhỏ nhất và tự quyết giá (nhập: theo giá gửi; xuất: giá vốn).
+          quantity: l.qty,
+          unit: l.selectedUnit,
+          unit_price: l.price,
         })),
       },
       {

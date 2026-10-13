@@ -351,3 +351,49 @@ func TestProductUsecase_DeleteProduct(t *testing.T) {
 		})
 	}
 }
+
+func TestProductUsecase_GetProductStats(t *testing.T) {
+	stats := &domain.ProductStatsResponse{
+		TotalProducts: 40, OnSaleProducts: 38,
+		LowStockProducts: 2, RetailRevenueMonth: 1500000,
+	}
+
+	t.Run("Thành công - Thống kê sản phẩm", func(t *testing.T) {
+		mockRepo := new(MockProductRepository)
+		mockRepo.On("GetProductStats", mock.Anything, "org-123").
+			Return(stats, nil)
+
+		uc := NewProductUsecase(mockRepo)
+		res, err := uc.GetProductStats(withOrgCtx("org-123"))
+
+		assert.NoError(t, err)
+		assert.NotNil(t, res)
+		assert.Equal(t, int64(40), res.TotalProducts)
+		assert.Equal(t, int64(2), res.LowStockProducts)
+		assert.Equal(t, float64(1500000), res.RetailRevenueMonth)
+		mockRepo.AssertExpectations(t)
+	})
+
+	t.Run("Thất bại - Thiếu organization_id", func(t *testing.T) {
+		uc := NewProductUsecase(new(MockProductRepository))
+		res, err := uc.GetProductStats(context.Background())
+
+		assert.Error(t, err)
+		assert.Nil(t, res)
+		assertFlatAppError(t, err, 400)
+	})
+
+	t.Run("Thất bại - Lỗi DB", func(t *testing.T) {
+		mockRepo := new(MockProductRepository)
+		mockRepo.On("GetProductStats", mock.Anything, "org-123").
+			Return(nil, errors.New("db error"))
+
+		uc := NewProductUsecase(mockRepo)
+		res, err := uc.GetProductStats(withOrgCtx("org-123"))
+
+		assert.Error(t, err)
+		assert.Nil(t, res)
+		assertFlatAppError(t, err, 500)
+		mockRepo.AssertExpectations(t)
+	})
+}

@@ -9,14 +9,16 @@ import (
 	"github.com/daidat02/server/internal/delivery/http/middlewares"
 	appointmentDomain "github.com/daidat02/server/internal/domain/appointment"
 	domain "github.com/daidat02/server/internal/domain/customer"
+	orderDomain "github.com/daidat02/server/internal/domain/order"
 	"github.com/daidat02/server/pkg/apperror"
 	"github.com/daidat02/server/pkg/pagination"
 	"github.com/daidat02/server/pkg/utils"
 )
 
 type CustomerUsecase struct {
-	repo    domain.CustomerRepository
-	history HistoryStore
+	repo         domain.CustomerRepository
+	history      HistoryStore
+	orderHistory OrderHistoryStore
 }
 
 // HistoryStore lấy lịch sử lịch hẹn của khách.
@@ -26,18 +28,27 @@ type HistoryStore interface {
 	CountAppointmentsByCustomerID(ctx context.Context, orgID, customerID string) (int64, error)
 }
 
-func NewCustomerUsecase(repo domain.CustomerRepository, history HistoryStore) *CustomerUsecase {
+// OrderHistoryStore lấy lịch sử đơn hàng của khách.
+// PostgresOrderRepository thỏa mãn ngầm.
+type OrderHistoryStore interface {
+	ListHistoriesOrderByCustomerId(ctx context.Context, orgID, customerID string, limit, offset int) ([]*orderDomain.Order, error)
+	CountHistoriesOrderByCustomerId(ctx context.Context, orgID, customerID string) (int64, error)
+}
+
+func NewCustomerUsecase(repo domain.CustomerRepository, history HistoryStore, orderHistory OrderHistoryStore) *CustomerUsecase {
 	return &CustomerUsecase{
-		repo:    repo,
-		history: history,
+		repo:         repo,
+		history:      history,
+		orderHistory: orderHistory,
 	}
 }
 
-// CustomerDetail hồ sơ khách + lịch sử lịch hẹn (phân trang riêng).
-// Lịch sử mua hàng (orders) sẽ bổ sung khi có module Order.
+// CustomerDetail hồ sơ khách + chi tiêu 6 tháng + lịch sử lịch hẹn
+// + lịch sử đơn hàng (mỗi loại phân trang riêng).
 type CustomerDetail struct {
-	Customer     *domain.CustomerResponse                           `json:"customer"`
+	Customer     *domain.CustomerDetailsResponse                    `json:"customer"`
 	Appointments *pagination.Result[*appointmentDomain.Appointment] `json:"appointments"`
+	Orders       *pagination.Result[*orderDomain.Order]              `json:"orders"`
 }
 
 func toResponse(c *domain.Customer) *domain.CustomerResponse {
@@ -51,6 +62,8 @@ func toResponse(c *domain.Customer) *domain.CustomerResponse {
 		Note:           c.Note,
 		TotalSpent:     c.TotalSpent,
 		TotalVisits:    c.TotalVisits,
+		RewardPoints:   c.RewardPoints,
+		IsFlaggedRisk:  c.IsFlaggedRisk,
 		CreatedAt:      c.CreatedAt,
 		UpdatedAt:      c.UpdatedAt,
 		DeletedAt:      c.DeletedAt,
@@ -73,7 +86,7 @@ func (u *CustomerUsecase) CreateCustomer(ctx context.Context, customer *domain.C
 		log.Println("Error creating customer:", err)
 		return nil, apperror.New(500, "Lỗi khi tạo khách hàng", err)
 	}
-	
+
 	return toResponse(customer), nil
 }
 
@@ -92,7 +105,7 @@ func (u *CustomerUsecase) GetCustomersByOrgID(ctx context.Context, page, pageSiz
 	}
 
 	var result []*domain.CustomerResponse
-	for _,c :=range customers {
+	for _, c := range customers {
 		result = append(result, toResponse(c))
 	}
 
@@ -104,7 +117,7 @@ func (u *CustomerUsecase) GetCustomersByOrgID(ctx context.Context, page, pageSiz
 	return pagination.NewResult(result, params, total), nil
 }
 
-func (u *CustomerUsecase) GetCustomerDetail(ctx context.Context, id string, histPage, histPageSize int) (*CustomerDetail, error) {
+func (u *CustomerUsecase) GetCustomerDetail(ctx context.Context, id string, histPage, histPageSize, ordPage, ordPageSize int) (*CustomerDetail, error) {
 	if strings.TrimSpace(id) == "" {
 		return nil, apperror.New(400, "Thiếu id khách hàng", nil)
 	}
@@ -114,7 +127,7 @@ func (u *CustomerUsecase) GetCustomerDetail(ctx context.Context, id string, hist
 		return nil, apperror.New(400, "Không tìm thấy organization_id trong context", err)
 	}
 
-	customer, err := u.repo.GetCustomerByID(ctx, orgID, id)
+	customer, err := u.repo.GetCustomerDetailByID(ctx, orgID, id)
 	if err != nil {
 		if errors.Is(err, domain.ErrCustomerNotFound) {
 			return nil, apperror.New(404, "Không tìm thấy khách hàng", err)
@@ -134,10 +147,41 @@ func (u *CustomerUsecase) GetCustomerDetail(ctx context.Context, id string, hist
 		return nil, apperror.New(500, "Lỗi khi đếm lịch sử lịch hẹn", err)
 	}
 
+	ordParams := pagination.Normalize(ordPage, ordPageSize)
+
+	orders, err := u.orderHistory.ListHistoriesOrderByCustomerId(ctx, orgID, id, ordParams.PageSize, ordParams.Offset())
+	if err != nil {
+		return nil, apperror.New(500, "Lỗi khi lấy lịch sử đơn hàng", err)
+	}
+
+	ordTotal, err := u.orderHistory.CountHistoriesOrderByCustomerId(ctx, orgID, id)
+	if err != nil {
+		return nil, apperror.New(500, "Lỗi khi đếm lịch sử đơn hàng", err)
+	}
+
 	return &CustomerDetail{
-		Customer:     toResponse(customer),
+		Customer:     customer,
 		Appointments: pagination.NewResult(appointments, params, total),
+		Orders:       pagination.NewResult(orders, ordParams, ordTotal),
 	}, nil
+}
+
+func (u *CustomerUsecase) GetCustomerByPhoneNumber(ctx context.Context, phone string) (*domain.CustomerResponse, error) {
+	orgID, err := middlewares.GetOrgID(ctx)
+	if err != nil {
+		return nil, apperror.New(400, "Không tìm thấy organization_id trong context", err)
+	}
+
+	customer, err := u.repo.GetCustomerByPhone(ctx, orgID, phone)
+	if err != nil {
+		if errors.Is(err, domain.ErrCustomerNotFound) {
+			return nil, apperror.New(404, "Không tìm thấy khách hàng", err)
+		}
+		log.Println("Error getting customer by phone:", err)
+		return nil, apperror.New(500, "Lỗi khi lấy khách hàng", err)
+	}
+
+	return toResponse(customer), nil
 }
 
 func (u *CustomerUsecase) UpdateCustomer(ctx context.Context, id string, customer *domain.Customer) (*domain.CustomerResponse, error) {
@@ -188,3 +232,18 @@ func (u *CustomerUsecase) DeleteCustomer(ctx context.Context, id string) (string
 	return id, nil
 }
 
+// GetCustomerStats thống kê tổng quan tệp khách của salon.
+func (u *CustomerUsecase) GetCustomerStats(ctx context.Context) (*domain.CustomerStatsResponse, error) {
+	orgID, err := middlewares.GetOrgID(ctx)
+	if err != nil {
+		return nil, apperror.New(400, "Không tìm thấy organization_id trong context", err)
+	}
+
+	stats, err := u.repo.GetCustomerStats(ctx, orgID)
+	if err != nil {
+		log.Println("Error getting customer stats:", err)
+		return nil, apperror.New(500, "Lỗi khi lấy thống kê khách hàng", err)
+	}
+
+	return stats, nil
+}

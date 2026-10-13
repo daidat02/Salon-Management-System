@@ -58,19 +58,19 @@
                     "200": {
                         "description": "Danh sách lịch hẹn kèm phân trang",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                            "$ref": "#/definitions/response.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Bộ lọc không hợp lệ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     }
                 }
@@ -98,7 +98,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_internal_domain_appointment.AppointmentCreateRequest"
+                            "$ref": "#/definitions/appointment.AppointmentCreateRequest"
                         }
                     }
                 ],
@@ -106,31 +106,31 @@
                     "200": {
                         "description": "Tạo lịch hẹn thành công",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                            "$ref": "#/definitions/response.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Dữ liệu không hợp lệ / thiếu organization",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Service/product không thuộc tổ chức",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Lỗi server",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     }
                 }
@@ -163,25 +163,25 @@
                     "200": {
                         "description": "Chi tiết lịch hẹn",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                            "$ref": "#/definitions/response.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Thiếu id",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Không tìm thấy lịch hẹn",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     }
                 }
@@ -212,25 +212,25 @@
                     "200": {
                         "description": "Xóa lịch hẹn thành công",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                            "$ref": "#/definitions/response.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Trạng thái không cho xóa (hãy hủy lịch)",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Không tìm thấy lịch hẹn",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     }
                 }
@@ -267,7 +267,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_internal_domain_appointment.CancelRequest"
+                            "$ref": "#/definitions/appointment.CancelRequest"
                         }
                     }
                 ],
@@ -275,25 +275,25 @@
                     "200": {
                         "description": "Hủy lịch thành công",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                            "$ref": "#/definitions/response.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Trạng thái không cho hủy",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Không tìm thấy lịch hẹn",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     }
                 }
@@ -330,7 +330,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_internal_domain_appointment.RescheduleRequest"
+                            "$ref": "#/definitions/appointment.RescheduleRequest"
                         }
                     }
                 ],
@@ -338,25 +338,25 @@
                     "200": {
                         "description": "Đổi lịch thành công",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                            "$ref": "#/definitions/response.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Giờ invalid / trạng thái không cho đổi",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Không tìm thấy lịch hẹn",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     }
                 }
@@ -393,7 +393,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_internal_domain_appointment.UpdateStatusRequest"
+                            "$ref": "#/definitions/appointment.UpdateStatusRequest"
                         }
                     }
                 ],
@@ -401,25 +401,25 @@
                     "200": {
                         "description": "Cập nhật trạng thái thành công",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                            "$ref": "#/definitions/response.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Chuyển đổi không hợp lệ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Không tìm thấy lịch hẹn",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     }
                 }
@@ -457,19 +457,19 @@
                     "200": {
                         "description": "Danh sách danh mục kèm phân trang",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                            "$ref": "#/definitions/response.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Thiếu organization",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     }
                 }
@@ -497,7 +497,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_internal_domain_category.CreateCategoryRequest"
+                            "$ref": "#/definitions/category.CreateCategoryRequest"
                         }
                     }
                 ],
@@ -505,25 +505,25 @@
                     "200": {
                         "description": "Tạo danh mục thành công",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                            "$ref": "#/definitions/response.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Dữ liệu không hợp lệ / thiếu organization",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Lỗi server (vd trùng tên trong org)",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     }
                 }
@@ -560,7 +560,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_internal_domain_category.UpdateCategoryRequest"
+                            "$ref": "#/definitions/category.UpdateCategoryRequest"
                         }
                     }
                 ],
@@ -568,25 +568,25 @@
                     "200": {
                         "description": "Cập nhật danh mục thành công",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                            "$ref": "#/definitions/response.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Thiếu id / dữ liệu không hợp lệ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Không tìm thấy danh mục",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     }
                 }
@@ -617,25 +617,25 @@
                     "200": {
                         "description": "Xóa danh mục thành công",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                            "$ref": "#/definitions/response.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Thiếu id",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Không tìm thấy danh mục",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     }
                 }
@@ -679,19 +679,19 @@
                     "200": {
                         "description": "Danh sách khách hàng kèm phân trang",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                            "$ref": "#/definitions/response.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Thiếu organization",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     }
                 }
@@ -719,7 +719,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_internal_domain_customer.CreateCustomerRequest"
+                            "$ref": "#/definitions/customer.CreateCustomerRequest"
                         }
                     }
                 ],
@@ -727,25 +727,112 @@
                     "200": {
                         "description": "Tạo khách hàng thành công",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                            "$ref": "#/definitions/response.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Dữ liệu không hợp lệ / thiếu organization",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Lỗi server (vd trùng số điện thoại)",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/customers/phone": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Customers"
+                ],
+                "summary": "Tra cứu khách hàng theo số điện thoại",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Số điện thoại cần tra cứu",
+                        "name": "phone",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Thông tin khách hàng",
+                        "schema": {
+                            "$ref": "#/definitions/response.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Thiếu số điện thoại / thiếu organization",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Thiếu token / token không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Không tìm thấy khách hàng",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/customers/stats": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Customers"
+                ],
+                "summary": "Thống kê tổng quan tệp khách (tổng, mới tháng này/trước, điểm tồn)",
+                "responses": {
+                    "200": {
+                        "description": "Thống kê khách hàng",
+                        "schema": {
+                            "$ref": "#/definitions/response.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Thiếu organization",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Thiếu token / token không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     }
                 }
@@ -764,7 +851,7 @@
                 "tags": [
                     "Customers"
                 ],
-                "summary": "Chi tiết khách hàng kèm lịch sử lịch hẹn",
+                "summary": "Chi tiết khách hàng kèm lịch sử lịch hẹn + đơn hàng",
                 "parameters": [
                     {
                         "type": "string",
@@ -775,40 +862,52 @@
                     },
                     {
                         "type": "integer",
-                        "description": "Trang lịch sử (mặc định 1)",
+                        "description": "Trang lịch sử hẹn (mặc định 1)",
                         "name": "hist_page",
                         "in": "query"
                     },
                     {
                         "type": "integer",
-                        "description": "Số dòng lịch sử/trang (mặc định 10, tối đa 100)",
+                        "description": "Số dòng lịch hẹn/trang (mặc định 10, tối đa 100)",
                         "name": "hist_page_size",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Trang lịch sử đơn (mặc định 1)",
+                        "name": "ord_page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Số dòng đơn/trang (mặc định 10, tối đa 100)",
+                        "name": "ord_page_size",
                         "in": "query"
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Hồ sơ + lịch sử lịch hẹn",
+                        "description": "Hồ sơ + lịch sử hẹn + đơn",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                            "$ref": "#/definitions/response.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Thiếu id",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Không tìm thấy khách hàng",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     }
                 }
@@ -843,7 +942,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_internal_domain_customer.UpdateCustomerRequest"
+                            "$ref": "#/definitions/customer.UpdateCustomerRequest"
                         }
                     }
                 ],
@@ -851,25 +950,25 @@
                     "200": {
                         "description": "Cập nhật khách hàng thành công",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                            "$ref": "#/definitions/response.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Thiếu id / dữ liệu không hợp lệ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Không tìm thấy khách hàng",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     }
                 }
@@ -900,25 +999,25 @@
                     "200": {
                         "description": "Xóa khách hàng thành công",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                            "$ref": "#/definitions/response.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Thiếu id",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Không tìm thấy khách hàng",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     }
                 }
@@ -987,19 +1086,19 @@
                     "200": {
                         "description": "Danh sách phiếu kho kèm phân trang",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                            "$ref": "#/definitions/response.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Thiếu organization",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     }
                 }
@@ -1024,12 +1123,12 @@
                 "summary": "Tạo phiếu kho (header + chi tiết + ghi sổ tồn)",
                 "parameters": [
                     {
-                        "description": "Thông tin phiếu kho kèm danh sách sản phẩm",
+                        "description": "Phiếu kho: mỗi dòng gửi quantity theo unit hiển thị, server tự quy về đơn vị nhỏ nhất + tự quyết giá",
                         "name": "body",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_internal_domain_inventory.CreateDocumentRequest"
+                            "$ref": "#/definitions/inventory.CreateDocumentRequest"
                         }
                     }
                 ],
@@ -1037,19 +1136,19 @@
                     "200": {
                         "description": "Tạo phiếu kho thành công",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                            "$ref": "#/definitions/response.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Dữ liệu không hợp lệ / tồn không đủ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     }
                 }
@@ -1087,19 +1186,19 @@
                     "200": {
                         "description": "Danh sách tồn thấp kèm phân trang",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                            "$ref": "#/definitions/response.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Thiếu organization",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     }
                 }
@@ -1143,19 +1242,19 @@
                     "200": {
                         "description": "Lịch sử kho kèm phân trang",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                            "$ref": "#/definitions/response.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Thiếu organization",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     }
                 }
@@ -1229,19 +1328,19 @@
                     "200": {
                         "description": "Lịch sử kho theo sản phẩm kèm phân trang",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                            "$ref": "#/definitions/response.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Thiếu organization",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     }
                 }
@@ -1274,25 +1373,25 @@
                     "200": {
                         "description": "Chi tiết phiếu kho",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                            "$ref": "#/definitions/response.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Thiếu organization",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Phiếu kho không tồn tại",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     }
                 }
@@ -1317,7 +1416,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_internal_domain_user.LoginRequest"
+                            "$ref": "#/definitions/user.LoginRequest"
                         }
                     }
                 ],
@@ -1325,25 +1424,25 @@
                     "200": {
                         "description": "Đăng nhập thành công (kèm access_token)",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                            "$ref": "#/definitions/response.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Dữ liệu không hợp lệ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Mật khẩu không đúng",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Số điện thoại không tồn tại",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     }
                 }
@@ -1387,19 +1486,19 @@
                     "200": {
                         "description": "Danh sách đơn hàng kèm phân trang",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                            "$ref": "#/definitions/response.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Thiếu organization",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     }
                 }
@@ -1427,7 +1526,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_internal_domain_order.CreateOrderRequest"
+                            "$ref": "#/definitions/order.CreateOrderRequest"
                         }
                     }
                 ],
@@ -1435,25 +1534,150 @@
                     "200": {
                         "description": "Tạo đơn hàng thành công",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                            "$ref": "#/definitions/response.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Dữ liệu không hợp lệ / tồn không đủ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Không tìm thấy khách/dịch vụ/sản phẩm",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/orders/items/{itemId}/staff": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Orders"
+                ],
+                "summary": "Gán lại NV thực hiện cho 1 dòng đơn (thay toàn bộ)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID dòng đơn hàng",
+                        "name": "itemId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Danh sách NV (type: percent|fixed|profit, tổng share = 100, hoa hồng tự nhập ở UI)",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/order.StaffOrderItemInput"
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Danh sách NV đã gán kèm hoa hồng đã chốt",
+                        "schema": {
+                            "$ref": "#/definitions/response.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Thiếu id / type-share sai / trùng NV",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Thiếu token / token không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Không tìm thấy dòng đơn / nhân viên",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/orders/materials": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Orders"
+                ],
+                "summary": "Gán lại vật tư tiêu hao cho nhiều đơn + chỉnh giữ chỗ kho theo delta",
+                "parameters": [
+                    {
+                        "description": "Danh sách vật tư theo order_item_id, server tự suy đơn (mảng rỗng = không làm gì)",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/order.OrderMaterialInput"
+                            }
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Danh sách vật tư vừa lưu",
+                        "schema": {
+                            "$ref": "#/definitions/response.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Thiếu order_id / vật tư không thuộc đơn / số lượng sai",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Thiếu token / token không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Không tìm thấy đơn hàng / sản phẩm",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     }
                 }
@@ -1515,19 +1739,19 @@
                     "200": {
                         "description": "Danh sách sản phẩm/dịch vụ POS",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                            "$ref": "#/definitions/response.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Thiếu organization",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     }
                 }
@@ -1560,25 +1784,25 @@
                     "200": {
                         "description": "Chi tiết đơn hàng",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                            "$ref": "#/definitions/response.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Thiếu id",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Không tìm thấy đơn hàng",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     }
                 }
@@ -1611,25 +1835,25 @@
                     "200": {
                         "description": "Hủy đơn thành công",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                            "$ref": "#/definitions/response.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Trạng thái không cho hủy",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Không tìm thấy đơn hàng",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     }
                 }
@@ -1662,25 +1886,88 @@
                     "200": {
                         "description": "Hoàn tất đơn hàng thành công",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                            "$ref": "#/definitions/response.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Trạng thái không cho hoàn tất",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Không tìm thấy đơn hàng",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/orders/{id}/customer": {
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Orders"
+                ],
+                "summary": "Gán/đổi khách hàng cho đơn chưa khóa",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID đơn hàng",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "customer_id hoặc new_customer",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/order.UpdateOrderCustomerRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Gán khách hàng thành công",
+                        "schema": {
+                            "$ref": "#/definitions/response.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Dữ liệu không hợp lệ / đơn đã khóa",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Thiếu token / token không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Không tìm thấy đơn/khách hàng",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     }
                 }
@@ -1717,7 +2004,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_internal_domain_order.CreatePaymentRequest"
+                            "$ref": "#/definitions/order.CreatePaymentRequest"
                         }
                     }
                 ],
@@ -1725,25 +2012,25 @@
                     "200": {
                         "description": "Ghi nhận thanh toán thành công",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                            "$ref": "#/definitions/response.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Dữ liệu không hợp lệ / đơn đã hủy",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Không tìm thấy đơn hàng",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     }
                 }
@@ -1776,25 +2063,25 @@
                     "200": {
                         "description": "Hoàn đơn thành công",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                            "$ref": "#/definitions/response.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Trạng thái không cho hoàn",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Không tìm thấy đơn hàng",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     }
                 }
@@ -1827,25 +2114,25 @@
                     "200": {
                         "description": "Bắt đầu phục vụ, đã sinh phiếu xuất",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                            "$ref": "#/definitions/response.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Chưa thanh toán / tồn kho không đủ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Không tìm thấy đơn hàng",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     }
                 }
@@ -1912,25 +2199,25 @@
                     "200": {
                         "description": "Danh sách sản phẩm kèm phân trang {data, page, page_size, total, total_pages}",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                            "$ref": "#/definitions/response.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Thiếu organization",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Lỗi server",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     }
                 }
@@ -1958,7 +2245,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_internal_domain_product.CreateProductRequest"
+                            "$ref": "#/definitions/product.CreateProductRequest"
                         }
                     }
                 ],
@@ -1966,25 +2253,25 @@
                     "200": {
                         "description": "Tạo sản phẩm thành công",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                            "$ref": "#/definitions/response.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Dữ liệu không hợp lệ / thiếu organization",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Lỗi server (vd trùng SKU)",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     }
                 }
@@ -2021,7 +2308,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_internal_domain_product.UpdateProductRequest"
+                            "$ref": "#/definitions/product.UpdateProductRequest"
                         }
                     }
                 ],
@@ -2029,25 +2316,25 @@
                     "200": {
                         "description": "Cập nhật sản phẩm thành công",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                            "$ref": "#/definitions/response.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Thiếu id / dữ liệu không hợp lệ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Không tìm thấy sản phẩm",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     }
                 }
@@ -2078,25 +2365,25 @@
                     "200": {
                         "description": "Xóa sản phẩm thành công",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                            "$ref": "#/definitions/response.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Thiếu id",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Không tìm thấy sản phẩm",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     }
                 }
@@ -2121,7 +2408,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_internal_domain_user.CreateUserRequest"
+                            "$ref": "#/definitions/user.CreateUserRequest"
                         }
                     }
                 ],
@@ -2129,19 +2416,19 @@
                     "200": {
                         "description": "Tạo người dùng thành công",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                            "$ref": "#/definitions/response.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Dữ liệu không hợp lệ / Số điện thoại đã tồn tại",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Lỗi server",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     }
                 }
@@ -2208,25 +2495,25 @@
                     "200": {
                         "description": "Danh sách dịch vụ kèm phân trang {data, page, page_size, total, total_pages}",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                            "$ref": "#/definitions/response.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Thiếu organization",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Lỗi server",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     }
                 }
@@ -2254,7 +2541,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_internal_domain_service.CreateServiceRequest"
+                            "$ref": "#/definitions/service.CreateServiceRequest"
                         }
                     }
                 ],
@@ -2262,25 +2549,25 @@
                     "200": {
                         "description": "Tạo dịch vụ thành công",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                            "$ref": "#/definitions/response.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Dữ liệu không hợp lệ / thiếu organization",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Lỗi server",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     }
                 }
@@ -2317,7 +2604,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_internal_domain_service.UpdateServiceRequest"
+                            "$ref": "#/definitions/service.UpdateServiceRequest"
                         }
                     }
                 ],
@@ -2325,25 +2612,25 @@
                     "200": {
                         "description": "Cập nhật dịch vụ thành công",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                            "$ref": "#/definitions/response.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Thiếu id / dữ liệu không hợp lệ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Không tìm thấy dịch vụ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     }
                 }
@@ -2374,25 +2661,25 @@
                     "200": {
                         "description": "Xóa dịch vụ thành công",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                            "$ref": "#/definitions/response.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Thiếu id",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Không tìm thấy dịch vụ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     }
                 }
@@ -2425,25 +2712,25 @@
                     "200": {
                         "description": "Chi tiết dịch vụ và danh sách nguyên vật liệu",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                            "$ref": "#/definitions/response.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Thiếu id",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Không tìm thấy dịch vụ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     }
                 }
@@ -2510,25 +2797,25 @@
                     "200": {
                         "description": "Danh sách nhân viên kèm phân trang {data, page, page_size, total, total_pages}",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                            "$ref": "#/definitions/response.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Thiếu organization",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Lỗi server",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     }
                 }
@@ -2556,7 +2843,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_internal_domain_staff.CreateStaffRequest"
+                            "$ref": "#/definitions/staff.CreateStaffRequest"
                         }
                     }
                 ],
@@ -2564,25 +2851,25 @@
                     "200": {
                         "description": "Tạo nhân viên thành công",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                            "$ref": "#/definitions/response.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Dữ liệu không hợp lệ / thiếu organization",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Lỗi server",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     }
                 }
@@ -2619,7 +2906,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_internal_domain_staff.UpdateStaffRequest"
+                            "$ref": "#/definitions/staff.UpdateStaffRequest"
                         }
                     }
                 ],
@@ -2627,25 +2914,25 @@
                     "200": {
                         "description": "Cập nhật nhân viên thành công",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                            "$ref": "#/definitions/response.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Thiếu id / dữ liệu không hợp lệ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Không tìm thấy nhân viên",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     }
                 }
@@ -2676,25 +2963,25 @@
                     "200": {
                         "description": "Xóa nhân viên thành công",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                            "$ref": "#/definitions/response.SuccessResponse"
                         }
                     },
                     "400": {
                         "description": "Thiếu id",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Không tìm thấy nhân viên",
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                            "$ref": "#/definitions/response.ErrorResponse"
                         }
                     }
                 }
@@ -2702,7 +2989,7 @@
         }
     },
     "definitions": {
-        "github_com_daidat02_server_internal_domain_appointment.ApoimentItemInput": {
+        "appointment.ApoimentItemInput": {
             "type": "object",
             "required": [
                 "item_type"
@@ -2729,7 +3016,7 @@
                 }
             }
         },
-        "github_com_daidat02_server_internal_domain_appointment.AppointmentCreateRequest": {
+        "appointment.AppointmentCreateRequest": {
             "type": "object",
             "properties": {
                 "client_ip": {
@@ -2756,7 +3043,7 @@
                 "items": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_daidat02_server_internal_domain_appointment.ApoimentItemInput"
+                        "$ref": "#/definitions/appointment.ApoimentItemInput"
                     }
                 },
                 "note": {
@@ -2782,7 +3069,7 @@
                 }
             }
         },
-        "github_com_daidat02_server_internal_domain_appointment.CancelRequest": {
+        "appointment.CancelRequest": {
             "type": "object",
             "properties": {
                 "reason": {
@@ -2790,7 +3077,7 @@
                 }
             }
         },
-        "github_com_daidat02_server_internal_domain_appointment.RescheduleRequest": {
+        "appointment.RescheduleRequest": {
             "type": "object",
             "properties": {
                 "end_time": {
@@ -2801,7 +3088,7 @@
                 }
             }
         },
-        "github_com_daidat02_server_internal_domain_appointment.UpdateStatusRequest": {
+        "appointment.UpdateStatusRequest": {
             "type": "object",
             "properties": {
                 "status": {
@@ -2809,7 +3096,7 @@
                 }
             }
         },
-        "github_com_daidat02_server_internal_domain_category.CreateCategoryRequest": {
+        "category.CreateCategoryRequest": {
             "type": "object",
             "properties": {
                 "description": {
@@ -2826,7 +3113,7 @@
                 }
             }
         },
-        "github_com_daidat02_server_internal_domain_category.UpdateCategoryRequest": {
+        "category.UpdateCategoryRequest": {
             "type": "object",
             "properties": {
                 "description": {
@@ -2843,7 +3130,7 @@
                 }
             }
         },
-        "github_com_daidat02_server_internal_domain_customer.CreateCustomerRequest": {
+        "customer.CreateCustomerRequest": {
             "type": "object",
             "properties": {
                 "birth_date": {
@@ -2863,7 +3150,7 @@
                 }
             }
         },
-        "github_com_daidat02_server_internal_domain_customer.UpdateCustomerRequest": {
+        "customer.UpdateCustomerRequest": {
             "type": "object",
             "properties": {
                 "birth_date": {
@@ -2883,7 +3170,7 @@
                 }
             }
         },
-        "github_com_daidat02_server_internal_domain_inventory.CreateDocumentRequest": {
+        "inventory.CreateDocumentRequest": {
             "type": "object",
             "properties": {
                 "created_by": {
@@ -2895,7 +3182,7 @@
                 "items": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_daidat02_server_internal_domain_inventory.DocumentItemInput"
+                        "$ref": "#/definitions/inventory.DocumentItemInput"
                     }
                 },
                 "note": {
@@ -2915,7 +3202,7 @@
                 }
             }
         },
-        "github_com_daidat02_server_internal_domain_inventory.DocumentItemInput": {
+        "inventory.DocumentItemInput": {
             "type": "object",
             "properties": {
                 "product_id": {
@@ -2932,7 +3219,7 @@
                 }
             }
         },
-        "github_com_daidat02_server_internal_domain_order.CreateOrderRequest": {
+        "order.CreateOrderRequest": {
             "type": "object",
             "properties": {
                 "appointment_id": {
@@ -2947,12 +3234,20 @@
                 "items": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_daidat02_server_internal_domain_order.OrderItemInput"
+                        "$ref": "#/definitions/order.OrderItemInput"
                     }
+                },
+                "new_customer": {
+                    "description": "Khách mới ghi tại POS: server tự tìm theo SĐT (dùng luôn nếu có),\nchưa có thì tạo mới rồi gán vào đơn.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/order.NewCustomerInput"
+                        }
+                    ]
                 }
             }
         },
-        "github_com_daidat02_server_internal_domain_order.CreatePaymentRequest": {
+        "order.CreatePaymentRequest": {
             "type": "object",
             "properties": {
                 "amount": {
@@ -2969,7 +3264,7 @@
                 }
             }
         },
-        "github_com_daidat02_server_internal_domain_order.ItemMaterialInput": {
+        "order.ItemMaterialInput": {
             "type": "object",
             "properties": {
                 "id": {
@@ -2989,7 +3284,18 @@
                 }
             }
         },
-        "github_com_daidat02_server_internal_domain_order.OrderItemInput": {
+        "order.NewCustomerInput": {
+            "type": "object",
+            "properties": {
+                "full_name": {
+                    "type": "string"
+                },
+                "phone": {
+                    "type": "string"
+                }
+            }
+        },
+        "order.OrderItemInput": {
             "type": "object",
             "properties": {
                 "item_type": {
@@ -2998,7 +3304,7 @@
                 "materials": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_daidat02_server_internal_domain_order.ItemMaterialInput"
+                        "$ref": "#/definitions/order.ItemMaterialInput"
                     }
                 },
                 "product_id": {
@@ -3012,10 +3318,60 @@
                 },
                 "staff_id": {
                     "type": "string"
+                },
+                "unit": {
+                    "description": "Unit đơn vị của Quantity (rỗng = đơn vị lớn của SP).\nServer tự quy về đơn vị nhỏ nhất để lưu kho + tính tiền.",
+                    "type": "string"
                 }
             }
         },
-        "github_com_daidat02_server_internal_domain_product.CreateProductRequest": {
+        "order.OrderMaterialInput": {
+            "type": "object",
+            "properties": {
+                "order_item_id": {
+                    "type": "string"
+                },
+                "product_id": {
+                    "type": "string"
+                },
+                "quantity": {
+                    "type": "number"
+                },
+                "unit": {
+                    "description": "Unit đơn vị của Quantity (rỗng = đơn vị lớn của SP).",
+                    "type": "string"
+                }
+            }
+        },
+        "order.StaffOrderItemInput": {
+            "type": "object",
+            "properties": {
+                "commission_amount": {
+                    "type": "number"
+                },
+                "share_pct": {
+                    "type": "number"
+                },
+                "staff_id": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "order.UpdateOrderCustomerRequest": {
+            "type": "object",
+            "properties": {
+                "customer_id": {
+                    "type": "string"
+                },
+                "new_customer": {
+                    "$ref": "#/definitions/order.NewCustomerInput"
+                }
+            }
+        },
+        "product.CreateProductRequest": {
             "type": "object",
             "properties": {
                 "category_id": {
@@ -3059,7 +3415,7 @@
                 }
             }
         },
-        "github_com_daidat02_server_internal_domain_product.UpdateProductRequest": {
+        "product.UpdateProductRequest": {
             "type": "object",
             "properties": {
                 "category_id": {
@@ -3103,7 +3459,36 @@
                 }
             }
         },
-        "github_com_daidat02_server_internal_domain_service.CreateServiceRequest": {
+        "response.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "error": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.SuccessResponse": {
+            "type": "object",
+            "properties": {
+                "access_token": {
+                    "type": "string"
+                },
+                "code": {
+                    "type": "integer"
+                },
+                "data": {},
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "service.CreateServiceRequest": {
             "type": "object",
             "properties": {
                 "buffer_minutes": {
@@ -3124,7 +3509,7 @@
                 "materials": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/github_com_daidat02_server_internal_domain_service.ServiceMaterialInput"
+                        "$ref": "#/definitions/service.ServiceMaterialInput"
                     }
                 },
                 "name": {
@@ -3135,7 +3520,7 @@
                 }
             }
         },
-        "github_com_daidat02_server_internal_domain_service.ServiceMaterialInput": {
+        "service.ServiceMaterialInput": {
             "type": "object",
             "required": [
                 "product_id",
@@ -3148,10 +3533,14 @@
                 "quantity": {
                     "description": "Định lượng tiêu hao (vd: 0.75 tuýp, 150 gram)",
                     "type": "number"
+                },
+                "unit": {
+                    "description": "Unit đơn vị của Quantity (rỗng = đơn vị lớn của SP).\nChỉ chấp nhận unit lớn hoặc net_unit của sản phẩm, server tự mặc định khi rỗng.",
+                    "type": "string"
                 }
             }
         },
-        "github_com_daidat02_server_internal_domain_service.UpdateServiceRequest": {
+        "service.UpdateServiceRequest": {
             "type": "object",
             "properties": {
                 "buffer_minutes": {
@@ -3177,7 +3566,7 @@
                 }
             }
         },
-        "github_com_daidat02_server_internal_domain_staff.CreateStaffRequest": {
+        "staff.CreateStaffRequest": {
             "type": "object",
             "properties": {
                 "code": {
@@ -3209,7 +3598,7 @@
                 }
             }
         },
-        "github_com_daidat02_server_internal_domain_staff.UpdateStaffRequest": {
+        "staff.UpdateStaffRequest": {
             "type": "object",
             "properties": {
                 "code": {
@@ -3235,7 +3624,7 @@
                 }
             }
         },
-        "github_com_daidat02_server_internal_domain_user.CreateUserRequest": {
+        "user.CreateUserRequest": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -3270,42 +3659,13 @@
                 }
             }
         },
-        "github_com_daidat02_server_internal_domain_user.LoginRequest": {
+        "user.LoginRequest": {
             "type": "object",
             "properties": {
                 "password": {
                     "type": "string"
                 },
                 "phone": {
-                    "type": "string"
-                }
-            }
-        },
-        "github_com_daidat02_server_pkg_response.ErrorResponse": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "integer"
-                },
-                "error": {
-                    "type": "string"
-                },
-                "message": {
-                    "type": "string"
-                }
-            }
-        },
-        "github_com_daidat02_server_pkg_response.SuccessResponse": {
-            "type": "object",
-            "properties": {
-                "access_token": {
-                    "type": "string"
-                },
-                "code": {
-                    "type": "integer"
-                },
-                "data": {},
-                "message": {
                     "type": "string"
                 }
             }

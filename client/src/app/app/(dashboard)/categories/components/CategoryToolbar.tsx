@@ -1,11 +1,17 @@
 'use client';
 
-import { DashInput } from '@/components/dashboard/DashInput';
-import { DashSelect } from '@/components/dashboard/DashSelect';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import DashTabs from '@/components/dashboard/DashTabs';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import useCategory from '@/hooks/use-category';
-import { cn } from 'cn';
-import { RefreshCw, Search, ShoppingBag, Sparkles } from 'lucide-react';
+import { Search, ShoppingBag, Sparkles } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import React, { useEffect } from 'react';
 
@@ -59,65 +65,61 @@ const CategoryToolbar = () => {
   };
 
   return (
-    <section className="bg-surface rounded-xl border border-outline p-4 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
-      <div className="flex items-center p-1 bg-surface-container rounded-lg border border-outline/70 w-fit">
-        <button
-          onClick={() => handleTabChange('service')}
-          className={cn(
-            'flex items-center gap-2 px-3.5 py-1.5 rounded-md text-xs transition-all',
-            tab === 'service'
-              ? 'bg-primary text-white font-semibold shadow-sm'
-              : 'text-on-surface-variant hover:text-on-surface font-medium',
-          )}
-        >
-          <Sparkles className="h-3.5 w-3.5" />
-          <span>Danh mục Dịch vụ ({serviceCount})</span>
-        </button>
-        <button
-          onClick={() => handleTabChange('product')}
-          className={cn(
-            'flex items-center gap-2 px-3.5 py-1.5 rounded-md text-xs transition-all',
-            tab === 'product'
-              ? 'bg-primary text-white font-semibold shadow-sm'
-              : 'text-on-surface-variant hover:text-on-surface font-medium',
-          )}
-        >
-          <ShoppingBag className="h-3.5 w-3.5" />
-          <span>Danh mục Sản phẩm ({productCount})</span>
-        </button>
-      </div>
+    <section className="bg-surface flex flex-col gap-3 rounded-md border border-outline p-3.5 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+      <DashTabs
+        value={tab}
+        onValueChange={(v) => handleTabChange(v as 'service' | 'product')}
+        items={[
+          { value: 'service', label: `Danh mục Dịch vụ (${serviceCount})`, icon: Sparkles },
+          { value: 'product', label: `Danh mục Sản phẩm (${productCount})`, icon: ShoppingBag },
+        ]}
+      />
 
-      <div className="flex items-center gap-2.5 flex-1 md:justify-end">
-        <div className="relative flex-1 md:w-64 md:flex-none md:max-w-xs">
-          <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-on-surface-variant">
-            <Search className="h-4 w-4" />
+      <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
+        <div className="relative w-full sm:w-72">
+          <span className="text-on-surface-variant pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2.5">
+            <Search className="h-3.5 w-3.5" />
           </span>
-          <DashInput
+          <Input
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             placeholder="Tìm theo tên danh mục..."
-            className="pl-9 text-xs"
+            className="bg-surface-container border-outline placeholder:text-on-surface-variant focus-visible:border-primary focus-visible:ring-primary/30 h-8 w-full rounded-md border py-2 pr-3 pl-8 text-xs placeholder:text-xs focus-visible:ring-1"
           />
         </div>
-        <DashSelect
-          value={status}
-          onValueChange={handleStatusChange}
-          placeholder="Tất cả trạng thái"
-          triggerClassName="w-40"
-          options={[
-            { value: '', label: 'Tất cả trạng thái' },
-            { value: 'active', label: 'Hoạt động' },
-            { value: 'inactive', label: 'Tạm ẩn' },
-          ]}
-        />
+
+        <div className="relative w-full sm:w-44">
+          <Select
+            value={status || undefined}
+            onValueChange={(v) => handleStatusChange(v === '__all' ? '' : (v ?? ''))}
+          >
+            <SelectTrigger
+              size="default"
+              className="bg-surface-container border-outline text-on-surface focus-visible:border-primary focus-visible:ring-primary/30 h-8 w-full rounded-md border px-3 py-2 text-xs focus-visible:ring-1 data-placeholder:text-on-surface-variant"
+            >
+              <SelectValue placeholder="Tất cả trạng thái" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all" className="text-xs">
+                Tất cả trạng thái
+              </SelectItem>
+              <SelectItem value="active" className="text-xs">
+                Hoạt động
+              </SelectItem>
+              <SelectItem value="inactive" className="text-xs">
+                Tạm ẩn
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
         <Button
           variant="outline"
-          size="icon"
+          size="sm"
           onClick={handleReset}
-          title="Đặt lại bộ lọc"
-          className="border-outline text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-lg shrink-0"
+          className="border-outline text-on-surface-variant hover:text-primary hover:bg-surface-container rounded-md border px-3 py-1.5 text-xs font-medium shrink-0"
         >
-          <RefreshCw className="h-4 w-4" />
+          Đặt lại bộ lọc
         </Button>
       </div>
     </section>

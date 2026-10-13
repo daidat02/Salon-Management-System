@@ -2,7 +2,7 @@
 import PageHeading from '@/components/dashboard/PageHeading';
 import { FileDown, UserPlus } from 'lucide-react';
 import { useState } from 'react';
-import { CustomerCreateDialog } from './CustomerCreateDialog';
+import { CustomerForm } from './CustomerForm';
 
 const CustomerHeading = () => {
   const [openCreateDialog, setOpenCreateDialog] = useState(false);
@@ -32,7 +32,7 @@ const CustomerHeading = () => {
         ]}
       />
 
-      <CustomerCreateDialog open={openCreateDialog} onOpenChange={setOpenCreateDialog} />
+      <CustomerForm mode="create" open={openCreateDialog} onOpenChange={setOpenCreateDialog} />
     </>
   );
 };

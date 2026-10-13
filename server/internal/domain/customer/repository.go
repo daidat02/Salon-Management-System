@@ -13,7 +13,9 @@ type CustomerRepository interface {
 	CreateCustomer(ctx context.Context, customer *Customer) error
 	GetCustomersByOrgID(ctx context.Context, orgID, search string, limit, offset int) ([]*Customer, error)
 	CountCustomersByOrgID(ctx context.Context, orgID, search string) (int64, error)
-	GetCustomerByID(ctx context.Context, orgID, id string) (*Customer, error)
+	GetCustomerDetailByID(ctx context.Context, orgID, id string) (*CustomerDetailsResponse, error)
+	GetCustomerByPhone(ctx context.Context, orgID, phone string) (*Customer, error)
 	UpdateCustomer(ctx context.Context, customer *Customer) error
 	DeleteCustomer(ctx context.Context, orgID, id string) error
+	GetCustomerStats(ctx context.Context, orgID string) (*CustomerStatsResponse, error)
 }

@@ -98,15 +98,36 @@ func (h *CustomerHandler) GetCustomersByOrgID(c *gin.Context) {
 	response.Success(c, 200, "Danh sách khách hàng", result)
 }
 
+// GetCustomerStats godoc
+// @Summary      Thống kê tổng quan tệp khách (tổng, mới tháng này/trước, điểm tồn)
+// @Tags         Customers
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200  {object}  response.SuccessResponse  "Thống kê khách hàng"
+// @Failure      400  {object}  response.ErrorResponse    "Thiếu organization"
+// @Failure      401  {object}  response.ErrorResponse    "Thiếu token / token không hợp lệ"
+// @Router       /customers/stats [get]
+func (h *CustomerHandler) GetCustomerStats(c *gin.Context) {
+	result, err := h.uc.GetCustomerStats(c.Request.Context())
+	if err != nil {
+		response.Error(c, err)
+		c.Abort()
+		return
+	}
+	response.Success(c, 200, "Thống kê khách hàng", result)
+}
+
 // GetCustomerDetail godoc
-// @Summary      Chi tiết khách hàng kèm lịch sử lịch hẹn
+// @Summary      Chi tiết khách hàng kèm lịch sử lịch hẹn + đơn hàng
 // @Tags         Customers
 // @Produce      json
 // @Security     BearerAuth
 // @Param        id               path   string  true   "ID khách hàng"
-// @Param        hist_page        query  int     false  "Trang lịch sử (mặc định 1)"
-// @Param        hist_page_size   query  int     false  "Số dòng lịch sử/trang (mặc định 10, tối đa 100)"
-// @Success      200              {object}  response.SuccessResponse  "Hồ sơ + lịch sử lịch hẹn"
+// @Param        hist_page        query  int     false  "Trang lịch sử hẹn (mặc định 1)"
+// @Param        hist_page_size   query  int     false  "Số dòng lịch hẹn/trang (mặc định 10, tối đa 100)"
+// @Param        ord_page         query  int     false  "Trang lịch sử đơn (mặc định 1)"
+// @Param        ord_page_size    query  int     false  "Số dòng đơn/trang (mặc định 10, tối đa 100)"
+// @Success      200              {object}  response.SuccessResponse  "Hồ sơ + lịch sử hẹn + đơn"
 // @Failure      400              {object}  response.ErrorResponse    "Thiếu id"
 // @Failure      401              {object}  response.ErrorResponse    "Thiếu token / token không hợp lệ"
 // @Failure      404              {object}  response.ErrorResponse    "Không tìm thấy khách hàng"
@@ -114,14 +135,44 @@ func (h *CustomerHandler) GetCustomersByOrgID(c *gin.Context) {
 func (h *CustomerHandler) GetCustomerDetail(c *gin.Context) {
 	histPage, _ := strconv.Atoi(c.DefaultQuery("hist_page", "1"))
 	histPageSize, _ := strconv.Atoi(c.DefaultQuery("hist_page_size", "10"))
+	ordPage, _ := strconv.Atoi(c.DefaultQuery("ord_page", "1"))
+	ordPageSize, _ := strconv.Atoi(c.DefaultQuery("ord_page_size", "10"))
 
-	result, err := h.uc.GetCustomerDetail(c.Request.Context(), c.Param("id"), histPage, histPageSize)
+	result, err := h.uc.GetCustomerDetail(c.Request.Context(), c.Param("id"), histPage, histPageSize, ordPage, ordPageSize)
 	if err != nil {
 		response.Error(c, err)
 		c.Abort()
 		return
 	}
 	response.Success(c, 200, "Chi tiết khách hàng", result)
+}
+
+// GetCustomerByPhone godoc
+// @Summary      Tra cứu khách hàng theo số điện thoại
+// @Tags         Customers
+// @Produce      json
+// @Security     BearerAuth
+// @Param        phone  query     string  true  "Số điện thoại cần tra cứu"
+// @Success      200    {object}  response.SuccessResponse  "Thông tin khách hàng"
+// @Failure      400    {object}  response.ErrorResponse    "Thiếu số điện thoại / thiếu organization"
+// @Failure      401    {object}  response.ErrorResponse    "Thiếu token / token không hợp lệ"
+// @Failure      404    {object}  response.ErrorResponse    "Không tìm thấy khách hàng"
+// @Router       /customers/phone [get]
+func (h *CustomerHandler) GetCustomerByPhone(c *gin.Context) {
+	phone := c.Query("phone")
+	if phone == "" {
+		response.Error(c, apperror.New(400, "Thiếu số điện thoại", nil))
+		c.Abort()
+		return
+	}
+
+	result, err := h.uc.GetCustomerByPhoneNumber(c.Request.Context(), phone)
+	if err != nil {
+		response.Error(c, err)
+		c.Abort()
+		return
+	}
+	response.Success(c, 200, "Thông tin khách hàng", result)
 }
 
 // UpdateCustomer godoc
@@ -147,11 +198,22 @@ func (h *CustomerHandler) UpdateCustomer(c *gin.Context) {
 		return
 	}
 
+	var birthDateParsed *time.Time
+	if req.BirthDate != nil && *req.BirthDate != "" {
+		parsedTime, err := time.Parse("2006-01-02", *req.BirthDate)
+		if err != nil {
+			response.Error(c, apperror.New(400, "Dữ liệu không hợp lệ", err))
+			c.Abort()
+			return
+		}
+		birthDateParsed = &parsedTime
+	}
+
 	customer := &domain.Customer{
 		FullName:  req.FullName,
 		Phone:     req.Phone,
 		Gender:    req.Gender,
-		BirthDate: req.BirthDate,
+		BirthDate: birthDateParsed,
 		Note:      req.Note,
 	}
 

@@ -68,7 +68,8 @@ func (u *ServiceUsecase) CreateService(ctx context.Context, service *domain.Serv
 
 // validateMaterials kiểm tra từng material ở tầng usecase (không phụ thuộc
 // mỗi binding validator của handler): đủ product_id, quantity > 0,
-// và mọi product đều thuộc đúng organization.
+// mọi product đều thuộc đúng organization, unit (nếu gửi) phải là unit
+// lớn hoặc net_unit của sản phẩm; rỗng thì mặc định unit lớn.
 func (u *ServiceUsecase) validateMaterials(ctx context.Context, orgID string, materials []*domain.ServiceMaterialInput) error {
 	seen := make(map[string]struct{}, len(materials))
 	var productIDs []string
@@ -95,7 +96,42 @@ func (u *ServiceUsecase) validateMaterials(ctx context.Context, orgID string, ma
 	if len(missing) > 0 {
 		return apperror.New(404, fmt.Sprintf("Không tìm thấy sản phẩm trong tổ chức: %s", strings.Join(missing, ", ")), nil)
 	}
+
+	units, err := u.repo.GetProductUnits(ctx, orgID, productIDs)
+	if err != nil {
+		return apperror.New(500, "Lỗi khi lấy đơn vị sản phẩm", err)
+	}
+	for i, m := range materials {
+		pu, ok := units[m.ProductID]
+		if !ok {
+			return apperror.New(404, fmt.Sprintf("Không tìm thấy sản phẩm trong tổ chức: %s", m.ProductID), nil)
+		}
+		u := ""
+		if m.Unit != nil {
+			u = strings.TrimSpace(*m.Unit)
+		}
+		if u == "" {
+			u = pu.Unit
+		} else {
+			nu := ""
+			if pu.NetUnit != nil {
+				nu = strings.TrimSpace(*pu.NetUnit)
+			}
+			if u != pu.Unit && (nu == "" || u != nu) {
+				return apperror.New(400, fmt.Sprintf("Nguyên vật liệu thứ %d: đơn vị %q không hợp lệ (chỉ nhận %q%s)", i+1, u, pu.Unit, netHint(nu)), nil)
+			}
+		}
+		m.Unit = &u
+	}
 	return nil
+}
+
+// netHint gợi ý net_unit trong message lỗi.
+func netHint(nu string) string {
+	if nu == "" {
+		return ""
+	}
+	return " hoặc " + nu
 }
 
 // checkCategoryInOrg đảm bảo category (nếu có) thuộc đúng organization.

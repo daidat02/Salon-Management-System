@@ -8,6 +8,7 @@ import (
 	"log"
 	"strings"
 
+	orderdomain "github.com/daidat02/server/internal/domain/order"
 	domain "github.com/daidat02/server/internal/domain/service"
 	"github.com/daidat02/server/pkg/utils"
 	"github.com/jackc/pgx/v5"
@@ -33,14 +34,25 @@ func (r *PostgresServiceRepository) bulkUpsertServiceMaterials(ctx context.Conte
 		var placeholders []string
 	for _, m:= range materials{
 		ID := utils.NewID()
-		placeholders = append(placeholders, fmt.Sprintf("($%d, $%d, $%d, $%d, $%d)", len(args)+1, len(args)+2, len(args)+3, len(args)+4, len(args)+5))
-		args = append(args, ID, orgID, serviceID, m.ProductID, m.Quantity)
+		placeholders = append(placeholders, fmt.Sprintf("($%d, $%d, $%d, $%d, $%d, $%d)", len(args)+1, len(args)+2, len(args)+3, len(args)+4, len(args)+5, len(args)+6))
+		args = append(args, ID, orgID, serviceID, m.ProductID, m.Quantity, unitOrDefault(m.Unit))
 	}
 
 	query += strings.Join(placeholders, ", ")
-	query += ` ON CONFLICT (organization_id, service_id, product_id) DO UPDATE SET quantity = EXCLUDED.quantity, updated_at = now()`
+	query += ` ON CONFLICT (organization_id, service_id, product_id) DO UPDATE SET quantity = EXCLUDED.quantity, unit = EXCLUDED.unit, updated_at = now()`
 	_, err := tx.Exec(ctx, query, args...)
 	return err
+}
+
+// unitOrDefault chuẩn hoá unit định mức: rỗng -> "" (DB nullable, repo gọi đã mặc định).
+func unitOrDefault(u *string) any {
+	if u == nil {
+		return nil
+	}
+	if v := strings.TrimSpace(*u); v != "" {
+		return v
+	}
+	return nil
 }
 func (r *PostgresServiceRepository) CreateService(ctx context.Context, service *domain.Service, materials []*domain.ServiceMaterialInput) error {
 
@@ -167,6 +179,29 @@ func (r *PostgresServiceRepository) CategoryExistsInOrg(ctx context.Context, org
 		return false, fmt.Errorf("lỗi khi kiểm tra danh mục: %w", err)
 	}
 	return exists, nil
+}
+
+// GetProductUnits lấy đơn vị lớn + net của sản phẩm (để validate/mặc định unit định mức).
+func (r *PostgresServiceRepository) GetProductUnits(ctx context.Context, orgID string, productIDs []string) (map[string]domain.ProductUnit, error) {
+	rows, err := r.db.Query(ctx, productUnitsInOrgQuery, orgID, productIDs)
+	if err != nil {
+		return nil, fmt.Errorf("lỗi khi lấy đơn vị sản phẩm: %w", err)
+	}
+	defer rows.Close()
+
+	units := make(map[string]domain.ProductUnit, len(productIDs))
+	for rows.Next() {
+		var id string
+		var u domain.ProductUnit
+		if err := rows.Scan(&id, &u.Unit, &u.NetUnit, &u.NetAmount); err != nil {
+			return nil, fmt.Errorf("lỗi khi đọc đơn vị sản phẩm: %w", err)
+		}
+		units[id] = u
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("lỗi trong quá trình đọc đơn vị: %w", err)
+	}
+	return units, nil
 }
 
 // ProductsExistInOrg trả về danh sách productIDs không thuộc org (rỗng = tất cả hợp lệ).
@@ -305,4 +340,42 @@ func (r *PostgresServiceRepository) GetServiceDetails(ctx context.Context, orgID
 	}
 
 	return service, materials, nil
+}
+// ---------- Giá + định mức tại thời điểm bán (đúng chủ bảng services/service_materials) ----------
+
+// GetServicePrice lấy giá bán hiện tại của 1 dịch vụ; đã xóa/khác salon
+// thì trả ErrServiceNotFound (lỗi của order domain để usecase map 404).
+func (r *PostgresServiceRepository) GetServicePrice(ctx context.Context, orgID, serviceID string) (float64, error) {
+	var price float64
+	if err := r.db.QueryRow(ctx, servicePriceQuery, orgID, serviceID).Scan(&price); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return 0, fmt.Errorf("dịch vụ %s: %w", serviceID, orderdomain.ErrServiceNotFound)
+		}
+		return 0, fmt.Errorf("lỗi khi lấy giá dịch vụ: %w", err)
+	}
+	return price, nil
+}
+
+// GetServiceMaterials lấy định mức vật tư + giá vốn hiện tại theo từng dịch vụ,
+// dùng để snapshot vật tư tiêu hao lúc tạo đơn.
+func (r *PostgresServiceRepository) GetServiceMaterials(ctx context.Context, orgID string, serviceIDs []string) (map[string][]orderdomain.ServiceMaterialUsage, error) {
+	rows, err := r.db.Query(ctx, serviceMaterialsWithCostQuery, orgID, serviceIDs)
+	if err != nil {
+		return nil, fmt.Errorf("lỗi khi lấy định mức vật tư: %w", err)
+	}
+	defer rows.Close()
+
+	usages := make(map[string][]orderdomain.ServiceMaterialUsage)
+	for rows.Next() {
+		var serviceID string
+		var u orderdomain.ServiceMaterialUsage
+		if err := rows.Scan(&serviceID, &u.ProductID, &u.QuantityPerService, &u.Unit, &u.UnitCost); err != nil {
+			return nil, fmt.Errorf("lỗi khi đọc định mức vật tư: %w", err)
+		}
+		usages[serviceID] = append(usages[serviceID], u)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("lỗi trong quá trình đọc định mức: %w", err)
+	}
+	return usages, nil
 }

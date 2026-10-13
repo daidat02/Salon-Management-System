@@ -27,7 +27,7 @@ func NewInventoryHandler(uc *uc.InventoryUsecase) *InventoryHandler {
 // @Accept       json
 // @Produce      json
 // @Security     BearerAuth
-// @Param        body  body      domain.CreateDocumentRequest  true  "Thông tin phiếu kho kèm danh sách sản phẩm"
+// @Param        body  body      domain.CreateDocumentRequest  true  "Phiếu kho: mỗi dòng gửi quantity theo unit hiển thị, server tự quy về đơn vị nhỏ nhất + tự quyết giá"
 // @Success      200   {object}  response.SuccessResponse      "Tạo phiếu kho thành công"
 // @Failure      400   {object}  response.ErrorResponse        "Dữ liệu không hợp lệ / tồn không đủ"
 // @Failure      401   {object}  response.ErrorResponse        "Thiếu token / token không hợp lệ"

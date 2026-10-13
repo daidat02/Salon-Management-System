@@ -3,31 +3,28 @@ package inventory
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"strings"
 
 	"github.com/daidat02/server/internal/delivery/http/middlewares"
 	domain "github.com/daidat02/server/internal/domain/inventory"
+	orderdomain "github.com/daidat02/server/internal/domain/order"
+	productdomain "github.com/daidat02/server/internal/domain/product"
 	"github.com/daidat02/server/pkg/apperror"
 	"github.com/daidat02/server/pkg/pagination"
 	"github.com/daidat02/server/pkg/utils"
 )
 
-// ProductChecker kiểm tra sản phẩm thuộc đúng organization.
-// PostgresServiceRepository thỏa mãn ngầm.
-type ProductChecker interface {
-	ProductsExistInOrg(ctx context.Context, orgID string, productIDs []string) ([]string, error)
-}
-
 type InventoryUsecase struct {
-	repo    domain.InventoryRepository
-	checker ProductChecker
+	repo     domain.InventoryRepository
+	products orderdomain.ProductStore
 }
 
-func NewInventoryUsecase(repo domain.InventoryRepository, checker ProductChecker) *InventoryUsecase {
+func NewInventoryUsecase(repo domain.InventoryRepository, products orderdomain.ProductStore) *InventoryUsecase {
 	return &InventoryUsecase{
-		repo:    repo,
-		checker: checker,
+		repo:     repo,
+		products: products,
 	}
 }
 
@@ -49,18 +46,17 @@ func (u *InventoryUsecase) CreateDocument(ctx context.Context, req *domain.Creat
 		SupplierID:     req.SupplierID,
 		OrderID:        req.OrderID,
 		DocumentCode:   strings.TrimSpace(req.DocumentCode),
-		Type:           req.Type,
+		Type:           strings.TrimSpace(req.Type),
 		Reason:         req.Reason,
 		Note:           req.Note,
 		CreatedBy:      req.CreatedBy,
 	}
-	items := make([]*domain.DocumentItemInput, 0, len(req.Items))
-	for _, it := range req.Items {
-		items = append(items, &domain.DocumentItemInput{
-			ProductID: strings.TrimSpace(it.ProductID),
-			Quantity:  it.Quantity,
-			UnitPrice: it.UnitPrice,
-		})
+
+	// Client chỉ gửi (product_id, quantity theo đơn vị hiển thị, unit).
+	// Server tự quy về đơn vị nhỏ nhất + tự quyết giá, không tin số client.
+	items, err := u.toBaseItems(ctx, orgID, doc.Type, req.Items)
+	if err != nil {
+		return nil, err
 	}
 
 	if err := u.repo.CreateDocument(ctx, doc, items); err != nil {
@@ -82,6 +78,76 @@ func (u *InventoryUsecase) CreateDocument(ctx context.Context, req *domain.Creat
 		Note:           doc.Note,
 		CreatedAt:      doc.CreatedAt,
 	}, nil
+}
+
+// toBaseItems quy từng dòng phiếu về đơn vị nhỏ nhất + giá chuẩn server.
+//   - quantity: số hiển thị × hệ số unit (unit lạ -> 400).
+//   - giá: phiếu nhập (import) tôn trọng giá user theo unit gửi (quy về base);
+//     xuất/bán/trả/điều chỉnh (export/sale/return/adjust) lấy giá vốn server,
+//     bỏ qua số client gửi.
+// Unit gửi được giữ lại để lưu lịch sử hiển thị.
+func (u *InventoryUsecase) toBaseItems(ctx context.Context, orgID, docType string, inputs []domain.DocumentItemInput) ([]*domain.DocumentItemInput, error) {
+	seen := map[string]struct{}{}
+	var productIDs []string
+	for i := range inputs {
+		pid := strings.TrimSpace(inputs[i].ProductID)
+		if pid == "" {
+			return nil, apperror.New(400, fmt.Sprintf("Dòng thứ %d thiếu product_id", i+1), nil)
+		}
+		if _, ok := seen[pid]; !ok {
+			seen[pid] = struct{}{}
+			productIDs = append(productIDs, pid)
+		}
+	}
+	if len(productIDs) == 0 {
+		return nil, apperror.New(400, "Phiếu kho phải có ít nhất 1 sản phẩm", nil)
+	}
+
+	missing, err := u.products.ProductsExistInOrg(ctx, orgID, productIDs)
+	if err != nil {
+		return nil, apperror.New(500, "Lỗi khi kiểm tra sản phẩm", err)
+	}
+	if len(missing) > 0 {
+		return nil, apperror.New(404, fmt.Sprintf("Không tìm thấy sản phẩm trong tổ chức: %s", strings.Join(missing, ", ")), nil)
+	}
+	units, err := u.products.GetProductUnits(ctx, orgID, productIDs)
+	if err != nil {
+		return nil, apperror.New(500, "Lỗi khi lấy đơn vị sản phẩm", err)
+	}
+	pricing, err := u.products.GetProductPricing(ctx, orgID, productIDs)
+	if err != nil {
+		return nil, apperror.New(500, "Lỗi khi lấy giá sản phẩm", err)
+	}
+
+	useClientPrice := docType == domain.TypeImport
+	items := make([]*domain.DocumentItemInput, 0, len(inputs))
+	for i := range inputs {
+		pid := strings.TrimSpace(inputs[i].ProductID)
+		pu, ok := units[pid]
+		if !ok {
+			return nil, apperror.New(404, fmt.Sprintf("Không tìm thấy sản phẩm trong tổ chức: %s", pid), nil)
+		}
+		unit := strings.TrimSpace(inputs[i].Unit)
+		pricePerLarge := inputs[i].UnitPrice
+		if !useClientPrice {
+			cost, ok := pricing[pid]
+			if !ok {
+				return nil, apperror.New(404, fmt.Sprintf("Không tìm thấy sản phẩm trong tổ chức: %s", pid), nil)
+			}
+			pricePerLarge = cost.CostPrice
+		}
+		baseQty, basePrice, convErr := productdomain.ToBase(pu.Unit, unit, pu.NetUnit, pu.NetAmount, inputs[i].Quantity, pricePerLarge)
+		if convErr != nil {
+			return nil, apperror.New(400, fmt.Sprintf("Dòng thứ %d: %s", i+1, convErr.Error()), convErr)
+		}
+		items = append(items, &domain.DocumentItemInput{
+			ProductID: pid,
+			Unit:      unit,
+			Quantity:  baseQty,
+			UnitPrice: basePrice,
+		})
+	}
+	return items, nil
 }
 
 func (u *InventoryUsecase) GetTransactionsByOrgID(ctx context.Context, productID string, page, pageSize int) (*pagination.Result[*domain.InventoryTransaction], error) {

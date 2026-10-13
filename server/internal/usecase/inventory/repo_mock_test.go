@@ -4,6 +4,7 @@ import (
 	"context"
 
 	domain "github.com/daidat02/server/internal/domain/inventory"
+	orderdomain "github.com/daidat02/server/internal/domain/order"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -65,17 +66,33 @@ func (m *MockInventoryRepository) CountDocumentsByOrgID(ctx context.Context, org
 	args := m.Called(ctx, orgID)
 	return args.Get(0).(int64), args.Error(1)
 }
-// MockProductChecker giả lập ProductChecker
-type MockProductChecker struct {
+// MockInventoryProducts giả lập ProductStore (đúng chủ bảng products).
+type MockInventoryProducts struct {
 	mock.Mock
 }
 
-func (m *MockProductChecker) ProductsExistInOrg(ctx context.Context, orgID string, productIDs []string) ([]string, error) {
+func (m *MockInventoryProducts) ProductsExistInOrg(ctx context.Context, orgID string, productIDs []string) ([]string, error) {
 	args := m.Called(ctx, orgID, productIDs)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
 	return args.Get(0).([]string), args.Error(1)
+}
+
+func (m *MockInventoryProducts) GetProductPricing(ctx context.Context, orgID string, productIDs []string) (map[string]orderdomain.ProductPricing, error) {
+	args := m.Called(ctx, orgID, productIDs)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(map[string]orderdomain.ProductPricing), args.Error(1)
+}
+
+func (m *MockInventoryProducts) GetProductUnits(ctx context.Context, orgID string, productIDs []string) (map[string]orderdomain.ProductUnit, error) {
+	args := m.Called(ctx, orgID, productIDs)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(map[string]orderdomain.ProductUnit), args.Error(1)
 }
 
 func (m *MockInventoryRepository) GetDocumentByID(ctx context.Context, orgID string, documentID string) (*domain.DocumentDetailResponse, error) {

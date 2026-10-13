@@ -3,10 +3,12 @@
 import * as React from "react"
 import DashTable from "@/components/dashboard/DashTable"
 import { serviceColumns } from "./columns"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter, useSearchParams } from 'next/navigation'
 import useService from "@/hooks/use-service"
 import { TableSkeleton } from "@/components/dashboard/DashboardSkeletons"
 import { getApiErrorMessage } from "@/services/apiClient"
+import type { Service } from "@/types/service"
+import { ServiceDrawer } from "./ServiceDrawer"
 
 export default function ServicesTable() {
   const router = useRouter()
@@ -22,6 +24,9 @@ export default function ServicesTable() {
 
   const services = (data?.data || []).filter((r): r is NonNullable<typeof r> => r !== null && r !== undefined)
   const total = (data as any)?.total || 0
+
+  const [drawerOpen, setDrawerOpen] = React.useState(false)
+  const [selected, setSelected] = React.useState<Service | null>(null)
 
   const handlePageChange = (newPage: number) => {
     const params = new URLSearchParams(searchParams.toString())
@@ -42,11 +47,22 @@ export default function ServicesTable() {
   }
 
   return (
-    <DashTable
-      columns={serviceColumns}
-      data={services}
-      getRowId={(r) => r.id}
-      pagination={{ page, pageSize, total, itemLabel: "dịch vụ", onPageChange: handlePageChange }}
-    />
-  )
+    <>
+      <DashTable
+        columns={serviceColumns}
+        data={services}
+        getRowId={(r) => r.id}
+        onRowClick={(row) => {
+          setSelected(row);
+          setDrawerOpen(true);
+        }}
+        pagination={{ page, pageSize, total, itemLabel: "dịch vụ", onPageChange: handlePageChange }}
+      />
+      <ServiceDrawer
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+        service={selected}
+      />
+    </>
+  );
 }

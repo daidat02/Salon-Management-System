@@ -12,7 +12,7 @@ export const getCategoriesByOrgID = async ({
   pageSize: number;
 }) => {
   const res = await apiClient.get<ApiResponse<PaginationResult<Category>>>(
-    CATEGORIES_ENDPOINT.GET_CATEGORIES,
+    CATEGORIES_ENDPOINT.GET_ALL,
     {
       params: {
         page: page,
@@ -32,26 +32,17 @@ export type CreateCategoryPayload = {
 };
 
 export const createCategory = async (payload: CreateCategoryPayload) => {
-  const res = await apiClient.post<ApiResponse<Category>>(
-    CATEGORIES_ENDPOINT.GET_CATEGORIES,
-    payload,
-  );
+  const res = await apiClient.post<ApiResponse<Category>>(CATEGORIES_ENDPOINT.CREATE, payload);
   return res.data.data;
 };
 
 export type UpdateCategoryPayload = Partial<CreateCategoryPayload>;
-
 export const updateCategory = async (id: string, payload: UpdateCategoryPayload) => {
-  const res = await apiClient.put<ApiResponse<Category>>(
-    `${CATEGORIES_ENDPOINT.GET_CATEGORIES}/${id}`,
-    payload,
-  );
+  const res = await apiClient.put<ApiResponse<Category>>(CATEGORIES_ENDPOINT.UPDATE(id), payload);
   return res.data.data;
 };
 
 export const deleteCategory = async (id: string) => {
-  const res = await apiClient.delete<ApiResponse<{ id: string }>>(
-    `${CATEGORIES_ENDPOINT.GET_CATEGORIES}/${id}`,
-  );
+  const res = await apiClient.delete<ApiResponse<{ id: string }>>(CATEGORIES_ENDPOINT.DELETE(id));
   return res.data.data;
 };

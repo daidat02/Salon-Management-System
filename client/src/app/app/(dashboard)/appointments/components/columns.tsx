@@ -1,56 +1,113 @@
 import { Tag } from "@/components/ui/tag"
 import type { DashColumn } from "@/components/dashboard/DashTable"
-import type { AppointmentItem } from "./data"
+import type { Appointment, AppointmentStatus } from "@/types/appointment"
 
-export const appointmentColumns: DashColumn<AppointmentItem>[] = [
-  { id: "time", header: "Giờ hẹn", className: "whitespace-nowrap font-medium" },
-  {
-    id: "customer",
-    header: "Khách hàng",
-    className: "min-w-[180px]",
-    cell: (row) => (
-      <div>
-        <div className="font-semibold text-on-surface">{row.customer}</div>
-        <div className="text-[11px] text-on-surface-variant">{row.phone}</div>
-      </div>
-    ),
-  },
-  {
-    id: "service",
-    header: "Dịch vụ",
-    className: "min-w-[200px]",
-    cell: (row) => (
-      <div>
-        <div className="font-medium text-on-surface">{row.service}</div>
-        <div className="text-[11px] text-on-surface-variant">{row.duration}</div>
-      </div>
-    ),
-  },
-  { id: "staff", header: "Nhân viên", accessorKey: "staff" },
-  {
-    id: "status",
-    header: "Trạng thái",
-    className: "text-center",
-    cell: (row) => {
-      const variantMap = {
-        pending: "warning",
-        confirmed: "blue",
-        serving: "primary",
-        done: "success",
-        cancelled: "gray",
-      } as const
-      const label: Record<string, string> = {
-        pending: "Chờ xác nhận",
-        confirmed: "Đã xác nhận",
-        serving: "Đang phục vụ",
-        done: "Hoàn thành",
-        cancelled: "Đã hủy",
-      }
-      return (
-        <Tag variant={variantMap[row.status]} shape="pill" size="md">
-          {label[row.status]}
-        </Tag>
-      )
+export type CustomerLookup = (id: string) => { name: string; phone: string } | undefined
+export type StaffLookup = (id: string) => string | undefined
+
+type StatusVariant = "warning" | "blue" | "teal" | "primary" | "success" | "gray" | "error" | "slate"
+
+const STATUS_META: Record<AppointmentStatus, { variant: Exclude<StatusVariant, "slate">; label: string }> = {
+  pending: { variant: "warning", label: "Chờ xác nhận" },
+  confirmed: { variant: "blue", label: "Đã xác nhận" },
+  checked_in: { variant: "teal", label: "Đã check-in" },
+  in_progress: { variant: "primary", label: "Đang phục vụ" },
+  completed: { variant: "success", label: "Hoàn thành" },
+  cancelled: { variant: "gray", label: "Đã hủy" },
+  no_show: { variant: "error", label: "Không đến" },
+}
+
+const SOURCE_LABEL: Record<string, string> = {
+  online: "Online",
+  walk_in: "Khách lẻ",
+  phone: "Điện thoại",
+}
+
+function formatTime(value: string): string {
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return value
+  const hh = String(d.getHours()).padStart(2, "0")
+  const mm = String(d.getMinutes()).padStart(2, "0")
+  const dd = String(d.getDate()).padStart(2, "0")
+  const mo = String(d.getMonth() + 1).padStart(2, "0")
+  return `${hh}:${mm} ${dd}/${mo}`
+}
+
+function durationMinutes(start: string, end: string): string {
+  const diff = new Date(end).getTime() - new Date(start).getTime()
+  if (Number.isNaN(diff) || diff <= 0) return "—"
+  return `${Math.round(diff / 60000)}p`
+}
+
+export function buildAppointmentColumns(
+  findCustomer: CustomerLookup,
+  findStaff: StaffLookup,
+): DashColumn<Appointment>[] {
+  return [
+    {
+      id: "time",
+      header: "Giờ hẹn",
+      className: "whitespace-nowrap font-medium",
+      cell: (row) => (
+        <div>
+          <div className="font-semibold text-on-surface">{formatTime(row.start_time)}</div>
+          <div className="text-[11px] text-on-surface-variant">
+            {durationMinutes(row.start_time, row.end_time)}
+          </div>
+        </div>
+      ),
     },
-  },
-]
+    {
+      id: "customer",
+      header: "Khách hàng",
+      className: "min-w-[180px]",
+      cell: (row) => {
+        const c = row.customer_id ? findCustomer(row.customer_id) : undefined
+        return (
+          <div>
+            <div className="font-semibold text-on-surface">{c?.name ?? "Khách lẻ"}</div>
+            {c && <div className="text-[11px] text-on-surface-variant">{c.phone}</div>}
+          </div>
+        )
+      },
+    },
+    {
+      id: "info",
+      header: "Thông tin",
+      className: "min-w-[180px]",
+      cell: (row) => (
+        <div>
+          <div className="font-medium text-on-surface">{row.code}</div>
+          <div className="text-[11px] text-on-surface-variant">
+            {SOURCE_LABEL[row.source] ?? row.source}
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: "staff",
+      header: "Nhân viên",
+      cell: (row) => findStaff(row.staff_id) ?? "—",
+    },
+    {
+      id: "total",
+      header: "Tạm tính",
+      className: "whitespace-nowrap text-right font-semibold",
+      cell: (row) => `${row.total_amount.toLocaleString("vi-VN")} đ`,
+    },
+    {
+      id: "status",
+      header: "Trạng thái",
+      className: "text-center",
+      cell: (row) => {
+        const meta: { variant: StatusVariant; label: string } =
+          STATUS_META[row.status] ?? { variant: "slate", label: row.status }
+        return (
+          <Tag variant={meta.variant} shape="pill" size="md">
+            {meta.label}
+          </Tag>
+        )
+      },
+    },
+  ]
+}

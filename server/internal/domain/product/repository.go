@@ -15,4 +15,5 @@ type ProductRepository interface {
 	CountProductsByOrgID(ctx context.Context, orgID string, search string, status string) (int64, error)
 	UpdateProduct(ctx context.Context, product *Product) error
 	DeleteProduct(ctx context.Context, orgID, id string) error
+	GetProductStats(ctx context.Context, orgID string) (*ProductStatsResponse, error)
 }

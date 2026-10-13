@@ -44,7 +44,9 @@ export default function CustomersTable({
   const pageSize = data?.page_size ?? initialPageSize;
 
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const handleRowClick = () => {
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const handleRowClick = (row: { id: string }) => {
+    setSelectedId(row.id);
     setDrawerOpen(true);
   };
 
@@ -83,7 +85,7 @@ export default function CustomersTable({
           onPageChange: handlePageChange,
         }}
       />
-      <CustomerDrawer open={drawerOpen} onOpenChange={setDrawerOpen} />
+      <CustomerDrawer open={drawerOpen} onOpenChange={setDrawerOpen} customerId={selectedId} />
     </>
   );
 }

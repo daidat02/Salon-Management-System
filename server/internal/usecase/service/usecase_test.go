@@ -18,6 +18,10 @@ func withOrgCtx(orgID string) context.Context {
 	return context.WithValue(context.Background(), middlewares.OrgIdKey, orgID)
 }
 
+func strPtr(s string) *string { return &s }
+
+func f64Ptr(v float64) *float64 { return &v }
+
 func validService() *domain.Service {
 	catID := "cat-1"
 	return &domain.Service{
@@ -54,6 +58,9 @@ func TestServiceUsecase_CreateService(t *testing.T) {
 		mockMissingProducts []string
 		mockProductsErr     error
 		expectProductsCheck bool
+		// mockProductUnits giả lập đơn vị SP cho validate unit (nil = mặc định unit lớn "chai").
+		mockProductUnits    map[string]domain.ProductUnit
+		expectUnitsCheck    bool
 		mockReturnErr       error
 		callRepo            bool
 		expectedError       bool
@@ -84,6 +91,10 @@ func TestServiceUsecase_CreateService(t *testing.T) {
 			},
 			mockCategoryExists: true, expectCategoryCheck: true,
 			mockMissingProducts: nil, expectProductsCheck: true,
+			mockProductUnits: map[string]domain.ProductUnit{
+				"prod-1": {Unit: "chai"},
+				"prod-2": {Unit: "tuýp", NetUnit: strPtr("ml"), NetAmount: f64Ptr(60)},
+			}, expectUnitsCheck: true,
 			callRepo: true, expectedError: false,
 		},
 		{
@@ -168,6 +179,19 @@ func TestServiceUsecase_CreateService(t *testing.T) {
 			callRepo: false, expectedError: true, expectedCode: 500,
 		},
 		{
+			name: "Thất bại - Unit định mức không hợp lệ", ctx: withOrgCtx("org-123"),
+			input: validService(),
+			inputMaterials: []*domain.ServiceMaterialInput{
+				{ProductID: "prod-1", Quantity: 1, Unit: strPtr("kg")},
+			},
+			mockCategoryExists: true, expectCategoryCheck: true,
+			mockMissingProducts: nil, expectProductsCheck: true,
+			mockProductUnits: map[string]domain.ProductUnit{
+				"prod-1": {Unit: "tuýp", NetUnit: strPtr("ml"), NetAmount: f64Ptr(60)},
+			}, expectUnitsCheck: true,
+			callRepo: false, expectedError: true, expectedCode: 400,
+		},
+		{
 			name: "Thất bại - Lỗi DB khi tạo dịch vụ", ctx: withOrgCtx("org-123"),
 			input: validService(), inputMaterials: nil,
 			mockCategoryExists: true, expectCategoryCheck: true,
@@ -186,6 +210,10 @@ func TestServiceUsecase_CreateService(t *testing.T) {
 			if tt.expectProductsCheck {
 				mockRepo.On("ProductsExistInOrg", mock.Anything, "org-123", mock.Anything).
 					Return(tt.mockMissingProducts, tt.mockProductsErr)
+			}
+			if tt.expectUnitsCheck {
+				mockRepo.On("GetProductUnits", mock.Anything, "org-123", mock.Anything).
+					Return(tt.mockProductUnits, nil)
 			}
 			if tt.callRepo {
 				mockRepo.On("CreateService", mock.Anything, mock.Anything, mock.Anything).Return(tt.mockReturnErr)
@@ -551,3 +579,4 @@ func TestServiceUsecase_GetServiceDetails(t *testing.T) {
 		})
 	}
 }
+

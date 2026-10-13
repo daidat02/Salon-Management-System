@@ -1,6 +1,6 @@
 basePath: /api/v1
 definitions:
-  github_com_daidat02_server_internal_domain_appointment.ApoimentItemInput:
+  appointment.ApoimentItemInput:
     properties:
       item_type:
         enum:
@@ -18,7 +18,7 @@ definitions:
     required:
     - item_type
     type: object
-  github_com_daidat02_server_internal_domain_appointment.AppointmentCreateRequest:
+  appointment.AppointmentCreateRequest:
     properties:
       client_ip:
         type: string
@@ -36,7 +36,7 @@ definitions:
         type: string
       items:
         items:
-          $ref: '#/definitions/github_com_daidat02_server_internal_domain_appointment.ApoimentItemInput'
+          $ref: '#/definitions/appointment.ApoimentItemInput'
         type: array
       note:
         type: string
@@ -53,24 +53,24 @@ definitions:
       total_amount:
         type: number
     type: object
-  github_com_daidat02_server_internal_domain_appointment.CancelRequest:
+  appointment.CancelRequest:
     properties:
       reason:
         type: string
     type: object
-  github_com_daidat02_server_internal_domain_appointment.RescheduleRequest:
+  appointment.RescheduleRequest:
     properties:
       end_time:
         type: string
       start_time:
         type: string
     type: object
-  github_com_daidat02_server_internal_domain_appointment.UpdateStatusRequest:
+  appointment.UpdateStatusRequest:
     properties:
       status:
         type: string
     type: object
-  github_com_daidat02_server_internal_domain_category.CreateCategoryRequest:
+  category.CreateCategoryRequest:
     properties:
       description:
         type: string
@@ -81,7 +81,7 @@ definitions:
       type:
         type: string
     type: object
-  github_com_daidat02_server_internal_domain_category.UpdateCategoryRequest:
+  category.UpdateCategoryRequest:
     properties:
       description:
         type: string
@@ -92,7 +92,7 @@ definitions:
       type:
         type: string
     type: object
-  github_com_daidat02_server_internal_domain_customer.CreateCustomerRequest:
+  customer.CreateCustomerRequest:
     properties:
       birth_date:
         type: string
@@ -105,7 +105,7 @@ definitions:
       phone:
         type: string
     type: object
-  github_com_daidat02_server_internal_domain_customer.UpdateCustomerRequest:
+  customer.UpdateCustomerRequest:
     properties:
       birth_date:
         type: string
@@ -118,7 +118,7 @@ definitions:
       phone:
         type: string
     type: object
-  github_com_daidat02_server_internal_domain_inventory.CreateDocumentRequest:
+  inventory.CreateDocumentRequest:
     properties:
       created_by:
         type: string
@@ -126,7 +126,7 @@ definitions:
         type: string
       items:
         items:
-          $ref: '#/definitions/github_com_daidat02_server_internal_domain_inventory.DocumentItemInput'
+          $ref: '#/definitions/inventory.DocumentItemInput'
         type: array
       note:
         type: string
@@ -139,7 +139,7 @@ definitions:
       type:
         type: string
     type: object
-  github_com_daidat02_server_internal_domain_inventory.DocumentItemInput:
+  inventory.DocumentItemInput:
     properties:
       product_id:
         type: string
@@ -150,7 +150,7 @@ definitions:
       unit_price:
         type: number
     type: object
-  github_com_daidat02_server_internal_domain_order.CreateOrderRequest:
+  order.CreateOrderRequest:
     properties:
       appointment_id:
         type: string
@@ -160,10 +160,16 @@ definitions:
         type: number
       items:
         items:
-          $ref: '#/definitions/github_com_daidat02_server_internal_domain_order.OrderItemInput'
+          $ref: '#/definitions/order.OrderItemInput'
         type: array
+      new_customer:
+        allOf:
+        - $ref: '#/definitions/order.NewCustomerInput'
+        description: |-
+          Khách mới ghi tại POS: server tự tìm theo SĐT (dùng luôn nếu có),
+          chưa có thì tạo mới rồi gán vào đơn.
     type: object
-  github_com_daidat02_server_internal_domain_order.CreatePaymentRequest:
+  order.CreatePaymentRequest:
     properties:
       amount:
         type: number
@@ -174,7 +180,7 @@ definitions:
       provider_txn_id:
         type: string
     type: object
-  github_com_daidat02_server_internal_domain_order.ItemMaterialInput:
+  order.ItemMaterialInput:
     properties:
       id:
         type: string
@@ -187,13 +193,20 @@ definitions:
       unit_cost_at_time:
         type: number
     type: object
-  github_com_daidat02_server_internal_domain_order.OrderItemInput:
+  order.NewCustomerInput:
+    properties:
+      full_name:
+        type: string
+      phone:
+        type: string
+    type: object
+  order.OrderItemInput:
     properties:
       item_type:
         type: string
       materials:
         items:
-          $ref: '#/definitions/github_com_daidat02_server_internal_domain_order.ItemMaterialInput'
+          $ref: '#/definitions/order.ItemMaterialInput'
         type: array
       product_id:
         type: string
@@ -203,8 +216,43 @@ definitions:
         type: string
       staff_id:
         type: string
+      unit:
+        description: |-
+          Unit đơn vị của Quantity (rỗng = đơn vị lớn của SP).
+          Server tự quy về đơn vị nhỏ nhất để lưu kho + tính tiền.
+        type: string
     type: object
-  github_com_daidat02_server_internal_domain_product.CreateProductRequest:
+  order.OrderMaterialInput:
+    properties:
+      order_item_id:
+        type: string
+      product_id:
+        type: string
+      quantity:
+        type: number
+      unit:
+        description: Unit đơn vị của Quantity (rỗng = đơn vị lớn của SP).
+        type: string
+    type: object
+  order.StaffOrderItemInput:
+    properties:
+      commission_amount:
+        type: number
+      share_pct:
+        type: number
+      staff_id:
+        type: string
+      type:
+        type: string
+    type: object
+  order.UpdateOrderCustomerRequest:
+    properties:
+      customer_id:
+        type: string
+      new_customer:
+        $ref: '#/definitions/order.NewCustomerInput'
+    type: object
+  product.CreateProductRequest:
     properties:
       category_id:
         type: string
@@ -233,7 +281,7 @@ definitions:
       unit:
         type: string
     type: object
-  github_com_daidat02_server_internal_domain_product.UpdateProductRequest:
+  product.UpdateProductRequest:
     properties:
       category_id:
         type: string
@@ -262,7 +310,26 @@ definitions:
       unit:
         type: string
     type: object
-  github_com_daidat02_server_internal_domain_service.CreateServiceRequest:
+  response.ErrorResponse:
+    properties:
+      code:
+        type: integer
+      error:
+        type: string
+      message:
+        type: string
+    type: object
+  response.SuccessResponse:
+    properties:
+      access_token:
+        type: string
+      code:
+        type: integer
+      data: {}
+      message:
+        type: string
+    type: object
+  service.CreateServiceRequest:
     properties:
       buffer_minutes:
         type: integer
@@ -276,25 +343,30 @@ definitions:
         type: boolean
       materials:
         items:
-          $ref: '#/definitions/github_com_daidat02_server_internal_domain_service.ServiceMaterialInput'
+          $ref: '#/definitions/service.ServiceMaterialInput'
         type: array
       name:
         type: string
       price:
         type: number
     type: object
-  github_com_daidat02_server_internal_domain_service.ServiceMaterialInput:
+  service.ServiceMaterialInput:
     properties:
       product_id:
         type: string
       quantity:
         description: 'Định lượng tiêu hao (vd: 0.75 tuýp, 150 gram)'
         type: number
+      unit:
+        description: |-
+          Unit đơn vị của Quantity (rỗng = đơn vị lớn của SP).
+          Chỉ chấp nhận unit lớn hoặc net_unit của sản phẩm, server tự mặc định khi rỗng.
+        type: string
     required:
     - product_id
     - quantity
     type: object
-  github_com_daidat02_server_internal_domain_service.UpdateServiceRequest:
+  service.UpdateServiceRequest:
     properties:
       buffer_minutes:
         type: integer
@@ -311,7 +383,7 @@ definitions:
       price:
         type: number
     type: object
-  github_com_daidat02_server_internal_domain_staff.CreateStaffRequest:
+  staff.CreateStaffRequest:
     properties:
       code:
         type: string
@@ -332,7 +404,7 @@ definitions:
       status:
         type: string
     type: object
-  github_com_daidat02_server_internal_domain_staff.UpdateStaffRequest:
+  staff.UpdateStaffRequest:
     properties:
       code:
         type: string
@@ -349,7 +421,7 @@ definitions:
       status:
         type: string
     type: object
-  github_com_daidat02_server_internal_domain_user.CreateUserRequest:
+  user.CreateUserRequest:
     properties:
       created_at:
         type: string
@@ -372,30 +444,11 @@ definitions:
       updated_at:
         type: string
     type: object
-  github_com_daidat02_server_internal_domain_user.LoginRequest:
+  user.LoginRequest:
     properties:
       password:
         type: string
       phone:
-        type: string
-    type: object
-  github_com_daidat02_server_pkg_response.ErrorResponse:
-    properties:
-      code:
-        type: integer
-      error:
-        type: string
-      message:
-        type: string
-    type: object
-  github_com_daidat02_server_pkg_response.SuccessResponse:
-    properties:
-      access_token:
-        type: string
-      code:
-        type: integer
-      data: {}
-      message:
         type: string
     type: object
 info:
@@ -433,15 +486,15 @@ paths:
         "200":
           description: Danh sách lịch hẹn kèm phân trang
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+            $ref: '#/definitions/response.SuccessResponse'
         "400":
           description: Bộ lọc không hợp lệ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Lấy danh sách lịch hẹn (phân trang + lọc)
@@ -456,30 +509,30 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/github_com_daidat02_server_internal_domain_appointment.AppointmentCreateRequest'
+          $ref: '#/definitions/appointment.AppointmentCreateRequest'
       produces:
       - application/json
       responses:
         "200":
           description: Tạo lịch hẹn thành công
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+            $ref: '#/definitions/response.SuccessResponse'
         "400":
           description: Dữ liệu không hợp lệ / thiếu organization
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "404":
           description: Service/product không thuộc tổ chức
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "500":
           description: Lỗi server
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Tạo lịch hẹn (tự tìm/tạo khách theo phone)
@@ -499,19 +552,19 @@ paths:
         "200":
           description: Xóa lịch hẹn thành công
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+            $ref: '#/definitions/response.SuccessResponse'
         "400":
           description: Trạng thái không cho xóa (hãy hủy lịch)
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "404":
           description: Không tìm thấy lịch hẹn
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Xóa cứng lịch hẹn (chỉ pending/cancelled)
@@ -530,19 +583,19 @@ paths:
         "200":
           description: Chi tiết lịch hẹn
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+            $ref: '#/definitions/response.SuccessResponse'
         "400":
           description: Thiếu id
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "404":
           description: Không tìm thấy lịch hẹn
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Chi tiết lịch hẹn kèm items
@@ -563,26 +616,26 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/github_com_daidat02_server_internal_domain_appointment.CancelRequest'
+          $ref: '#/definitions/appointment.CancelRequest'
       produces:
       - application/json
       responses:
         "200":
           description: Hủy lịch thành công
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+            $ref: '#/definitions/response.SuccessResponse'
         "400":
           description: Trạng thái không cho hủy
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "404":
           description: Không tìm thấy lịch hẹn
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Hủy lịch hẹn (chỉ pending/confirmed)
@@ -603,26 +656,26 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/github_com_daidat02_server_internal_domain_appointment.RescheduleRequest'
+          $ref: '#/definitions/appointment.RescheduleRequest'
       produces:
       - application/json
       responses:
         "200":
           description: Đổi lịch thành công
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+            $ref: '#/definitions/response.SuccessResponse'
         "400":
           description: Giờ invalid / trạng thái không cho đổi
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "404":
           description: Không tìm thấy lịch hẹn
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Đổi lịch hẹn (chỉ pending/confirmed)
@@ -643,26 +696,26 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/github_com_daidat02_server_internal_domain_appointment.UpdateStatusRequest'
+          $ref: '#/definitions/appointment.UpdateStatusRequest'
       produces:
       - application/json
       responses:
         "200":
           description: Cập nhật trạng thái thành công
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+            $ref: '#/definitions/response.SuccessResponse'
         "400":
           description: Chuyển đổi không hợp lệ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "404":
           description: Không tìm thấy lịch hẹn
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Chuyển trạng thái lịch hẹn (theo state machine)
@@ -685,15 +738,15 @@ paths:
         "200":
           description: Danh sách danh mục kèm phân trang
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+            $ref: '#/definitions/response.SuccessResponse'
         "400":
           description: Thiếu organization
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Lấy danh sách danh mục (phân trang)
@@ -708,26 +761,26 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/github_com_daidat02_server_internal_domain_category.CreateCategoryRequest'
+          $ref: '#/definitions/category.CreateCategoryRequest'
       produces:
       - application/json
       responses:
         "200":
           description: Tạo danh mục thành công
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+            $ref: '#/definitions/response.SuccessResponse'
         "400":
           description: Dữ liệu không hợp lệ / thiếu organization
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "500":
           description: Lỗi server (vd trùng tên trong org)
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Tạo danh mục
@@ -747,19 +800,19 @@ paths:
         "200":
           description: Xóa danh mục thành công
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+            $ref: '#/definitions/response.SuccessResponse'
         "400":
           description: Thiếu id
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "404":
           description: Không tìm thấy danh mục
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Xóa danh mục
@@ -779,26 +832,26 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/github_com_daidat02_server_internal_domain_category.UpdateCategoryRequest'
+          $ref: '#/definitions/category.UpdateCategoryRequest'
       produces:
       - application/json
       responses:
         "200":
           description: Cập nhật danh mục thành công
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+            $ref: '#/definitions/response.SuccessResponse'
         "400":
           description: Thiếu id / dữ liệu không hợp lệ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "404":
           description: Không tìm thấy danh mục
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Cập nhật danh mục
@@ -825,15 +878,15 @@ paths:
         "200":
           description: Danh sách khách hàng kèm phân trang
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+            $ref: '#/definitions/response.SuccessResponse'
         "400":
           description: Thiếu organization
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Lấy danh sách khách hàng (phân trang + tìm kiếm)
@@ -848,26 +901,26 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/github_com_daidat02_server_internal_domain_customer.CreateCustomerRequest'
+          $ref: '#/definitions/customer.CreateCustomerRequest'
       produces:
       - application/json
       responses:
         "200":
           description: Tạo khách hàng thành công
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+            $ref: '#/definitions/response.SuccessResponse'
         "400":
           description: Dữ liệu không hợp lệ / thiếu organization
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "500":
           description: Lỗi server (vd trùng số điện thoại)
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Tạo khách hàng
@@ -887,19 +940,19 @@ paths:
         "200":
           description: Xóa khách hàng thành công
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+            $ref: '#/definitions/response.SuccessResponse'
         "400":
           description: Thiếu id
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "404":
           description: Không tìm thấy khách hàng
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Xóa mềm khách hàng
@@ -912,36 +965,44 @@ paths:
         name: id
         required: true
         type: string
-      - description: Trang lịch sử (mặc định 1)
+      - description: Trang lịch sử hẹn (mặc định 1)
         in: query
         name: hist_page
         type: integer
-      - description: Số dòng lịch sử/trang (mặc định 10, tối đa 100)
+      - description: Số dòng lịch hẹn/trang (mặc định 10, tối đa 100)
         in: query
         name: hist_page_size
+        type: integer
+      - description: Trang lịch sử đơn (mặc định 1)
+        in: query
+        name: ord_page
+        type: integer
+      - description: Số dòng đơn/trang (mặc định 10, tối đa 100)
+        in: query
+        name: ord_page_size
         type: integer
       produces:
       - application/json
       responses:
         "200":
-          description: Hồ sơ + lịch sử lịch hẹn
+          description: Hồ sơ + lịch sử hẹn + đơn
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+            $ref: '#/definitions/response.SuccessResponse'
         "400":
           description: Thiếu id
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "404":
           description: Không tìm thấy khách hàng
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Chi tiết khách hàng kèm lịch sử lịch hẹn
+      summary: Chi tiết khách hàng kèm lịch sử lịch hẹn + đơn hàng
       tags:
       - Customers
     put:
@@ -958,29 +1019,83 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/github_com_daidat02_server_internal_domain_customer.UpdateCustomerRequest'
+          $ref: '#/definitions/customer.UpdateCustomerRequest'
       produces:
       - application/json
       responses:
         "200":
           description: Cập nhật khách hàng thành công
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+            $ref: '#/definitions/response.SuccessResponse'
         "400":
           description: Thiếu id / dữ liệu không hợp lệ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "404":
           description: Không tìm thấy khách hàng
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Cập nhật khách hàng
+      tags:
+      - Customers
+  /customers/phone:
+    get:
+      parameters:
+      - description: Số điện thoại cần tra cứu
+        in: query
+        name: phone
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Thông tin khách hàng
+          schema:
+            $ref: '#/definitions/response.SuccessResponse'
+        "400":
+          description: Thiếu số điện thoại / thiếu organization
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "401":
+          description: Thiếu token / token không hợp lệ
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Không tìm thấy khách hàng
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Tra cứu khách hàng theo số điện thoại
+      tags:
+      - Customers
+  /customers/stats:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Thống kê khách hàng
+          schema:
+            $ref: '#/definitions/response.SuccessResponse'
+        "400":
+          description: Thiếu organization
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "401":
+          description: Thiếu token / token không hợp lệ
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Thống kê tổng quan tệp khách (tổng, mới tháng này/trước, điểm tồn)
       tags:
       - Customers
   /inventory/:
@@ -1023,15 +1138,15 @@ paths:
         "200":
           description: Danh sách phiếu kho kèm phân trang
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+            $ref: '#/definitions/response.SuccessResponse'
         "400":
           description: Thiếu organization
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Lấy danh sách phiếu kho (tìm kiếm + lọc loại + sắp xếp + phân trang)
@@ -1051,19 +1166,19 @@ paths:
         "200":
           description: Chi tiết phiếu kho
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+            $ref: '#/definitions/response.SuccessResponse'
         "400":
           description: Thiếu organization
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "404":
           description: Phiếu kho không tồn tại
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Lấy chi tiết phiếu kho theo ID (kèm danh sách dòng sản phẩm)
@@ -1074,27 +1189,28 @@ paths:
       consumes:
       - application/json
       parameters:
-      - description: Thông tin phiếu kho kèm danh sách sản phẩm
+      - description: 'Phiếu kho: mỗi dòng gửi quantity theo unit hiển thị, server
+          tự quy về đơn vị nhỏ nhất + tự quyết giá'
         in: body
         name: body
         required: true
         schema:
-          $ref: '#/definitions/github_com_daidat02_server_internal_domain_inventory.CreateDocumentRequest'
+          $ref: '#/definitions/inventory.CreateDocumentRequest'
       produces:
       - application/json
       responses:
         "200":
           description: Tạo phiếu kho thành công
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+            $ref: '#/definitions/response.SuccessResponse'
         "400":
           description: Dữ liệu không hợp lệ / tồn không đủ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Tạo phiếu kho (header + chi tiết + ghi sổ tồn)
@@ -1117,15 +1233,15 @@ paths:
         "200":
           description: Danh sách tồn thấp kèm phân trang
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+            $ref: '#/definitions/response.SuccessResponse'
         "400":
           description: Thiếu organization
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Lấy danh sách sản phẩm tồn thấp
@@ -1152,15 +1268,15 @@ paths:
         "200":
           description: Lịch sử kho kèm phân trang
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+            $ref: '#/definitions/response.SuccessResponse'
         "400":
           description: Thiếu organization
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Lấy lịch sử kho (phân trang, lọc theo sản phẩm)
@@ -1209,15 +1325,15 @@ paths:
         "200":
           description: Lịch sử kho theo sản phẩm kèm phân trang
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+            $ref: '#/definitions/response.SuccessResponse'
         "400":
           description: Thiếu organization
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Lấy lịch sử kho theo sản phẩm (lọc loại + ngày + sắp xếp + phân trang)
@@ -1233,26 +1349,26 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/github_com_daidat02_server_internal_domain_user.LoginRequest'
+          $ref: '#/definitions/user.LoginRequest'
       produces:
       - application/json
       responses:
         "200":
           description: Đăng nhập thành công (kèm access_token)
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+            $ref: '#/definitions/response.SuccessResponse'
         "400":
           description: Dữ liệu không hợp lệ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "401":
           description: Mật khẩu không đúng
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "404":
           description: Số điện thoại không tồn tại
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       summary: Đăng nhập
       tags:
       - Auth
@@ -1277,15 +1393,15 @@ paths:
         "200":
           description: Danh sách đơn hàng kèm phân trang
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+            $ref: '#/definitions/response.SuccessResponse'
         "400":
           description: Thiếu organization
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Lấy danh sách đơn hàng (phân trang)
@@ -1300,26 +1416,26 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/github_com_daidat02_server_internal_domain_order.CreateOrderRequest'
+          $ref: '#/definitions/order.CreateOrderRequest'
       produces:
       - application/json
       responses:
         "200":
           description: Tạo đơn hàng thành công
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+            $ref: '#/definitions/response.SuccessResponse'
         "400":
           description: Dữ liệu không hợp lệ / tồn không đủ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "404":
           description: Không tìm thấy khách/dịch vụ/sản phẩm
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Tạo đơn hàng (trừ kho trong transaction)
@@ -1339,19 +1455,19 @@ paths:
         "200":
           description: Chi tiết đơn hàng
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+            $ref: '#/definitions/response.SuccessResponse'
         "400":
           description: Thiếu id
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "404":
           description: Không tìm thấy đơn hàng
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Lấy chi tiết đơn hàng (dòng hàng + vật tư + thanh toán)
@@ -1371,19 +1487,19 @@ paths:
         "200":
           description: Hủy đơn thành công
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+            $ref: '#/definitions/response.SuccessResponse'
         "400":
           description: Trạng thái không cho hủy
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "404":
           description: Không tìm thấy đơn hàng
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Hủy đơn chưa phục vụ (nhả giữ chỗ kho, không hoàn tồn)
@@ -1403,22 +1519,62 @@ paths:
         "200":
           description: Hoàn tất đơn hàng thành công
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+            $ref: '#/definitions/response.SuccessResponse'
         "400":
           description: Trạng thái không cho hoàn tất
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "404":
           description: Không tìm thấy đơn hàng
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Hoàn tất phục vụ đơn hàng
+      tags:
+      - Orders
+  /orders/{id}/customer:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: ID đơn hàng
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: customer_id hoặc new_customer
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/order.UpdateOrderCustomerRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Gán khách hàng thành công
+          schema:
+            $ref: '#/definitions/response.SuccessResponse'
+        "400":
+          description: Dữ liệu không hợp lệ / đơn đã khóa
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "401":
+          description: Thiếu token / token không hợp lệ
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Không tìm thấy đơn/khách hàng
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Gán/đổi khách hàng cho đơn chưa khóa
       tags:
       - Orders
   /orders/{id}/payments:
@@ -1436,26 +1592,26 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/github_com_daidat02_server_internal_domain_order.CreatePaymentRequest'
+          $ref: '#/definitions/order.CreatePaymentRequest'
       produces:
       - application/json
       responses:
         "200":
           description: Ghi nhận thanh toán thành công
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+            $ref: '#/definitions/response.SuccessResponse'
         "400":
           description: Dữ liệu không hợp lệ / đơn đã hủy
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "404":
           description: Không tìm thấy đơn hàng
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Ghi nhận thanh toán cho đơn (idempotent theo mã giao dịch)
@@ -1475,19 +1631,19 @@ paths:
         "200":
           description: Hoàn đơn thành công
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+            $ref: '#/definitions/response.SuccessResponse'
         "400":
           description: Trạng thái không cho hoàn
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "404":
           description: Không tìm thấy đơn hàng
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Hoàn đơn đang phục vụ (hoàn kho + vô hiệu phiếu xuất)
@@ -1507,22 +1663,103 @@ paths:
         "200":
           description: Bắt đầu phục vụ, đã sinh phiếu xuất
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+            $ref: '#/definitions/response.SuccessResponse'
         "400":
           description: Chưa thanh toán / tồn kho không đủ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "404":
           description: Không tìm thấy đơn hàng
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Bắt đầu phục vụ đơn đã thanh toán (trừ kho + sinh phiếu xuất)
+      tags:
+      - Orders
+  /orders/items/{itemId}/staff:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: ID dòng đơn hàng
+        in: path
+        name: itemId
+        required: true
+        type: string
+      - description: 'Danh sách NV (type: percent|fixed|profit, tổng share = 100,
+          hoa hồng tự nhập ở UI)'
+        in: body
+        name: body
+        required: true
+        schema:
+          items:
+            $ref: '#/definitions/order.StaffOrderItemInput'
+          type: array
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Danh sách NV đã gán kèm hoa hồng đã chốt
+          schema:
+            $ref: '#/definitions/response.SuccessResponse'
+        "400":
+          description: Thiếu id / type-share sai / trùng NV
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "401":
+          description: Thiếu token / token không hợp lệ
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Không tìm thấy dòng đơn / nhân viên
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Gán lại NV thực hiện cho 1 dòng đơn (thay toàn bộ)
+      tags:
+      - Orders
+  /orders/materials:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Danh sách vật tư theo order_item_id, server tự suy đơn (mảng
+          rỗng = không làm gì)
+        in: body
+        name: body
+        required: true
+        schema:
+          items:
+            $ref: '#/definitions/order.OrderMaterialInput'
+          type: array
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Danh sách vật tư vừa lưu
+          schema:
+            $ref: '#/definitions/response.SuccessResponse'
+        "400":
+          description: Thiếu order_id / vật tư không thuộc đơn / số lượng sai
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "401":
+          description: Thiếu token / token không hợp lệ
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Không tìm thấy đơn hàng / sản phẩm
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Gán lại vật tư tiêu hao cho nhiều đơn + chỉnh giữ chỗ kho theo delta
       tags:
       - Orders
   /orders/pos-items:
@@ -1558,15 +1795,15 @@ paths:
         "200":
           description: Danh sách sản phẩm/dịch vụ POS
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+            $ref: '#/definitions/response.SuccessResponse'
         "400":
           description: Thiếu organization
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Lấy danh sách sản phẩm/dịch vụ cho màn POS (tìm kiếm + lọc danh mục
@@ -1612,19 +1849,19 @@ paths:
           description: Danh sách sản phẩm kèm phân trang {data, page, page_size, total,
             total_pages}
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+            $ref: '#/definitions/response.SuccessResponse'
         "400":
           description: Thiếu organization
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "500":
           description: Lỗi server
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Lấy danh sách sản phẩm (phân trang + lọc + sắp xếp)
@@ -1639,26 +1876,26 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/github_com_daidat02_server_internal_domain_product.CreateProductRequest'
+          $ref: '#/definitions/product.CreateProductRequest'
       produces:
       - application/json
       responses:
         "200":
           description: Tạo sản phẩm thành công
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+            $ref: '#/definitions/response.SuccessResponse'
         "400":
           description: Dữ liệu không hợp lệ / thiếu organization
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "500":
           description: Lỗi server (vd trùng SKU)
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Tạo sản phẩm
@@ -1678,19 +1915,19 @@ paths:
         "200":
           description: Xóa sản phẩm thành công
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+            $ref: '#/definitions/response.SuccessResponse'
         "400":
           description: Thiếu id
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "404":
           description: Không tìm thấy sản phẩm
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Xóa sản phẩm
@@ -1710,26 +1947,26 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/github_com_daidat02_server_internal_domain_product.UpdateProductRequest'
+          $ref: '#/definitions/product.UpdateProductRequest'
       produces:
       - application/json
       responses:
         "200":
           description: Cập nhật sản phẩm thành công
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+            $ref: '#/definitions/response.SuccessResponse'
         "400":
           description: Thiếu id / dữ liệu không hợp lệ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "404":
           description: Không tìm thấy sản phẩm
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Cập nhật sản phẩm
@@ -1745,22 +1982,22 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/github_com_daidat02_server_internal_domain_user.CreateUserRequest'
+          $ref: '#/definitions/user.CreateUserRequest'
       produces:
       - application/json
       responses:
         "200":
           description: Tạo người dùng thành công
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+            $ref: '#/definitions/response.SuccessResponse'
         "400":
           description: Dữ liệu không hợp lệ / Số điện thoại đã tồn tại
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "500":
           description: Lỗi server
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       summary: Đăng ký người dùng
       tags:
       - Auth
@@ -1803,19 +2040,19 @@ paths:
           description: Danh sách dịch vụ kèm phân trang {data, page, page_size, total,
             total_pages}
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+            $ref: '#/definitions/response.SuccessResponse'
         "400":
           description: Thiếu organization
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "500":
           description: Lỗi server
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Lấy danh sách dịch vụ (phân trang + lọc + sắp xếp)
@@ -1830,26 +2067,26 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/github_com_daidat02_server_internal_domain_service.CreateServiceRequest'
+          $ref: '#/definitions/service.CreateServiceRequest'
       produces:
       - application/json
       responses:
         "200":
           description: Tạo dịch vụ thành công
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+            $ref: '#/definitions/response.SuccessResponse'
         "400":
           description: Dữ liệu không hợp lệ / thiếu organization
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "500":
           description: Lỗi server
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Tạo dịch vụ
@@ -1869,19 +2106,19 @@ paths:
         "200":
           description: Xóa dịch vụ thành công
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+            $ref: '#/definitions/response.SuccessResponse'
         "400":
           description: Thiếu id
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "404":
           description: Không tìm thấy dịch vụ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Xóa dịch vụ
@@ -1901,26 +2138,26 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/github_com_daidat02_server_internal_domain_service.UpdateServiceRequest'
+          $ref: '#/definitions/service.UpdateServiceRequest'
       produces:
       - application/json
       responses:
         "200":
           description: Cập nhật dịch vụ thành công
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+            $ref: '#/definitions/response.SuccessResponse'
         "400":
           description: Thiếu id / dữ liệu không hợp lệ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "404":
           description: Không tìm thấy dịch vụ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Cập nhật dịch vụ
@@ -1940,19 +2177,19 @@ paths:
         "200":
           description: Chi tiết dịch vụ và danh sách nguyên vật liệu
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+            $ref: '#/definitions/response.SuccessResponse'
         "400":
           description: Thiếu id
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "404":
           description: Không tìm thấy dịch vụ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Lấy chi tiết dịch vụ và nguyên vật liệu
@@ -1997,19 +2234,19 @@ paths:
           description: Danh sách nhân viên kèm phân trang {data, page, page_size,
             total, total_pages}
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+            $ref: '#/definitions/response.SuccessResponse'
         "400":
           description: Thiếu organization
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "500":
           description: Lỗi server
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Lấy danh sách nhân viên (phân trang + lọc + sắp xếp)
@@ -2024,26 +2261,26 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/github_com_daidat02_server_internal_domain_staff.CreateStaffRequest'
+          $ref: '#/definitions/staff.CreateStaffRequest'
       produces:
       - application/json
       responses:
         "200":
           description: Tạo nhân viên thành công
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+            $ref: '#/definitions/response.SuccessResponse'
         "400":
           description: Dữ liệu không hợp lệ / thiếu organization
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "500":
           description: Lỗi server
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Tạo nhân viên
@@ -2063,19 +2300,19 @@ paths:
         "200":
           description: Xóa nhân viên thành công
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+            $ref: '#/definitions/response.SuccessResponse'
         "400":
           description: Thiếu id
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "404":
           description: Không tìm thấy nhân viên
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Xóa mềm nhân viên
@@ -2095,26 +2332,26 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/github_com_daidat02_server_internal_domain_staff.UpdateStaffRequest'
+          $ref: '#/definitions/staff.UpdateStaffRequest'
       produces:
       - application/json
       responses:
         "200":
           description: Cập nhật nhân viên thành công
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+            $ref: '#/definitions/response.SuccessResponse'
         "400":
           description: Thiếu id / dữ liệu không hợp lệ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "404":
           description: Không tìm thấy nhân viên
           schema:
-            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Cập nhật nhân viên

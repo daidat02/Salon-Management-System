@@ -10,11 +10,19 @@ type View = "list" | "week";
 
 export default function AppointmentsView() {
   const [view, setView] = React.useState<View>("list");
+  const todayLabel = React.useMemo(() => {
+    const now = new Date();
+    const dd = String(now.getDate()).padStart(2, "0");
+    const mo = String(now.getMonth() + 1).padStart(2, "0");
+    const yyyy = now.getFullYear();
+    const weekday = ["Chủ nhật", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7"][now.getDay()];
+    return `${weekday}, ${dd}/${mo}/${yyyy}`;
+  }, []);
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3 text-xs">
-        <span className="rounded-lg bg-surface-container px-3 py-1.5">Hôm nay, 24/10/2024</span>
+        <span className="rounded-lg bg-surface-container px-3 py-1.5">{todayLabel}</span>
         <div className="flex items-center gap-1 rounded-lg bg-surface-container p-1">
           <button
             type="button"

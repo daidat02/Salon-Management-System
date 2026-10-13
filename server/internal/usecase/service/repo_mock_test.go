@@ -53,6 +53,14 @@ func (m *MockServiceRepository) ProductsExistInOrg(ctx context.Context, orgID st
 	return args.Get(0).([]string), args.Error(1)
 }
 
+func (m *MockServiceRepository) GetProductUnits(ctx context.Context, orgID string, productIDs []string) (map[string]domain.ProductUnit, error) {
+	args := m.Called(ctx, orgID, productIDs)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(map[string]domain.ProductUnit), args.Error(1)
+}
+
 func (m *MockServiceRepository) ServicesExistInOrg(ctx context.Context, orgID string, serviceIDs []string) ([]string, error) {
 	args := m.Called(ctx, orgID, serviceIDs)
 	if args.Get(0) == nil {

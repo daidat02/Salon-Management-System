@@ -1,8 +1,7 @@
 export type OrderStatus =
-  | 'draft'
-  | 'pending_payment'
-  | 'paid'
-  | 'serving'
+  | 'pending'
+  | 'confirm'
+  | 'delivery'
   | 'completed'
   | 'cancelled'
   | 'refunded';
@@ -21,6 +20,15 @@ export interface Order {
   updated_at: string | null;
 }
 
+export interface OrderItemStaff {
+  id: string;
+  staff_id: string | null;
+  full_name: string | null;
+  type: 'percent' | 'fixed' | 'profit';
+  share_pct: number;
+  commission_amount: number;
+}
+
 export interface OrderDetailItem {
   id: string;
   item_type: 'service' | 'product';
@@ -30,6 +38,8 @@ export interface OrderDetailItem {
   quantity: number;
   unit_price: number;
   line_total: number;
+  /** NV thực hiện do server join sẵn (có thể vắng khi đơn cũ). */
+  staff?: OrderItemStaff[] | null;
 }
 
 export interface OrderDetailMaterial {
@@ -38,6 +48,8 @@ export interface OrderDetailMaterial {
   product_id: string;
   quantity: number;
   unit_cost_at_time: number;
+  /** Đơn vị của quantity (server trả kèm từ order_item_materials.unit). */
+  unit?: string | null;
 }
 
 export interface OrderDetailPayment {

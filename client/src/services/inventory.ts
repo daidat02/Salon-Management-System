@@ -1,4 +1,8 @@
-import { InventoryDocument, InventoryDocumentDetail, InventoryTransaction } from '@/types/inventory';
+import {
+  InventoryDocument,
+  InventoryDocumentDetail,
+  InventoryTransaction,
+} from '@/types/inventory';
 import { ApiResponse, PaginationResult } from '@/types/response';
 import apiClient from './apiClient';
 import { API_ENDPOINTS } from '@/constants';
@@ -35,7 +39,11 @@ export const getInventoryDocuments = async ({
 
 export type CreateDocumentItemPayload = {
   product_id: string;
+  /** Số lượng theo đơn vị hiển thị (server tự quy về đơn vị nhỏ nhất). */
   quantity: number;
+  /** Đơn vị của quantity (VD chai/ml, rỗng = đơn vị lớn của SP). */
+  unit?: string;
+  /** Đơn giá theo unit hiển thị — chỉ dùng cho phiếu nhập, phiếu xuất server tự lấy giá vốn. */
   unit_price: number;
 };
 
@@ -51,7 +59,7 @@ export type CreateDocumentPayload = {
 
 export const createInventoryDocument = async (payload: CreateDocumentPayload) => {
   const res = await apiClient.post<ApiResponse<InventoryDocument>>(
-    INVENTORY_ENDPOINT.GET_DOCUMENTS,
+    INVENTORY_ENDPOINT.CREATE_DOCUMENT,
     payload,
   );
 
@@ -60,9 +68,8 @@ export const createInventoryDocument = async (payload: CreateDocumentPayload) =>
 
 export const getInventoryDocument = async (id: string) => {
   const res = await apiClient.get<ApiResponse<InventoryDocumentDetail>>(
-    `${INVENTORY_ENDPOINT.GET_DOCUMENTS}${id}`,
+    `${INVENTORY_ENDPOINT.GET_DOCUMENT_DETAIL(id)}`,
   );
-
   return res.data.data;
 };
 

@@ -3,6 +3,7 @@ import type { MouseEvent } from 'react';
 import { ChevronRight, type LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import PageHeadingBackButton from './PageHeadingBackButton';
 
 export type PageHeadingBreadcrumb = {
   label: string;
@@ -21,6 +22,13 @@ export type PageHeadingAction = {
   onClick?: (e: MouseEvent) => void;
 };
 
+export type PageHeadingBackButton = {
+  /** Text nút (mặc định "Quay lại"). */
+  label?: string;
+  /** Có href thì render Link, không thì router.back(). */
+  href?: string;
+};
+
 type PageHeadingProps = {
   breadcrumbs?: PageHeadingBreadcrumb[];
   title: string;
@@ -32,6 +40,8 @@ type PageHeadingProps = {
   /** Tự style (mỗi preview một kiểu text-xs/text-sm khác nhau). */
   description?: React.ReactNode;
   actions?: PageHeadingAction[];
+  /** Hiện nút quay lại phía trên heading. true = mặc định router.back(). */
+  backButton?: boolean | PageHeadingBackButton;
 };
 
 /**
@@ -47,10 +57,17 @@ export default function PageHeading({
   badgeVariant = 'container',
   description,
   actions = [],
+  backButton = false,
 }: PageHeadingProps) {
+  const back = typeof backButton === 'object' && backButton !== null ? backButton : undefined;
+  const showBack = backButton === true || back !== undefined;
+
   return (
     <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
       <div>
+        {showBack && (
+          <PageHeadingBackButton label={back?.label} href={back?.href} />
+        )}
         {breadcrumbs.length > 0 && (
           <nav className="mb-1 flex items-center gap-2 text-xs text-on-surface-variant">
             {breadcrumbs.map((crumb, i) => {

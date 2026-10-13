@@ -152,3 +152,19 @@ func (u *ProductUsecase) DeleteProduct(ctx context.Context, id string) (string, 
 
 	return id, nil
 }
+
+// GetProductStats thống kê tổng quan sản phẩm/kho của salon.
+func (u *ProductUsecase) GetProductStats(ctx context.Context) (*domain.ProductStatsResponse, error) {
+	orgID, err := middlewares.GetOrgID(ctx)
+	if err != nil {
+		return nil, apperror.New(400, "Không tìm thấy organization_id trong context", err)
+	}
+
+	stats, err := u.repo.GetProductStats(ctx, orgID)
+	if err != nil {
+		log.Println("Error getting product stats:", err)
+		return nil, apperror.New(500, "Lỗi khi lấy thống kê sản phẩm", err)
+	}
+
+	return stats, nil
+}

@@ -7,7 +7,9 @@ import (
 	"time"
 
 	"github.com/daidat02/server/internal/delivery/http/middlewares"
+	appointmentDomain "github.com/daidat02/server/internal/domain/appointment"
 	domain "github.com/daidat02/server/internal/domain/customer"
+	orderDomain "github.com/daidat02/server/internal/domain/order"
 	"github.com/daidat02/server/pkg/apperror"
 
 	"github.com/stretchr/testify/assert"
@@ -124,7 +126,7 @@ func TestCustomerUsecase_CreateCustomer(t *testing.T) {
 				mockRepo.On("CreateCustomer", mock.Anything, mock.Anything).Return(tt.mockReturnErr)
 			}
 
-			uc := NewCustomerUsecase(mockRepo, new(MockHistoryStore))
+			uc := NewCustomerUsecase(mockRepo, new(MockHistoryStore), new(MockOrderHistoryStore))
 			res, err := uc.CreateCustomer(tt.ctx, tt.input)
 
 			if tt.expectedError {
@@ -224,7 +226,7 @@ func TestCustomerUsecase_GetCustomersByOrgID(t *testing.T) {
 					Return(tt.mockTotal, tt.mockCountErr)
 			}
 
-			uc := NewCustomerUsecase(mockRepo, new(MockHistoryStore))
+			uc := NewCustomerUsecase(mockRepo, new(MockHistoryStore), new(MockOrderHistoryStore))
 			res, err := uc.GetCustomersByOrgID(tt.ctx, tt.page, tt.pageSize, tt.search)
 
 			if tt.expectedError {
@@ -298,7 +300,7 @@ func TestCustomerUsecase_UpdateCustomer(t *testing.T) {
 				mockRepo.On("UpdateCustomer", mock.Anything, mock.Anything).Return(tt.mockReturnErr)
 			}
 
-			uc := NewCustomerUsecase(mockRepo, new(MockHistoryStore))
+			uc := NewCustomerUsecase(mockRepo, new(MockHistoryStore), new(MockOrderHistoryStore))
 			res, err := uc.UpdateCustomer(tt.ctx, tt.id, tt.input)
 
 			if tt.expectedError {
@@ -359,7 +361,7 @@ func TestCustomerUsecase_DeleteCustomer(t *testing.T) {
 				mockRepo.On("DeleteCustomer", mock.Anything, "org-123", tt.id).Return(tt.mockReturnErr)
 			}
 
-			uc := NewCustomerUsecase(mockRepo, new(MockHistoryStore))
+			uc := NewCustomerUsecase(mockRepo, new(MockHistoryStore), new(MockOrderHistoryStore))
 			deletedID, err := uc.DeleteCustomer(tt.ctx, tt.id)
 
 			if tt.expectedError {
@@ -373,4 +375,170 @@ func TestCustomerUsecase_DeleteCustomer(t *testing.T) {
 			mockRepo.AssertExpectations(t)
 		})
 	}
+}
+
+func TestCustomerUsecase_GetCustomerByPhoneNumber(t *testing.T) {
+	now := time.Now()
+	found := &domain.Customer{
+		ID: "cus-1", OrganizationID: "org-123", FullName: "Nguyễn Thị C",
+		Phone: "0912345678", Gender: domain.GenderFemale,
+		TotalSpent: 1500000, TotalVisits: 5, CreatedAt: &now, UpdatedAt: &now,
+	}
+
+	tests := []struct {
+		name          string
+		ctx           context.Context
+		phone         string
+		mockReturn    *domain.Customer
+		mockErr       error
+		callRepo      bool
+		expectedError bool
+		expectedCode  int
+	}{
+		{
+			name: "Thành công - Tìm thấy khách theo phone", ctx: withOrgCtx("org-123"),
+			phone: "0912345678", mockReturn: found, callRepo: true, expectedError: false,
+		},
+		{
+			name: "Thất bại - Thiếu organization_id", ctx: context.Background(),
+			phone: "0912345678", callRepo: false, expectedError: true, expectedCode: 400,
+		},
+		{
+			name: "Thất bại - Không tìm thấy khách hàng", ctx: withOrgCtx("org-123"),
+			phone: "0900000000", mockErr: domain.ErrCustomerNotFound,
+			callRepo: true, expectedError: true, expectedCode: 404,
+		},
+		{
+			name: "Thất bại - Lỗi DB", ctx: withOrgCtx("org-123"),
+			phone: "0912345678", mockErr: errors.New("db error"),
+			callRepo: true, expectedError: true, expectedCode: 500,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockRepo := new(MockCustomerRepository)
+			if tt.callRepo {
+				mockRepo.On("GetCustomerByPhone", mock.Anything, "org-123", tt.phone).
+					Return(tt.mockReturn, tt.mockErr)
+			}
+
+			uc := NewCustomerUsecase(mockRepo, new(MockHistoryStore), new(MockOrderHistoryStore))
+			res, err := uc.GetCustomerByPhoneNumber(tt.ctx, tt.phone)
+
+			if tt.expectedError {
+				assert.Error(t, err)
+				assert.Nil(t, res)
+				assertFlatAppError(t, err, tt.expectedCode)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, res)
+				assert.Equal(t, "cus-1", res.ID)
+				assert.Equal(t, "org-123", res.OrganizationID)
+				assert.Equal(t, tt.phone, res.Phone)
+				assert.Equal(t, found.FullName, res.FullName)
+			}
+			mockRepo.AssertExpectations(t)
+		})
+	}
+}
+
+func TestCustomerUsecase_GetCustomerDetail(t *testing.T) {
+	details := &domain.CustomerDetailsResponse{
+		ID: "cus-1", OrganizationID: "org-123", FullName: "Nguyễn Thị C",
+		Phone: "0912345678", TotalSpent: 1500000, TotalVisits: 5,
+		SpendingByMonth: []domain.SpendByMonth{
+			{Month: "2026-09", TotalSpent: 500000, TotalOrders: 1},
+		},
+	}
+
+	t.Run("Thành công - Chi tiết kèm chi tiêu tháng + lịch sử hẹn", func(t *testing.T) {
+		mockRepo := new(MockCustomerRepository)
+		mockRepo.On("GetCustomerDetailByID", mock.Anything, "org-123", "cus-1").
+			Return(details, nil)
+		mockHistory := new(MockHistoryStore)
+		mockHistory.On("GetAppointmentsByCustomerID", mock.Anything, "org-123", "cus-1", mock.Anything, mock.Anything).
+			Return([]*appointmentDomain.Appointment{}, nil)
+		mockHistory.On("CountAppointmentsByCustomerID", mock.Anything, "org-123", "cus-1").
+			Return(int64(0), nil)
+		mockOrders := new(MockOrderHistoryStore)
+		mockOrders.On("ListHistoriesOrderByCustomerId", mock.Anything, "org-123", "cus-1", mock.Anything, mock.Anything).
+			Return([]*orderDomain.Order{
+				{ID: "ord-1", OrganizationID: "org-123", Code: "ORD-1", TotalAmount: 300000, Status: "completed"},
+			}, nil)
+		mockOrders.On("CountHistoriesOrderByCustomerId", mock.Anything, "org-123", "cus-1").
+			Return(int64(1), nil)
+
+		uc := NewCustomerUsecase(mockRepo, mockHistory, mockOrders)
+		res, err := uc.GetCustomerDetail(withOrgCtx("org-123"), "cus-1", 1, 10, 1, 10)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, res)
+		assert.Equal(t, "cus-1", res.Customer.ID)
+		assert.Len(t, res.Customer.SpendingByMonth, 1)
+		assert.Equal(t, "2026-09", res.Customer.SpendingByMonth[0].Month)
+		assert.Len(t, res.Orders.Data, 1)
+		assert.Equal(t, "ORD-1", res.Orders.Data[0].Code)
+		assert.Equal(t, int64(1), res.Orders.Total)
+		mockRepo.AssertExpectations(t)
+	})
+
+	t.Run("Thất bại - Không tìm thấy khách hàng", func(t *testing.T) {
+		mockRepo := new(MockCustomerRepository)
+		mockRepo.On("GetCustomerDetailByID", mock.Anything, "org-123", "cus-x").
+			Return(nil, domain.ErrCustomerNotFound)
+
+		uc := NewCustomerUsecase(mockRepo, new(MockHistoryStore), new(MockOrderHistoryStore))
+		res, err := uc.GetCustomerDetail(withOrgCtx("org-123"), "cus-x", 1, 10, 1, 10)
+
+		assert.Error(t, err)
+		assert.Nil(t, res)
+		assertFlatAppError(t, err, 404)
+		mockRepo.AssertExpectations(t)
+	})
+}
+
+func TestCustomerUsecase_GetCustomerStats(t *testing.T) {
+	stats := &domain.CustomerStatsResponse{
+		TotalCustomer: 100, TotalNewCustomer: 100,
+		TotalNewCustomerLastMonth: 0, TotalOutstandingPoints: 150,
+	}
+
+	t.Run("Thành công - Thống kê tệp khách", func(t *testing.T) {
+		mockRepo := new(MockCustomerRepository)
+		mockRepo.On("GetCustomerStats", mock.Anything, "org-123").
+			Return(stats, nil)
+
+		uc := NewCustomerUsecase(mockRepo, new(MockHistoryStore), new(MockOrderHistoryStore))
+		res, err := uc.GetCustomerStats(withOrgCtx("org-123"))
+
+		assert.NoError(t, err)
+		assert.NotNil(t, res)
+		assert.Equal(t, int64(100), res.TotalCustomer)
+		assert.Equal(t, int64(150), res.TotalOutstandingPoints)
+		mockRepo.AssertExpectations(t)
+	})
+
+	t.Run("Thất bại - Thiếu organization_id", func(t *testing.T) {
+		uc := NewCustomerUsecase(new(MockCustomerRepository), new(MockHistoryStore), new(MockOrderHistoryStore))
+		res, err := uc.GetCustomerStats(context.Background())
+
+		assert.Error(t, err)
+		assert.Nil(t, res)
+		assertFlatAppError(t, err, 400)
+	})
+
+	t.Run("Thất bại - Lỗi DB", func(t *testing.T) {
+		mockRepo := new(MockCustomerRepository)
+		mockRepo.On("GetCustomerStats", mock.Anything, "org-123").
+			Return(nil, errors.New("db error"))
+
+		uc := NewCustomerUsecase(mockRepo, new(MockHistoryStore), new(MockOrderHistoryStore))
+		res, err := uc.GetCustomerStats(withOrgCtx("org-123"))
+
+		assert.Error(t, err)
+		assert.Nil(t, res)
+		assertFlatAppError(t, err, 500)
+		mockRepo.AssertExpectations(t)
+	})
 }

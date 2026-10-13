@@ -11,13 +11,15 @@ func RegisterOrderRoutes(r *gin.Engine, h *OrderHandler, basePath string) {
 	{
 		group.GET("", h.GetOrdersByOrgID)
 		group.POST("", h.CreateOrder)
+		group.POST("/items/:itemId/staff", h.ReplaceStaffOrderItems)
 		group.GET("/:id", h.GetOrderDetail)
-		
+
 		group.POST("/:id/cancel", h.CancelOrder)
 		group.POST("/:id/refund", h.RefundOrder)
-		group.POST("/:id/serve", h.ServeOrder)
 		group.POST("/:id/complete", h.CompleteOrder)
 		group.POST("/:id/payments", h.CreatePayment)
+		group.POST("/materials", h.ReplaceOrderMaterials)
+		group.PATCH("/:id/customer", h.UpdateOrderCustomer)
 
 		group.GET("/pos-items", h.GetPosItemsByOrgID)
 	}

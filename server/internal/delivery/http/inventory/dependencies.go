@@ -14,8 +14,8 @@ type Dependencies struct {
 
 func NewDependencies(dbPool *pgxpool.Pool) *Dependencies {
 	inventoryRepo := repo.NewPostgresInventoryRepository(dbPool)
-	serviceRepo := repo.NewPostgresServiceRepository(dbPool)
-	useCase := uc.NewInventoryUsecase(inventoryRepo, serviceRepo)
+	productRepo := repo.NewPostgresProductRepository(dbPool)
+	useCase := uc.NewInventoryUsecase(inventoryRepo, productRepo)
 	handler := NewInventoryHandler(useCase)
 
 	return &Dependencies{

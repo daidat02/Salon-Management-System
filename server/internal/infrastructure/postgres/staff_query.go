@@ -39,4 +39,9 @@ const (
 		SET deleted_at = now()
 		WHERE id = $1 AND organization_id = $2 AND deleted_at IS NULL
 	`
+	staffsExistInOrgQuery = `
+		SELECT id
+		FROM staff
+		WHERE organization_id = $1 AND id = ANY($2) AND deleted_at IS NULL
+	`
 )

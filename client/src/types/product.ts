@@ -17,3 +17,10 @@ export interface Product {
   created_at: string;
   updated_at: string;
 }
+
+export interface ProductStats {
+  total_products: number;
+  on_sale_products: number;
+  low_stock_products: number;
+  retail_revenue_month: number;
+}

@@ -4,7 +4,29 @@ import * as React from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import DashToolbar from '@/components/dashboard/DashToolbar';
 
-export default function OrdersToolbar() {
+type OrdersToolbarProps = {
+  /** Khi true: dropdown status chỉ hiện các trạng thái lịch sử (kết thúc). */
+  historyOnly?: boolean;
+};
+
+const ALL_STATUS_OPTIONS = [
+  { value: '', label: 'Tất cả trạng thái' },
+  { value: 'pending', label: 'Chờ xử lý' },
+  { value: 'confirm', label: 'Đã xác nhận' },
+  { value: 'delivery', label: 'Đang giao' },
+  { value: 'completed', label: 'Hoàn tất' },
+  { value: 'cancelled', label: 'Đã hủy' },
+  { value: 'refunded', label: 'Đã hoàn tiền' },
+];
+
+const HISTORY_STATUS_OPTIONS = [
+  { value: '', label: 'Tất cả lịch sử' },
+  { value: 'completed', label: 'Hoàn tất' },
+  { value: 'cancelled', label: 'Đã hủy' },
+  { value: 'refunded', label: 'Đã hoàn tiền' },
+];
+
+export default function OrdersToolbar({ historyOnly = false }: OrdersToolbarProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const search = searchParams.get('search') || '';
@@ -46,15 +68,7 @@ export default function OrdersToolbar() {
           placeholder: 'Tất cả trạng thái',
           value: status || undefined,
           widthClass: 'sm:w-44',
-          options: [
-            { value: '', label: 'Tất cả trạng thái' },
-            { value: 'pending_payment', label: 'Chưa thanh toán' },
-            { value: 'paid', label: 'Đã thanh toán' },
-            { value: 'serving', label: 'Đang phục vụ' },
-            { value: 'completed', label: 'Hoàn tất' },
-            { value: 'cancelled', label: 'Đã hủy' },
-            { value: 'refunded', label: 'Đã hoàn tiền' },
-          ],
+          options: historyOnly ? HISTORY_STATUS_OPTIONS : ALL_STATUS_OPTIONS,
           onValueChange: handleStatusChange,
         },
       ]}

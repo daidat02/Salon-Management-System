@@ -105,6 +105,25 @@ func (h *ProductHandler) GetProductsByOrgID(c *gin.Context) {
 	response.Success(c, 200, "Danh sách sản phẩm", result)
 }
 
+// GetProductStats godoc
+// @Summary      Thống kê tổng quan sản phẩm/kho (tổng, đang bán, sắp hết, doanh thu lẻ tháng)
+// @Tags         Products
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200  {object}  response.SuccessResponse  "Thống kê sản phẩm"
+// @Failure      400  {object}  response.ErrorResponse    "Thiếu organization"
+// @Failure      401  {object}  response.ErrorResponse    "Thiếu token / token không hợp lệ"
+// @Router       /products/stats [get]
+func (h *ProductHandler) GetProductStats(c *gin.Context) {
+	result, err := h.uc.GetProductStats(c.Request.Context())
+	if err != nil {
+		response.Error(c, err)
+		c.Abort()
+		return
+	}
+	response.Success(c, 200, "Thống kê sản phẩm", result)
+}
+
 // UpdateProduct godoc
 // @Summary      Cập nhật sản phẩm
 // @Tags         Products

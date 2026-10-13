@@ -39,3 +39,11 @@ func (m *MockProductRepository) DeleteProduct(ctx context.Context, orgID, id str
 	args := m.Called(ctx, orgID, id)
 	return args.Error(0)
 }
+
+func (m *MockProductRepository) GetProductStats(ctx context.Context, orgID string) (*domain.ProductStatsResponse, error) {
+	args := m.Called(ctx, orgID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*domain.ProductStatsResponse), args.Error(1)
+}
