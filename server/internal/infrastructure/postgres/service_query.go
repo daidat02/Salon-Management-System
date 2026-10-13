@@ -65,10 +65,10 @@ const (
 		JOIN products p ON p.id = sm.product_id AND p.organization_id = sm.organization_id
 		WHERE sm.organization_id = $1 AND sm.service_id = ANY($2)
 	`
-	servicePriceQuery = `
-		SELECT price
+	servicePricesQuery = `
+		SELECT id, price
 		FROM services
-		WHERE organization_id = $1 AND id = $2
+		WHERE organization_id = $1 AND id = ANY($2)
 	`
 	getServiceDetailsQuery = `
 		SELECT 

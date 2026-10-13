@@ -2,15 +2,12 @@ package order
 
 import (
 	"context"
-	"crypto/rand"
 	"errors"
 	"fmt"
 	"log"
-	"math/big"
 	"strings"
 	"time"
 
-	"github.com/daidat02/server/internal/delivery/http/middlewares"
 	customerdomain "github.com/daidat02/server/internal/domain/customer"
 	domain "github.com/daidat02/server/internal/domain/order"
 	productdomain "github.com/daidat02/server/internal/domain/product"
@@ -51,72 +48,11 @@ func NewOrderUsecase(repo domain.OrderRepository, catalog CatalogChecker, produc
 
 // ---------- Helper thuần túy (không chạm DB) ----------
 
-// generateOrderCode sinh mã đơn dạng ORD-ddMMyy-HHmm + 4 số ngẫu nhiên.
-func generateOrderCode() string {
-	now := time.Now()
-	var randPart [4]byte
-	for i := range randPart {
-		n, err := rand.Int(rand.Reader, big.NewInt(10))
-		if err != nil {
-			randPart[i] = byte('0' + now.Nanosecond()%10)
-			continue
-		}
-		randPart[i] = byte('0' + n.Int64())
-	}
-	// VD: ORD-300926-14304821
-	return fmt.Sprintf("ORD-%02d%02d%02d-%02d%02d%s",
-		now.Day(), int(now.Month()), now.Year()%100,
-		now.Hour(), now.Minute(), string(randPart[:]))
-}
-
 // isUniqueViolation nhận diện lỗi unique PostgreSQL (mã 23505) để map
 // sang message thân thiện (trùng mã đơn / trùng giao dịch thanh toán).
 func isUniqueViolation(err error) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == "23505"
-}
-
-// toResponse map entity Order sang response (chưa kèm tên khách POS).
-func toResponse(o *domain.Order) *domain.OrderResponse {
-	return &domain.OrderResponse{
-		ID:             o.ID,
-		OrganizationID: o.OrganizationID,
-		Code:           o.Code,
-		CustomerID:     o.CustomerID,
-		AppointmentID:  o.AppointmentID,
-		SubtotalAmount: o.SubtotalAmount,
-		DiscountAmount: o.DiscountAmount,
-		TotalAmount:    o.TotalAmount,
-		Status:         o.Status,
-		CreatedAt:      o.CreatedAt,
-		UpdatedAt:      o.UpdatedAt,
-	}
-}
-
-// toPaymentResponse map entity Payment sang response.
-func toPaymentResponse(p *domain.Payment) *domain.PaymentResponse {
-	return &domain.PaymentResponse{
-		ID: p.ID, OrderID: p.OrderID, Method: p.Method, Provider: p.Provider,
-		ProviderTxnID: p.ProviderTxnID, Amount: p.Amount, Status: p.Status,
-		PaidAt: p.PaidAt, CreatedAt: p.CreatedAt,
-	}
-}
-
-// strPtr biến "" thành nil để chứa trong field nullable của response.
-func strPtr(s string) *string {
-	if strings.TrimSpace(s) == "" {
-		return nil
-	}
-	v := strings.TrimSpace(s)
-	return &v
-}
-
-// ptrVal mở pointer string, nil thành "".
-func ptrVal(s *string) string {
-	if s == nil {
-		return ""
-	}
-	return *s
 }
 
 // ---------- 1. Tạo đơn ----------
@@ -125,9 +61,9 @@ func ptrVal(s *string) string {
 // server tự tra giá + snapshot vật tư, giữ chỗ kho trong 1 tx.
 // Đơn tổng 0đ thì paid luôn, ngược lại pending_payment.
 func (u *OrderUsecase) CreateOrder(ctx context.Context, req *domain.CreateOrderRequest) (*domain.OrderResponse, error) {
-	orgID, err := middlewares.GetOrgID(ctx)
+	orgID, err := requireOrgID(ctx)
 	if err != nil {
-		return nil, apperror.New(400, "Không tìm thấy organization_id trong context", err)
+		return nil, err
 	}
 	if len(req.Items) == 0 {
 		return nil, apperror.New(400, "Đơn hàng phải có ít nhất một dòng hàng", nil)
@@ -145,208 +81,48 @@ func (u *OrderUsecase) CreateOrder(ctx context.Context, req *domain.CreateOrderR
 	}
 
 	var serviceIDs, productIDs []string
-	seenService := map[string]struct{}{}
-	seenProduct := map[string]struct{}{}
-	for i, in := range req.Items {
-		if in.Quantity <= 0 {
-			return nil, apperror.New(400, fmt.Sprintf("Số lượng ở dòng thứ %d phải lớn hơn 0", i+1), nil)
-		}
-		switch strings.TrimSpace(in.ItemType) {
-		case domain.ItemTypeService:
-			if in.ServiceID == nil || strings.TrimSpace(*in.ServiceID) == "" {
-				return nil, apperror.New(400, fmt.Sprintf("Dòng thứ %d thiếu service_id", i+1), nil)
-			}
-			if _, ok := seenService[strings.TrimSpace(*in.ServiceID)]; !ok {
-				seenService[strings.TrimSpace(*in.ServiceID)] = struct{}{}
-				serviceIDs = append(serviceIDs, strings.TrimSpace(*in.ServiceID))
-			}
-		case domain.ItemTypeProduct:
-			if in.ProductID == nil || strings.TrimSpace(*in.ProductID) == "" {
-				return nil, apperror.New(400, fmt.Sprintf("Dòng thứ %d thiếu product_id", i+1), nil)
-			}
-			if _, ok := seenProduct[strings.TrimSpace(*in.ProductID)]; !ok {
-				seenProduct[strings.TrimSpace(*in.ProductID)] = struct{}{}
-				productIDs = append(productIDs, strings.TrimSpace(*in.ProductID))
-			}
-		default:
-			return nil, apperror.New(400, fmt.Sprintf("Loại dòng thứ %d không hợp lệ (service | product)", i+1), nil)
-		}
+	serviceIDs, productIDs, err = splitItemIDs(req.Items)
+	if err != nil {
+		return nil, err
 	}
 
-	if len(serviceIDs) > 0 {
-		missing, err := u.catalog.ServicesExistInOrg(ctx, orgID, serviceIDs)
-		if err != nil {
-			return nil, apperror.New(500, "Lỗi khi kiểm tra dịch vụ", err)
-		}
-		if len(missing) > 0 {
-			return nil, apperror.New(404, fmt.Sprintf("Không tìm thấy dịch vụ trong tổ chức: %s", strings.Join(missing, ", ")), nil)
-		}
+	if err := u.ensureServicesInOrg(ctx, orgID, serviceIDs); err != nil {
+		return nil, err
 	}
-	if len(productIDs) > 0 {
-		missing, err := u.catalog.ProductsExistInOrg(ctx, orgID, productIDs)
-		if err != nil {
-			return nil, apperror.New(500, "Lỗi khi kiểm tra sản phẩm", err)
-		}
-		if len(missing) > 0 {
-			return nil, apperror.New(404, fmt.Sprintf("Không tìm thấy sản phẩm trong tổ chức: %s", strings.Join(missing, ", ")), nil)
-		}
+	if err := u.ensureProductsInOrg(ctx, orgID, productIDs); err != nil {
+		return nil, err
 	}
 
 	// Giá + đơn vị tại thời điểm bán do server quyết định, không tin client.
 	// Số lượng tồn kho/giữ chỗ/snapshot vật tư LUÔN lưu ở đơn vị nhỏ nhất.
-	pricing := map[string]domain.ProductPricing{}
-	units := map[string]domain.ProductUnit{}
-	if len(productIDs) > 0 {
-		pricing, err = u.products.GetProductPricing(ctx, orgID, productIDs)
-		if err != nil {
-			return nil, apperror.New(500, "Lỗi khi lấy giá sản phẩm", err)
-		}
-		units, err = u.products.GetProductUnits(ctx, orgID, productIDs)
-		if err != nil {
-			return nil, apperror.New(500, "Lỗi khi lấy đơn vị sản phẩm", err)
-		}
-		for _, id := range productIDs {
-			if _, ok := pricing[id]; !ok {
-				return nil, apperror.New(404, fmt.Sprintf("Không tìm thấy sản phẩm trong tổ chức: %s", id), nil)
-			}
-			if _, ok := units[id]; !ok {
-				return nil, apperror.New(404, fmt.Sprintf("Không tìm thấy sản phẩm trong tổ chức: %s", id), nil)
-			}
-		}
+	pricing, units, err := u.fetchPricingUnits(ctx, orgID, productIDs)
+	if err != nil {
+		return nil, err
 	}
 	materialMap := map[string][]domain.ServiceMaterialUsage{}
+	servicePrices := map[string]float64{}
 	if len(serviceIDs) > 0 {
 		materialMap, err = u.services.GetServiceMaterials(ctx, orgID, serviceIDs)
 		if err != nil {
 			return nil, apperror.New(500, "Lỗi khi lấy định mức vật tư", err)
 		}
+		// Giá dịch vụ lấy 1 lần cho cả đơn (tránh N+1 query theo từng dòng).
+		servicePrices, err = u.services.GetServicePrices(ctx, orgID, serviceIDs)
+		if err != nil {
+			return nil, apperror.New(500, "Lỗi khi lấy giá dịch vụ", err)
+		}
 	}
 
 	// Định mức có thể lưu đơn vị lớn hoặc nhỏ (cột service_materials.unit) nên
 	// nạp thêm đơn vị các SP vật tư để quy về đơn vị nhỏ nhất lúc snapshot.
-	var recipePIDs []string
-	seenRecipe := map[string]struct{}{}
-	for _, usages := range materialMap {
-		for _, mu := range usages {
-			if _, ok := units[mu.ProductID]; ok {
-				continue
-			}
-			if _, ok := seenRecipe[mu.ProductID]; !ok {
-				seenRecipe[mu.ProductID] = struct{}{}
-				recipePIDs = append(recipePIDs, mu.ProductID)
-			}
-		}
-	}
-	if len(recipePIDs) > 0 {
-		recipeUnits, err := u.products.GetProductUnits(ctx, orgID, recipePIDs)
-		if err != nil {
-			return nil, apperror.New(500, "Lỗi khi lấy đơn vị vật tư", err)
-		}
-		for id, pu := range recipeUnits {
-			units[id] = pu
-		}
-		for _, id := range recipePIDs {
-			if _, ok := units[id]; !ok {
-				return nil, apperror.New(404, fmt.Sprintf("Không tìm thấy sản phẩm trong tổ chức: %s", id), nil)
-			}
-		}
+	if err := u.ensureRecipeUnits(ctx, orgID, materialMap, units); err != nil {
+		return nil, err
 	}
 
 	orderID := utils.NewID()
-	var items []*domain.OrderItem
-	var materials []*domain.OrderItemMaterial
-	deductions := map[string]float64{}
-	var subtotal float64
-
-	for _, in := range req.Items {
-		itemType := strings.TrimSpace(in.ItemType)
-		var unitPrice float64
-		var unit *string
-		quantity := in.Quantity
-		if itemType == domain.ItemTypeProduct {
-			pid := strings.TrimSpace(*in.ProductID)
-			unitPrice = pricing[pid].SellPrice
-			u := strings.TrimSpace(units[pid].Unit)
-			unit = &u
-		} else {
-			// Giá dịch vụ đọc từ service repo? Tạm dùng giá 0 và để repo FK giữ đúng tham chiếu;
-			// giá dịch vụ thực tế lấy từ bảng services qua pricing mở rộng sau.
-			// Để đơn đúng tiền ngay, yêu cầu client không gửi giá mà server tra giá dịch vụ:
-			unitPrice, err = u.servicePrice(ctx, orgID, strings.TrimSpace(*in.ServiceID))
-			if err != nil {
-				return nil, err
-			}
-		}
-		item := &domain.OrderItem{
-			ID:             utils.NewID(),
-			OrganizationID: orgID,
-			OrderID:        orderID,
-			ItemType:       itemType,
-			Quantity:       quantity,
-			UnitPrice:      unitPrice,
-			Unit:           unit,
-			LineTotal:      quantity * unitPrice,
-		}
-		fmt.Println("Creating order item:", item.Quantity, item.UnitPrice, item.LineTotal)
-		if in.ServiceID != nil {
-			v := strings.TrimSpace(*in.ServiceID)
-			item.ServiceID = &v
-		}
-		if in.ProductID != nil {
-			v := strings.TrimSpace(*in.ProductID)
-			item.ProductID = &v
-		}
-		if in.StaffID != nil {
-			v := strings.TrimSpace(*in.StaffID)
-			item.StaffID = &v
-		}
-		if err := item.Validate(); err != nil {
-			return nil, apperror.New(400, err.Error(), err)
-		}
-		items = append(items, item)
-		subtotal += item.LineTotal
-
-		if itemType == domain.ItemTypeProduct {
-			pu := units[*item.ProductID]
-			costPrice := pricing[*item.ProductID].CostPrice
-			baseQty,_ ,err := productdomain.ToBase(pu.Unit,"", pu.NetUnit, pu.NetAmount, item.Quantity, costPrice)
-			if err != nil {
-				return nil, apperror.New(400, fmt.Sprintf("Lỗi khi chuyển đổi đơn vị sản phẩm: %s", err.Error()), err)
-			}
-			deductions[*item.ProductID] += baseQty
-		} else {
-			// Snapshot vật tư: quy định mức về đơn vị nhỏ nhất (recipe có thể
-			// lưu đơn vị lớn như tuýp/can hoặc nhỏ như ml/g) và giá vốn về
-			// giá trên đơn vị nhỏ nhất để cặp (quantity, unit_cost) đồng nhất.
-			for idx, mu := range materialMap[*item.ServiceID] {
-				pu, ok := units[mu.ProductID]
-				if !ok {
-					return nil, apperror.New(404, fmt.Sprintf("Không tìm thấy sản phẩm trong tổ chức: %s", mu.ProductID), nil)
-				}
-				recipeUnit := strings.TrimSpace(mu.Unit)
-				if recipeUnit == "" {
-					recipeUnit = pu.Unit
-				}
-				factor, ferr := productdomain.BaseFactor(pu.Unit, recipeUnit, pu.NetUnit, pu.NetAmount)
-				if ferr != nil {
-					return nil, apperror.New(400, fmt.Sprintf("Định mức vật tư thứ %d: %s", idx+1, ferr.Error()), ferr)
-				}
-				large := productdomain.LargeFactor(pu.Unit, pu.NetUnit, pu.NetAmount)
-				if large <= 0 {
-					large = 1
-				}
-				qty := mu.QuantityPerService * factor * item.Quantity
-				materials = append(materials, &domain.OrderItemMaterial{
-					ID:             utils.NewID(),
-					OrderItemID:    item.ID,
-					ProductID:      mu.ProductID,
-					Quantity:       qty,
-					UnitCostAtTime: mu.UnitCost / large,
-					Unit:           baseUnitOf(pu),
-				})
-				deductions[mu.ProductID] += qty
-			}
-		}
+	items, materials, deductions, subtotal, err := buildOrderLines(orgID, orderID, req.Items, pricing, units, materialMap, servicePrices)
+	if err != nil {
+		return nil, err
 	}
 
 	if req.DiscountAmount > subtotal {
@@ -358,9 +134,9 @@ func (u *OrderUsecase) CreateOrder(ctx context.Context, req *domain.CreateOrderR
 	order := &domain.Order{
 		ID:             orderID,
 		OrganizationID: orgID,
-		Code:           generateOrderCode(),
-		CustomerID:     strPtr(ptrVal(req.CustomerID)),
-		AppointmentID:  strPtr(ptrVal(req.AppointmentID)),
+		Code:           utils.GenerateOrderCode(),
+		CustomerID:     utils.StrPtr(utils.StrVal(req.CustomerID)),
+		AppointmentID:  utils.StrPtr(utils.StrVal(req.AppointmentID)),
 		SubtotalAmount: subtotal,
 		DiscountAmount: req.DiscountAmount,
 		TotalAmount:    total,
@@ -430,12 +206,8 @@ func (u *OrderUsecase) CreateOrder(ctx context.Context, req *domain.CreateOrderR
 // checkReferencesInOrg đảm bảo customer/appointment đi kèm (nếu có) thuộc đúng salon.
 func (u *OrderUsecase) checkReferencesInOrg(ctx context.Context, orgID string, req *domain.CreateOrderRequest) error {
 	if req.CustomerID != nil && strings.TrimSpace(*req.CustomerID) != "" {
-		exists, err := u.customers.CustomerExistsInOrg(ctx, orgID, strings.TrimSpace(*req.CustomerID))
-		if err != nil {
-			return apperror.New(500, "Lỗi khi kiểm tra khách hàng", err)
-		}
-		if !exists {
-			return apperror.New(404, "Không tìm thấy khách hàng trong tổ chức", nil)
+		if err := u.ensureCustomerInOrg(ctx, orgID, strings.TrimSpace(*req.CustomerID)); err != nil {
+			return err
 		}
 	}
 	if req.AppointmentID != nil && strings.TrimSpace(*req.AppointmentID) != "" {
@@ -528,25 +300,13 @@ func (u *OrderUsecase) findOrCreateCustomer(ctx context.Context, orgID, fullName
 	return &c.ID, &c.FullName, false, nil
 }
 
-// servicePrice tra giá dịch vụ tại thời điểm bán (sai org/hết hiệu lực thì 404).
-func (u *OrderUsecase) servicePrice(ctx context.Context, orgID, serviceID string) (float64, error) {
-	price, err := u.services.GetServicePrice(ctx, orgID, serviceID)
-	if err != nil {
-		if errors.Is(err, domain.ErrServiceNotFound) {
-			return 0, apperror.New(404, "Không tìm thấy dịch vụ trong tổ chức", err)
-		}
-		return 0, apperror.New(500, "Lỗi khi lấy giá dịch vụ", err)
-	}
-	return price, nil
-}
-
 // ---------- 2. Đọc đơn ----------
 
 // GetOrdersByOrgID lấy danh sách đơn phân trang (lọc status tùy chọn).
 func (u *OrderUsecase) GetOrdersByOrgID(ctx context.Context, page, pageSize int, status string) (*pagination.Result[*domain.OrderResponse], error) {
-	orgID, err := middlewares.GetOrgID(ctx)
+	orgID, err := requireOrgID(ctx)
 	if err != nil {
-		return nil, apperror.New(400, "Không tìm thấy organization_id trong context", err)
+		return nil, err
 	}
 
 	params := pagination.Normalize(page, pageSize)
@@ -570,31 +330,24 @@ func (u *OrderUsecase) GetOrdersByOrgID(ctx context.Context, page, pageSize int,
 
 // GetOrderDetail lấy chi tiết đơn: header + dòng hàng (kèm NV) + vật tư + thanh toán.
 func (u *OrderUsecase) GetOrderDetail(ctx context.Context, id string) (*domain.OrderDetailResponse, error) {
-	if strings.TrimSpace(id) == "" {
-		return nil, apperror.New(400, "Thiếu id đơn hàng", nil)
+	id, err := requireID(id, "Thiếu id đơn hàng")
+	if err != nil {
+		return nil, err
 	}
 
-	orgID, err := middlewares.GetOrgID(ctx)
+	orgID, err := requireOrgID(ctx)
 	if err != nil {
-		return nil, apperror.New(400, "Không tìm thấy organization_id trong context", err)
+		return nil, err
 	}
 
-	order, err := u.repo.GetOrderByID(ctx, orgID, strings.TrimSpace(id))
+	order, err := u.loadOrder(ctx, orgID, id)
 	if err != nil {
-		if errors.Is(err, domain.ErrOrderNotFound) {
-			return nil, apperror.New(404, "Không tìm thấy đơn hàng", err)
-		}
-		return nil, apperror.New(500, "Lỗi khi lấy đơn hàng", err)
+		return nil, err
 	}
 
-	items, err := u.repo.GetOrderItems(ctx, orgID, order.ID)
+	items, materials, err := u.loadItemsAndMaterials(ctx, orgID, order.ID)
 	if err != nil {
-		return nil, apperror.New(500, "Lỗi khi lấy dòng đơn hàng", err)
-	}
-
-	materials, err := u.repo.GetOrderMaterials(ctx, order.ID)
-	if err != nil {
-		return nil, apperror.New(500, "Lỗi khi lấy vật tư đơn hàng", err)
+		return nil, err
 	}
 
 	payments, err := u.repo.GetOrderPayments(ctx, orgID, order.ID)
@@ -609,18 +362,10 @@ func (u *OrderUsecase) GetOrderDetail(ctx context.Context, id string) (*domain.O
 		Payments:  make([]*domain.PaymentResponse, 0, len(payments)),
 	}
 	for _, it := range items {
-		detail.Items = append(detail.Items, &domain.OrderItemResponse{
-			ID: it.ID, ItemType: it.ItemType, ServiceID: it.ServiceID,
-			ProductID: it.ProductID, StaffID: it.StaffID,
-			Quantity: it.Quantity, UnitPrice: it.UnitPrice, LineTotal: it.LineTotal,
-			Staff: it.Staff,
-		})
+		detail.Items = append(detail.Items, toItemResponse(it))
 	}
 	for _, m := range materials {
-		detail.Materials = append(detail.Materials, &domain.OrderMaterialResponse{
-			ID: m.ID, OrderItemID: m.OrderItemID, ProductID: m.ProductID,
-			Quantity: m.Quantity, UnitCostAtTime: m.UnitCostAtTime, Unit: m.Unit,
-		})
+		detail.Materials = append(detail.Materials, toMaterialResponse(m))
 	}
 	for _, p := range payments {
 		detail.Payments = append(detail.Payments, toPaymentResponse(p))
@@ -634,64 +379,32 @@ func (u *OrderUsecase) GetOrderDetail(ctx context.Context, id string) (*domain.O
 // repo chạy 1 tx (flip completed + trừ kho + nhả giữ chỗ + sổ sale + phiếu).
 // Dùng chung cho nút chốt tay và auto-chốt khi thu đủ tiền.
 func (u *OrderUsecase) completeWithSlip(ctx context.Context, orgID string, order *domain.Order) (*domain.OrderCompleteResponse, error) {
-	items, err := u.repo.GetOrderItems(ctx, orgID, order.ID)
+	items, materials, err := u.loadItemsAndMaterials(ctx, orgID, order.ID)
 	if err != nil {
-		return nil, apperror.New(500, "Lỗi khi lấy dòng đơn hàng", err)
-	}
-	materials, err := u.repo.GetOrderMaterials(ctx, order.ID)
-	if err != nil {
-		return nil, apperror.New(500, "Lỗi khi lấy vật tư đơn hàng", err)
+		return nil, err
 	}
 
 	productIDs := []string{}
-	for _, it := range items{
-		if it.ItemType == domain.ItemTypeProduct && it.ProductID !=nil{
-			productIDs = append(productIDs, *it.ProductID)
-		}
-	}
-
-	pricing := map[string]domain.ProductPricing{}
-	units := map[string]domain.ProductUnit{}
-	if len(productIDs) > 0 {
-		pricing, err = u.products.GetProductPricing(ctx, orgID, productIDs)
-		if err != nil {
-			return nil, apperror.New(500, "Lỗi khi lấy giá sản phẩm", err)
-		}
-		units, err = u.products.GetProductUnits(ctx, orgID, productIDs)
-		if err != nil {
-			return nil, apperror.New(500, "Lỗi khi lấy đơn vị sản phẩm", err)
-		}
-		for _, id := range productIDs {
-			if _, ok := pricing[id]; !ok {
-				return nil, apperror.New(404, fmt.Sprintf("Không tìm thấy sản phẩm trong tổ chức: %s", id), nil)
-			}
-			if _, ok := units[id]; !ok {
-				return nil, apperror.New(404, fmt.Sprintf("Không tìm thấy sản phẩm trong tổ chức: %s", id), nil)
-			}
-		}
-	}
-
-	var lines []domain.SaleSlipLine
+	seenPID := map[string]struct{}{}
 	for _, it := range items {
 		if it.ItemType == domain.ItemTypeProduct && it.ProductID != nil {
-			
-			qty,basePrice, err := productdomain.ToBase(units[*it.ProductID].Unit, units[*it.ProductID].Unit, units[*it.ProductID].NetUnit, units[*it.ProductID].NetAmount, it.Quantity, pricing[*it.ProductID].CostPrice)
-			if err != nil {
-				return nil, apperror.New(400, fmt.Sprintf("Lỗi khi chuyển đổi đơn vị sản phẩm: %s", err.Error()), err)
+			if _, ok := seenPID[*it.ProductID]; !ok {
+				seenPID[*it.ProductID] = struct{}{}
+				productIDs = append(productIDs, *it.ProductID)
 			}
-			lines = append(lines, domain.SaleSlipLine{
-				ProductID: *it.ProductID,
-				Quantity:  qty,
-				UnitPrice: basePrice,
-			})
 		}
 	}
-	for _, m := range materials {
-		lines = append(lines, domain.SaleSlipLine{
-			ProductID: m.ProductID,
-			Quantity:  m.Quantity,
-			UnitPrice: m.UnitCostAtTime,
-		})
+
+	pricing, units, err := u.fetchPricingUnits(ctx, orgID, productIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	// Dòng SP đã lưu ở đơn vị nhỏ nhất từ lúc tạo đơn nên ráp thẳng
+	// số lượng đã lưu + giá vốn base, không quy đổi lại.
+	lines, err := saleSlipLines(items, materials, pricing, units)
+	if err != nil {
+		return nil, err
 	}
 
 	slip, err := u.repo.CompleteOrderWithSlip(ctx, orgID, order.ID, lines)
@@ -721,26 +434,24 @@ func (u *OrderUsecase) completeWithSlip(ctx context.Context, orgID string, order
 // CompleteOrder chốt tay đơn pending/confirm/delivery: trừ kho thật +
 // nhả giữ chỗ + ghi sổ sale + sinh phiếu bán hàng. Tồn không đủ thì 400.
 func (u *OrderUsecase) CompleteOrder(ctx context.Context, id string) (*domain.OrderCompleteResponse, error) {
-	if strings.TrimSpace(id) == "" {
-		return nil, apperror.New(400, "Thiếu id đơn hàng", nil)
+	id, err := requireID(id, "Thiếu id đơn hàng")
+	if err != nil {
+		return nil, err
 	}
 
-	orgID, err := middlewares.GetOrgID(ctx)
+	orgID, err := requireOrgID(ctx)
 	if err != nil {
-		return nil, apperror.New(400, "Không tìm thấy organization_id trong context", err)
+		return nil, err
 	}
 
-	order, err := u.repo.GetOrderByID(ctx, orgID, strings.TrimSpace(id))
+	order, err := u.loadOrder(ctx, orgID, id)
 	if err != nil {
-		if errors.Is(err, domain.ErrOrderNotFound) {
-			return nil, apperror.New(404, "Không tìm thấy đơn hàng", err)
-		}
-		return nil, apperror.New(500, "Lỗi khi lấy đơn hàng", err)
+		return nil, err
 	}
-	switch order.Status {
-	case domain.StatusPending, domain.StatusConfirm, domain.StatusDelivery:
-	default:
-		return nil, apperror.New(400, "Chỉ chốt đơn ở trạng thái chờ/xác nhận/giao hàng", nil)
+	if err := requireOrderStatus(order,
+		[]string{domain.StatusPending, domain.StatusConfirm, domain.StatusDelivery},
+		"Chỉ chốt đơn ở trạng thái chờ/xác nhận/giao hàng"); err != nil {
+		return nil, err
 	}
 
 	return u.completeWithSlip(ctx, orgID, order)
@@ -762,29 +473,27 @@ func (u *OrderUsecase) RefundOrder(ctx context.Context, id string) (*domain.Orde
 // (draft/pending_payment/paid). Nhận customer_id có sẵn hoặc new_customer
 // (tìm theo SĐT, chưa có thì tạo mới — cùng luật với lúc tạo đơn).
 func (u *OrderUsecase) UpdateOrderCustomer(ctx context.Context, id string, req *domain.UpdateOrderCustomerRequest) (*domain.OrderResponse, error) {
-	if strings.TrimSpace(id) == "" {
-		return nil, apperror.New(400, "Thiếu id đơn hàng", nil)
+	id, err := requireID(id, "Thiếu id đơn hàng")
+	if err != nil {
+		return nil, err
 	}
 	if req == nil {
 		return nil, apperror.New(400, "Thiếu thông tin khách hàng", nil)
 	}
 
-	orgID, err := middlewares.GetOrgID(ctx)
+	orgID, err := requireOrgID(ctx)
 	if err != nil {
-		return nil, apperror.New(400, "Không tìm thấy organization_id trong context", err)
+		return nil, err
 	}
 
-	order, err := u.repo.GetOrderByID(ctx, orgID, strings.TrimSpace(id))
+	order, err := u.loadOrder(ctx, orgID, id)
 	if err != nil {
-		if errors.Is(err, domain.ErrOrderNotFound) {
-			return nil, apperror.New(404, "Không tìm thấy đơn hàng", err)
-		}
-		return nil, apperror.New(500, "Lỗi khi lấy đơn hàng", err)
+		return nil, err
 	}
-	switch order.Status {
-	case domain.StatusPending, domain.StatusConfirm, domain.StatusDelivery:
-	default:
-		return nil, apperror.New(400, "Đơn đã khóa, không đổi được khách hàng", nil)
+	if err := requireOrderStatus(order,
+		[]string{domain.StatusPending, domain.StatusConfirm, domain.StatusDelivery},
+		"Đơn đã khóa, không đổi được khách hàng"); err != nil {
+		return nil, err
 	}
 
 	var customerID *string
@@ -796,12 +505,8 @@ func (u *OrderUsecase) UpdateOrderCustomer(ctx context.Context, id string, req *
 		customerID = foundID
 	} else if req.CustomerID != nil && strings.TrimSpace(*req.CustomerID) != "" {
 		cid := strings.TrimSpace(*req.CustomerID)
-		exists, err := u.customers.CustomerExistsInOrg(ctx, orgID, cid)
-		if err != nil {
-			return nil, apperror.New(500, "Lỗi khi kiểm tra khách hàng", err)
-		}
-		if !exists {
-			return nil, apperror.New(404, "Không tìm thấy khách hàng trong tổ chức", nil)
+		if err := u.ensureCustomerInOrg(ctx, orgID, cid); err != nil {
+			return nil, err
 		}
 		customerID = &cid
 	} else {
@@ -824,41 +529,28 @@ func (u *OrderUsecase) UpdateOrderCustomer(ctx context.Context, id string, req *
 // xử lý từ snapshot live, rồi giao repo ApplyCancel (1 tx).
 // Refund (đã trừ thật) thì hoàn tồn; cancel (mới giữ chỗ) thì chỉ nhả giữ chỗ.
 func (u *OrderUsecase) closeOrder(ctx context.Context, id, newStatus string, allowed []string, denyMsg string) (*domain.OrderResponse, error) {
-	if strings.TrimSpace(id) == "" {
-		return nil, apperror.New(400, "Thiếu id đơn hàng", nil)
+	id, err := requireID(id, "Thiếu id đơn hàng")
+	if err != nil {
+		return nil, err
 	}
 
-	orgID, err := middlewares.GetOrgID(ctx)
+	orgID, err := requireOrgID(ctx)
 	if err != nil {
-		return nil, apperror.New(400, "Không tìm thấy organization_id trong context", err)
+		return nil, err
 	}
 
-	order, err := u.repo.GetOrderByID(ctx, orgID, strings.TrimSpace(id))
+	order, err := u.loadOrder(ctx, orgID, id)
 	if err != nil {
-		if errors.Is(err, domain.ErrOrderNotFound) {
-			return nil, apperror.New(404, "Không tìm thấy đơn hàng", err)
-		}
-		return nil, apperror.New(500, "Lỗi khi lấy đơn hàng", err)
+		return nil, err
 	}
 
-	ok := false
-	for _, s := range allowed {
-		if order.Status == s {
-			ok = true
-			break
-		}
-	}
-	if !ok {
-		return nil, apperror.New(400, denyMsg, nil)
+	if err := requireOrderStatus(order, allowed, denyMsg); err != nil {
+		return nil, err
 	}
 
-	items, err := u.repo.GetOrderItems(ctx, orgID, order.ID)
+	items, materials, err := u.loadItemsAndMaterials(ctx, orgID, order.ID)
 	if err != nil {
-		return nil, apperror.New(500, "Lỗi khi lấy dòng đơn hàng", err)
-	}
-	materials, err := u.repo.GetOrderMaterials(ctx, order.ID)
-	if err != nil {
-		return nil, apperror.New(500, "Lỗi khi lấy vật tư đơn hàng", err)
+		return nil, err
 	}
 
 	restores := map[string]float64{}
@@ -898,38 +590,35 @@ func (u *OrderUsecase) closeOrder(ctx context.Context, id, newStatus string, all
 // CreatePayment ghi nhận thanh toán, idempotent theo cặp provider/txn.
 // Thu đủ tổng thì đơn tự chốt sang completed (trừ kho + phiếu bán hàng).
 func (u *OrderUsecase) CreatePayment(ctx context.Context, orderID string, req *domain.CreatePaymentRequest) (*domain.PaymentResponse, error) {
-	if strings.TrimSpace(orderID) == "" {
-		return nil, apperror.New(400, "Thiếu id đơn hàng", nil)
+	orderID, err := requireID(orderID, "Thiếu id đơn hàng")
+	if err != nil {
+		return nil, err
 	}
 
-	orgID, err := middlewares.GetOrgID(ctx)
+	orgID, err := requireOrgID(ctx)
 	if err != nil {
-		return nil, apperror.New(400, "Không tìm thấy organization_id trong context", err)
+		return nil, err
 	}
 
 	payment := &domain.Payment{
 		ID:             utils.NewID(),
 		OrganizationID: orgID,
-		OrderID:        strings.TrimSpace(orderID),
+		OrderID:        orderID,
 		Method:         strings.TrimSpace(req.Method),
 		Provider:       req.Provider,
 		ProviderTxnID:  req.ProviderTxnID,
 		Amount:         req.Amount,
 		Status:         domain.PaymentStatusSucceeded,
 	}
-	if t := time.Now(); true {
-		payment.PaidAt = &t
-	}
+	paidAt := time.Now()
+	payment.PaidAt = &paidAt
 	if err := payment.Validate(); err != nil {
 		return nil, apperror.New(400, err.Error(), err)
 	}
 
-	order, err := u.repo.GetOrderByID(ctx, orgID, payment.OrderID)
+	order, err := u.loadOrder(ctx, orgID, payment.OrderID)
 	if err != nil {
-		if errors.Is(err, domain.ErrOrderNotFound) {
-			return nil, apperror.New(404, "Không tìm thấy đơn hàng", err)
-		}
-		return nil, apperror.New(500, "Lỗi khi lấy đơn hàng", err)
+		return nil, err
 	}
 	if order.Status == domain.StatusCancelled || order.Status == domain.StatusRefunded {
 		return nil, apperror.New(400, "Không thể thanh toán đơn đã hủy/hoàn", nil)
@@ -990,13 +679,13 @@ func (u *OrderUsecase) CreatePayment(ctx context.Context, orderID string, req *d
 // type = loại hoa hồng (percent | fixed | profit), hoa hồng do UI tự nhập.
 // Tổng share_pct của các dòng percent/profit trong 1 món phải bằng 100.
 func (u *OrderUsecase) ReplaceStaffOrderItems(ctx context.Context, orderItemID string, staffItems []*domain.StaffOrderItemInput) ([]*domain.StaffOrderItemResponse, error) {
-	orgID, err := middlewares.GetOrgID(ctx)
+	orgID, err := requireOrgID(ctx)
 	if err != nil {
-		return nil, apperror.New(400, "Không tìm thấy organization_id trong context", err)
+		return nil, err
 	}
-	orderItemID = strings.TrimSpace(orderItemID)
-	if orderItemID == "" {
-		return nil, apperror.New(400, "Thiếu id dòng đơn hàng", nil)
+	orderItemID, err = requireID(orderItemID, "Thiếu id dòng đơn hàng")
+	if err != nil {
+		return nil, err
 	}
 	if len(staffItems) == 0 {
 		return nil, apperror.New(400, "Danh sách nhân viên trống", nil)
@@ -1039,12 +728,8 @@ func (u *OrderUsecase) ReplaceStaffOrderItems(ctx context.Context, orderItemID s
 	}
 
 	// NV phải thuộc đúng salon (bỏ NV đã xóa mềm).
-	missing, err := u.staff.StaffsExistInOrg(ctx, orgID, staffIDs)
-	if err != nil {
-		return nil, apperror.New(500, "Lỗi khi kiểm tra nhân viên", err)
-	}
-	if len(missing) > 0 {
-		return nil, apperror.New(404, fmt.Sprintf("Không tìm thấy nhân viên trong tổ chức: %s", strings.Join(missing, ", ")), nil)
+	if err := u.ensureStaffsInOrg(ctx, orgID, staffIDs); err != nil {
+		return nil, err
 	}
 
 	staffs := make([]*domain.StaffOrderItem, 0, len(staffItems))
@@ -1072,11 +757,7 @@ func (u *OrderUsecase) ReplaceStaffOrderItems(ctx context.Context, orderItemID s
 
 	resp := make([]*domain.StaffOrderItemResponse, 0, len(staffs))
 	for _, s := range staffs {
-		resp = append(resp, &domain.StaffOrderItemResponse{
-			ID: s.ID, OrganizationID: s.OrganizationID, OrderItemID: s.OrderItemID,
-			StaffID: s.StaffID, Type: s.Type, SharePct: s.SharePct,
-			CommissionAmount: s.CommissionAmount,
-		})
+		resp = append(resp, toStaffResponse(s))
 	}
 	return resp, nil
 }
@@ -1086,16 +767,10 @@ func (u *OrderUsecase) ReplaceStaffOrderItems(ctx context.Context, orderItemID s
 // xử lý được vật tư của nhiều đơn. Mảng rỗng = không làm gì.
 // Chỉ ghi log tiêu hao, không động kho.
 // unit_cost_at_time do UI gửi (đã quy đổi theo đơn vị xuất).
-// baseUnitOf trả đơn vị nhỏ nhất của sản phẩm (delegate về productdomain
-// để dùng chung logic hasNet, khỏi lệch với BaseFactor/LargeFactor).
-func baseUnitOf(pu domain.ProductUnit) string {
-	return productdomain.BaseUnit(pu.Unit, pu.NetUnit, pu.NetAmount)
-}
-
 func (u *OrderUsecase) ReplaceOrderMaterials(ctx context.Context, inputs []*domain.OrderMaterialInput) ([]*domain.OrderMaterialResponse, error) {
-	orgID, err := middlewares.GetOrgID(ctx)
+	orgID, err := requireOrgID(ctx)
 	if err != nil {
-		return nil, apperror.New(400, "Không tìm thấy organization_id trong context", err)
+		return nil, err
 	}
 	if inputs == nil {
 		inputs = []*domain.OrderMaterialInput{}
@@ -1167,13 +842,9 @@ func (u *OrderUsecase) ReplaceOrderMaterials(ctx context.Context, inputs []*doma
 
 	// Đơn vị + giá vốn do server quyết: quy Quantity về đơn vị nhỏ nhất
 	// và tính lại giá vốn theo đơn vị gửi, không tin số client.
-	units, err := u.products.GetProductUnits(ctx, orgID, productIDs)
+	pricing, units, err := u.fetchPricingUnits(ctx, orgID, productIDs)
 	if err != nil {
-		return nil, apperror.New(500, "Lỗi khi lấy đơn vị sản phẩm", err)
-	}
-	pricing, err := u.products.GetProductPricing(ctx, orgID, productIDs)
-	if err != nil {
-		return nil, apperror.New(500, "Lỗi khi lấy giá sản phẩm", err)
+		return nil, err
 	}
 	materials := make([]*domain.OrderItemMaterial, 0, len(raws))
 	for _, r := range raws {
@@ -1198,14 +869,8 @@ func (u *OrderUsecase) ReplaceOrderMaterials(ctx context.Context, inputs []*doma
 		materials = append(materials, r.m)
 	}
 
-	if len(productIDs) > 0 {
-		missing, err := u.catalog.ProductsExistInOrg(ctx, orgID, productIDs)
-		if err != nil {
-			return nil, apperror.New(500, "Lỗi khi kiểm tra sản phẩm", err)
-		}
-		if len(missing) > 0 {
-			return nil, apperror.New(404, fmt.Sprintf("Không tìm thấy sản phẩm trong tổ chức: %s", strings.Join(missing, ", ")), nil)
-		}
+	if err := u.ensureProductsInOrg(ctx, orgID, productIDs); err != nil {
+		return nil, err
 	}
 
 	if err := u.repo.ReplaceOrderMaterials(ctx, orgID, orderIDs, materials); err != nil {
@@ -1224,11 +889,7 @@ func (u *OrderUsecase) ReplaceOrderMaterials(ctx context.Context, inputs []*doma
 
 	resp := make([]*domain.OrderMaterialResponse, 0, len(materials))
 	for _, m := range materials {
-		resp = append(resp, &domain.OrderMaterialResponse{
-			ID: m.ID, OrderItemID: m.OrderItemID, ProductID: m.ProductID,
-			Quantity: m.Quantity, UnitCostAtTime: m.UnitCostAtTime,
-			Unit: m.Unit,
-		})
+		resp = append(resp, toMaterialResponse(m))
 	}
 	return resp, nil
 }
@@ -1238,9 +899,9 @@ func (u *OrderUsecase) ReplaceOrderMaterials(ctx context.Context, inputs []*doma
 // GetPosItemsByOrgID lấy danh mục bán hàng POS (union sản phẩm + dịch vụ).
 // Limit clamp 1..100, còn lại (search/category/cursor) repo tự xử.
 func (u *OrderUsecase) GetPosItemsByOrgID(ctx context.Context, limit int, name, itemType string, id string, search string, categoryFilter string) ([]*domain.PosItemResponse, error) {
-	orgID, err := middlewares.GetOrgID(ctx)
+	orgID, err := requireOrgID(ctx)
 	if err != nil {
-		return nil, apperror.New(400, "Không tìm thấy organization_id trong context", err)
+		return nil, err
 	}
 
 	// Giới hạn page_size hợp lệ, mặc định 20

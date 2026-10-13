@@ -343,17 +343,29 @@ func (r *PostgresServiceRepository) GetServiceDetails(ctx context.Context, orgID
 }
 // ---------- Giá + định mức tại thời điểm bán (đúng chủ bảng services/service_materials) ----------
 
-// GetServicePrice lấy giá bán hiện tại của 1 dịch vụ; đã xóa/khác salon
-// thì trả ErrServiceNotFound (lỗi của order domain để usecase map 404).
-func (r *PostgresServiceRepository) GetServicePrice(ctx context.Context, orgID, serviceID string) (float64, error) {
-	var price float64
-	if err := r.db.QueryRow(ctx, servicePriceQuery, orgID, serviceID).Scan(&price); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return 0, fmt.Errorf("dịch vụ %s: %w", serviceID, orderdomain.ErrServiceNotFound)
-		}
-		return 0, fmt.Errorf("lỗi khi lấy giá dịch vụ: %w", err)
+// GetServicePrices lấy giá bán hiện tại của các dịch vụ trong 1 query
+// (tránh N+1 khi đơn có nhiều dòng dịch vụ). Thiếu id nào thì map không
+// có key đó, usecase map sang 404.
+func (r *PostgresServiceRepository) GetServicePrices(ctx context.Context, orgID string, serviceIDs []string) (map[string]float64, error) {
+	rows, err := r.db.Query(ctx, servicePricesQuery, orgID, serviceIDs)
+	if err != nil {
+		return nil, fmt.Errorf("lỗi khi lấy giá dịch vụ: %w", err)
 	}
-	return price, nil
+	defer rows.Close()
+
+	prices := make(map[string]float64, len(serviceIDs))
+	for rows.Next() {
+		var id string
+		var price float64
+		if err := rows.Scan(&id, &price); err != nil {
+			return nil, fmt.Errorf("lỗi khi đọc giá dịch vụ: %w", err)
+		}
+		prices[id] = price
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("lỗi trong quá trình đọc giá dịch vụ: %w", err)
+	}
+	return prices, nil
 }
 
 // GetServiceMaterials lấy định mức vật tư + giá vốn hiện tại theo từng dịch vụ,

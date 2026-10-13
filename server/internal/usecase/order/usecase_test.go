@@ -165,7 +165,7 @@ func TestOrderUsecase_CreateOrder(t *testing.T) {
 			}).Return(nil)
 
 		services := new(MockServiceStore)
-		services.On("GetServicePrice", mock.Anything, "org-123", "svc-1").Return(500000.0, nil)
+		services.On("GetServicePrices", mock.Anything, "org-123", []string{"svc-1"}).Return(map[string]float64{"svc-1": 500000}, nil)
 		services.On("GetServiceMaterials", mock.Anything, "org-123", []string{"svc-1"}).Return(
 			map[string][]domain.ServiceMaterialUsage{
 				"svc-1": {{ProductID: "prod-nhuom", QuantityPerService: 1, UnitCost: 120000, Unit: "tuýp"}},
@@ -205,7 +205,7 @@ func TestOrderUsecase_CreateOrder(t *testing.T) {
 			}).Return(nil)
 
 		services := new(MockServiceStore)
-		services.On("GetServicePrice", mock.Anything, "org-123", "svc-1").Return(500000.0, nil)
+		services.On("GetServicePrices", mock.Anything, "org-123", []string{"svc-1"}).Return(map[string]float64{"svc-1": 500000}, nil)
 		services.On("GetServiceMaterials", mock.Anything, "org-123", []string{"svc-1"}).Return(
 			map[string][]domain.ServiceMaterialUsage{
 				"svc-1": {{ProductID: "prod-nhuom", QuantityPerService: 60, UnitCost: 120000, Unit: "ml"}},

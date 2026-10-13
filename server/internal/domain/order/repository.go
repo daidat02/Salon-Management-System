@@ -51,9 +51,6 @@ type ServiceMaterialUsage struct {
 	Unit               string
 }
 
-// ErrServiceNotFound dùng để usecase map 404 khi giá dịch vụ không còn.
-var ErrServiceNotFound = errors.New("service not found")
-
 // ErrOrderNotEditable dùng khi đơn đã khóa sửa (đã hoàn tất/hủy/hoàn).
 var ErrOrderNotEditable = errors.New("order not editable")
 
@@ -130,7 +127,10 @@ type ProductStore interface {
 // ServiceStore giá + định mức dịch vụ tại thời điểm bán.
 // PostgresServiceRepository thỏa mãn ngầm.
 type ServiceStore interface {
-	GetServicePrice(ctx context.Context, orgID, serviceID string) (float64, error)
+	// GetServicePrices lấy giá bán hiện tại của các dịch vụ trong 1 query
+	// (tránh N+1 khi đơn có nhiều dòng dịch vụ). Thiếu id nào thì map
+	// không có key đó, usecase map sang 404.
+	GetServicePrices(ctx context.Context, orgID string, serviceIDs []string) (map[string]float64, error)
 	GetServiceMaterials(ctx context.Context, orgID string, serviceIDs []string) (map[string][]ServiceMaterialUsage, error)
 }
 

@@ -38,15 +38,6 @@ func NewAppointmentUseCase(repo domain.AppoimentRepository, customerFinder domai
 	}
 }
 
-// generateAppointmentCode sinh mã lịch hẹn vừa VARCHAR(20), vd APT-3F9A2C1D.
-func generateAppointmentCode() string {
-	id := strings.ReplaceAll(utils.NewID(), "-", "")
-	if len(id) > 8 {
-		id = id[:8]
-	}
-	return "APT-" + strings.ToUpper(id)
-}
-
 // parseAppointmentTime chấp nhận ISO8601 và 2 format phổ biến của client.
 func parseAppointmentTime(s string) (time.Time, bool) {
 	for _, layout := range []string{
@@ -129,7 +120,7 @@ func (u *AppointmentUseCase) CreateAppointment(ctx context.Context, req *domain.
 
 	code := strings.TrimSpace(req.Code)
 	if code == "" {
-		code = generateAppointmentCode()
+		code = utils.GenerateAppointmentCode()
 	}
 
 	appointment := &domain.Appointment{

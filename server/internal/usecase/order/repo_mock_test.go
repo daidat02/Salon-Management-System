@@ -182,9 +182,12 @@ type MockServiceStore struct {
 	mock.Mock
 }
 
-func (m *MockServiceStore) GetServicePrice(ctx context.Context, orgID, serviceID string) (float64, error) {
-	args := m.Called(ctx, orgID, serviceID)
-	return args.Get(0).(float64), args.Error(1)
+func (m *MockServiceStore) GetServicePrices(ctx context.Context, orgID string, serviceIDs []string) (map[string]float64, error) {
+	args := m.Called(ctx, orgID, serviceIDs)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(map[string]float64), args.Error(1)
 }
 
 func (m *MockServiceStore) GetServiceMaterials(ctx context.Context, orgID string, serviceIDs []string) (map[string][]domain.ServiceMaterialUsage, error) {
