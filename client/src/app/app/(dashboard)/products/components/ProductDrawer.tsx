@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { DashDrawer } from '@/components/dashboard/DashDrawer';
 import type { Product } from '@/types/product';
 import type { InventoryTransaction, InventoryTransactionType } from '@/types/inventory';
+import { formatShortDateTime, formatVND } from '@/lib/format';
 
 // Mock data cho drawer chi tiết sản phẩm — bám cấu trúc CustomerDrawer.
 // Chưa kết nối API.
@@ -41,20 +42,6 @@ const TXN_META: Record<InventoryTransactionType, { label: string; badge: string;
   sale: { label: 'Bán lẻ', badge: 'bg-blue-50 text-primary', sign: '−' },
   return: { label: 'Trả hàng', badge: 'bg-purple-50 text-purple-700', sign: '+' },
 };
-
-function formatVND(n: number): string {
-  return `${n.toLocaleString('vi-VN')} đ`;
-}
-
-function formatDateTime(value: string): string {
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return value;
-  const hh = String(d.getHours()).padStart(2, '0');
-  const mm = String(d.getMinutes()).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  const mo = String(d.getMonth() + 1).padStart(2, '0');
-  return `${hh}:${mm} ${dd}/${mo}`;
-}
 
 type Props = {
   open: boolean;
@@ -222,7 +209,7 @@ export function ProductDrawer({ open, onOpenChange, product }: Props) {
                     </td>
                     <td className="py-2 px-3 text-slate-700">{t.actor}</td>
                     <td className="py-2 px-3 text-right font-mono text-on-surface-variant">
-                      {formatDateTime(t.created_at)}
+                      {formatShortDateTime(t.created_at)}
                     </td>
                   </tr>
                 );

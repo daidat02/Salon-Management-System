@@ -3,7 +3,8 @@
 import { ReceiptText } from 'lucide-react';
 import { DashInput } from '@/components/dashboard/DashInput';
 import { VAT_RATE } from './voucherData';
-import { formatVND, numberToVietnameseWords, type VoucherTotals } from './voucherUtils';
+import { formatPlain as formatVND } from '@/lib/format';
+import { numberToVietnameseWords, type VoucherTotals } from './voucherUtils';
 
 type VoucherFinanceCardProps = {
   totals: VoucherTotals;

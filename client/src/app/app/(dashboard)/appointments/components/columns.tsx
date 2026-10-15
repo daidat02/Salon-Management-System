@@ -1,6 +1,7 @@
 import { Tag } from "@/components/ui/tag"
 import type { DashColumn } from "@/components/dashboard/DashTable"
 import type { Appointment, AppointmentStatus } from "@/types/appointment"
+import { formatShortDateTime as formatTime } from '@/lib/format';
 
 export type CustomerLookup = (id: string) => { name: string; phone: string } | undefined
 export type StaffLookup = (id: string) => string | undefined
@@ -21,16 +22,6 @@ const SOURCE_LABEL: Record<string, string> = {
   online: "Online",
   walk_in: "Khách lẻ",
   phone: "Điện thoại",
-}
-
-function formatTime(value: string): string {
-  const d = new Date(value)
-  if (Number.isNaN(d.getTime())) return value
-  const hh = String(d.getHours()).padStart(2, "0")
-  const mm = String(d.getMinutes()).padStart(2, "0")
-  const dd = String(d.getDate()).padStart(2, "0")
-  const mo = String(d.getMonth() + 1).padStart(2, "0")
-  return `${hh}:${mm} ${dd}/${mo}`
 }
 
 function durationMinutes(start: string, end: string): string {

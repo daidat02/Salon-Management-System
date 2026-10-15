@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Tag } from '@/components/ui/tag';
 import type { DashColumn } from '@/components/dashboard/DashTable';
 import type { Order, OrderStatus } from '@/types/order';
+import { formatVND } from '@/lib/format';
 
 export type CustomerLookup = (
   customerId: string | null,
@@ -18,10 +19,6 @@ const statusMeta: Record<
   cancelled: { label: 'Đã hủy', variant: 'gray' },
   refunded: { label: 'Đã hoàn tiền', variant: 'error' },
 };
-
-function formatVND(value: number): string {
-  return `${value.toLocaleString('vi-VN')} đ`;
-}
 
 export function buildOrderColumns(lookup: CustomerLookup): DashColumn<Order>[] {
   return [

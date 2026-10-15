@@ -115,10 +115,6 @@ export function calcTotals(lines: VoucherLine[], shippingFee: number): VoucherTo
   };
 }
 
-export function formatVND(n: number): string {
-  return n.toLocaleString('vi-VN');
-}
-
 const DIGITS = ['không', 'một', 'hai', 'ba', 'bốn', 'năm', 'sáu', 'bảy', 'tám', 'chín'];
 
 function readThreeDigits(n: number): string {

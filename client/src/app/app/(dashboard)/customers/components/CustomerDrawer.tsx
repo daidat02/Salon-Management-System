@@ -8,6 +8,7 @@ import useCustomerDetail from '@/hooks/use-customer-detail';
 import { getApiErrorMessage } from '@/services/apiClient';
 import type { SpendByMonth } from '@/types/customer';
 import { CustomerForm } from './CustomerForm';
+import { formatShortDateTime, formatVND } from '@/lib/format';
 
 type Props = {
   open: boolean;
@@ -15,10 +16,6 @@ type Props = {
   /** Id khách cần xem — null thì drawer không fetch. */
   customerId: string | null;
 };
-
-function formatVND(n: number): string {
-  return `${n.toLocaleString('vi-VN')} đ`;
-}
 
 function formatCompact(n: number): string {
   if (n >= 1000000) {
@@ -37,16 +34,6 @@ function formatBirth(birth: string | null): string {
   const yyyy = d.getFullYear();
   const age = new Date().getFullYear() - yyyy;
   return `${dd}/${mo}/${yyyy} (${age} tuổi)`;
-}
-
-function formatDateTime(value: string): string {
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return value;
-  const hh = String(d.getHours()).padStart(2, '0');
-  const mm = String(d.getMinutes()).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  const mo = String(d.getMonth() + 1).padStart(2, '0');
-  return `${hh}:${mm} ${dd}/${mo}`;
 }
 
 function formatMonthLabel(yyyyMM: string): string {

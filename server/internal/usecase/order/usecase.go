@@ -86,41 +86,14 @@ func (u *OrderUsecase) CreateOrder(ctx context.Context, req *domain.CreateOrderR
 		return nil, err
 	}
 
-	if err := u.ensureServicesInOrg(ctx, orgID, serviceIDs); err != nil {
-		return nil, err
-	}
-	if err := u.ensureProductsInOrg(ctx, orgID, productIDs); err != nil {
-		return nil, err
-	}
-
 	// Giá + đơn vị tại thời điểm bán do server quyết định, không tin client.
-	// Số lượng tồn kho/giữ chỗ/snapshot vật tư LUÔN lưu ở đơn vị nhỏ nhất.
-	pricing, units, err := u.fetchPricingUnits(ctx, orgID, productIDs)
+	cat, err := u.fetchOrderCatalog(ctx, orgID, serviceIDs, productIDs)
 	if err != nil {
-		return nil, err
-	}
-	materialMap := map[string][]domain.ServiceMaterialUsage{}
-	servicePrices := map[string]float64{}
-	if len(serviceIDs) > 0 {
-		materialMap, err = u.services.GetServiceMaterials(ctx, orgID, serviceIDs)
-		if err != nil {
-			return nil, apperror.New(500, "Lỗi khi lấy định mức vật tư", err)
-		}
-		// Giá dịch vụ lấy 1 lần cho cả đơn (tránh N+1 query theo từng dòng).
-		servicePrices, err = u.services.GetServicePrices(ctx, orgID, serviceIDs)
-		if err != nil {
-			return nil, apperror.New(500, "Lỗi khi lấy giá dịch vụ", err)
-		}
-	}
-
-	// Định mức có thể lưu đơn vị lớn hoặc nhỏ (cột service_materials.unit) nên
-	// nạp thêm đơn vị các SP vật tư để quy về đơn vị nhỏ nhất lúc snapshot.
-	if err := u.ensureRecipeUnits(ctx, orgID, materialMap, units); err != nil {
 		return nil, err
 	}
 
 	orderID := utils.NewID()
-	items, materials, deductions, subtotal, err := buildOrderLines(orgID, orderID, req.Items, pricing, units, materialMap, servicePrices)
+	items, materials, deductions, subtotal, err := buildOrderLines(orgID, orderID, req.Items, cat.pricing, cat.units, cat.materialMap, cat.servicePrices)
 	if err != nil {
 		return nil, err
 	}
@@ -201,6 +174,69 @@ func (u *OrderUsecase) CreateOrder(ctx context.Context, req *domain.CreateOrderR
 	resp.CustomerName = customerName
 	resp.CustomerReused = customerReused
 	return resp, nil
+}
+
+// AddOrderItems thêm dòng hàng vào đơn (chỉ pending/confirm).
+// Tái dùng toàn bộ pipeline của tạo đơn (validate, catalog, giá, build)
+// nên luật giá/tồn đồng nhất; tổng mới = tổng cũ + tổng dòng thêm.
+func (u *OrderUsecase) AddOrderItems(ctx context.Context, orderID string, items []domain.OrderItemInput) (*domain.OrderResponse, error) {
+	if len(items) == 0 {
+		return nil, apperror.New(400, "Không có mục nào để thêm vào đơn hàng", nil)
+	}
+	order, orgID, err := u.withEditableOrder(ctx, orderID)
+	if err != nil {
+		return nil, err
+	}
+
+	serviceIDs, productIDs, err := splitItemIDs(items)
+	if err != nil {
+		return nil, err
+	}
+	cat, err := u.fetchOrderCatalog(ctx, orgID, serviceIDs, productIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	lines, materials, deductions, addedSubtotal, err := buildOrderLines(orgID, order.ID, items, cat.pricing, cat.units, cat.materialMap, cat.servicePrices)
+	if err != nil {
+		return nil, err
+	}
+
+	// Thêm dòng chỉ làm tổng tăng nên discount cũ vẫn hợp lệ;
+	// check đã-thu để chắc khi dữ liệu thanh toán bất thường.
+	newSubtotal := order.SubtotalAmount + addedSubtotal
+	newTotal := newSubtotal - order.DiscountAmount
+	totalPaid, err := u.repo.GetTotalPaidByOrder(ctx, orgID, order.ID)
+	if err != nil {
+		return nil, apperror.New(500, "Lỗi khi tính tổng đã thu", err)
+	}
+	if totalPaid > newTotal {
+		return nil, apperror.New(400, "Đã thu vượt tổng mới, không thể thêm dòng", nil)
+	}
+
+	var deductList []domain.StockDeduction
+	for pid, qty := range deductions {
+		deductList = append(deductList, domain.StockDeduction{ProductID: pid, Quantity: qty})
+	}
+
+	if err := u.repo.AddOrderItems(ctx, orgID, order.ID, lines, materials, deductList, newSubtotal, newTotal); err != nil {
+		log.Println("Error adding order items:", err)
+		if errors.Is(err, domain.ErrOrderNotFound) {
+			return nil, apperror.New(404, "Không tìm thấy đơn hàng", err)
+		}
+		if errors.Is(err, domain.ErrOrderNotEditable) {
+			return nil, apperror.New(400, "Đơn đã khóa, không thêm được dòng hàng", err)
+		}
+		if errors.Is(err, domain.ErrInsufficientStock) {
+			return nil, apperror.New(400, "Tồn kho không đủ cho dòng thêm này", err)
+		}
+		return nil, apperror.New(500, "Lỗi khi thêm dòng hàng", err)
+	}
+
+	updated := *order
+	updated.SubtotalAmount = newSubtotal
+	updated.TotalAmount = newTotal
+	return toResponse(&updated), nil
 }
 
 // checkReferencesInOrg đảm bảo customer/appointment đi kèm (nếu có) thuộc đúng salon.
@@ -328,6 +364,31 @@ func (u *OrderUsecase) GetOrdersByOrgID(ctx context.Context, page, pageSize int,
 	return pagination.NewResult(results, params, total), nil
 }
 
+// GetOrderStats lấy 4 số thẻ thống kê đơn: tổng + doanh thu hôm nay,
+// chờ thanh toán, hủy/hoàn. % so hôm qua và % hủy/hoàn tính ở đây
+// (chia cho 0 thì trả 0).
+func (u *OrderUsecase) GetOrderStats(ctx context.Context) (*domain.OrderStatsResponse, error) {
+	orgID, err := requireOrgID(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	stats, err := u.repo.GetOrderStats(ctx, orgID)
+	if err != nil {
+		log.Println("Error getting order stats:", err)
+		return nil, apperror.New(500, "Lỗi khi lấy thống kê đơn hàng", err)
+	}
+
+	if stats.YesterdayRevenue > 0 {
+		stats.RevenueChangePct = (stats.TodayRevenue - stats.YesterdayRevenue) / stats.YesterdayRevenue * 100
+	}
+	if stats.MonthTotal > 0 {
+		stats.CancelRefundRate = float64(stats.CancelRefundMonth) / float64(stats.MonthTotal) * 100
+	}
+
+	return stats, nil
+}
+
 // GetOrderDetail lấy chi tiết đơn: header + dòng hàng (kèm NV) + vật tư + thanh toán.
 func (u *OrderUsecase) GetOrderDetail(ctx context.Context, id string) (*domain.OrderDetailResponse, error) {
 	id, err := requireID(id, "Thiếu id đơn hàng")
@@ -356,10 +417,11 @@ func (u *OrderUsecase) GetOrderDetail(ctx context.Context, id string) (*domain.O
 	}
 
 	detail := &domain.OrderDetailResponse{
-		Order:     toResponse(order),
-		Items:     make([]*domain.OrderItemResponse, 0, len(items)),
-		Materials: make([]*domain.OrderMaterialResponse, 0, len(materials)),
-		Payments:  make([]*domain.PaymentResponse, 0, len(payments)),
+		Order:       toResponse(order),
+		Items:       make([]*domain.OrderItemResponse, 0, len(items)),
+		Materials:   make([]*domain.OrderMaterialResponse, 0, len(materials)),
+		Payments:    make([]*domain.PaymentResponse, 0, len(payments)),
+		Commissions: buildCommissions(items),
 	}
 	for _, it := range items {
 		detail.Items = append(detail.Items, toItemResponse(it))
@@ -525,6 +587,224 @@ func (u *OrderUsecase) UpdateOrderCustomer(ctx context.Context, id string, req *
 	return toResponse(order), nil
 }
 
+// UpdateOrderItemQty đổi số lượng 1 dòng đơn (chỉ pending/confirm).
+// Quantity + Unit cùng ngữ nghĩa lúc tạo đơn (Unit rỗng = đơn vị lớn,
+// server chuẩn hóa về lớn để lưu); dòng service bỏ qua Unit.
+// Giá snapshot và NV được giữ; vật tư thuộc dòng scale theo tỷ lệ
+// (giữ chỉnh tay, không regenerate từ định mức).
+// Tổng mới phải chịu được discount và số đã thu, không thì 400.
+func (u *OrderUsecase) UpdateOrderItemQty(ctx context.Context, orderID, itemID string, req *domain.UpdateOrderItemQtyRequest) (*domain.OrderItemResponse, error) {
+	itemID, err := requireID(itemID, "Thiếu id dòng đơn hàng")
+	if err != nil {
+		return nil, err
+	}
+	if req == nil || req.Quantity <= 0 {
+		return nil, apperror.New(400, "Số lượng phải lớn hơn 0", nil)
+	}
+
+	order, orgID, err := u.withEditableOrder(ctx, orderID)
+	if err != nil {
+		return nil, err
+	}
+
+	items, materials, err := u.loadItemsAndMaterials(ctx, orgID, order.ID)
+	if err != nil {
+		return nil, err
+	}
+	var line *domain.OrderItem
+	for _, it := range items {
+		if it.ID == itemID {
+			line = it
+			break
+		}
+	}
+	if line == nil {
+		return nil, apperror.New(404, "Không tìm thấy dòng đơn trong tổ chức", nil)
+	}
+
+	// Chuẩn hóa SL mới về đơn vị lớn (dòng SP); dòng service là số suất.
+	newQty := req.Quantity
+	var large float64 = 1
+	var pu domain.ProductUnit
+	if line.ItemType == domain.ItemTypeProduct {
+		if line.ProductID == nil || strings.TrimSpace(*line.ProductID) == "" {
+			return nil, apperror.New(500, "Dữ liệu dòng đơn không hợp lệ", nil)
+		}
+		pid := strings.TrimSpace(*line.ProductID)
+		units, err := u.fetchUnits(ctx, orgID, []string{pid})
+		if err != nil {
+			return nil, err
+		}
+		pu = units[pid]
+		fromUnit := ""
+		if req.Unit != nil {
+			fromUnit = strings.TrimSpace(*req.Unit)
+		}
+		factor, ferr := productdomain.BaseFactor(pu.Unit, fromUnit, pu.NetUnit, pu.NetAmount)
+		if ferr != nil {
+			return nil, apperror.New(400, fmt.Sprintf("Lỗi khi chuyển đổi đơn vị sản phẩm: %s", ferr.Error()), ferr)
+		}
+		large = productdomain.LargeFactor(pu.Unit, pu.NetUnit, pu.NetAmount)
+		if large <= 0 {
+			large = 1
+		}
+		newQty = req.Quantity * factor / large
+	}
+	if line.Quantity <= 0 {
+		return nil, apperror.New(500, "Dữ liệu dòng đơn không hợp lệ", nil)
+	}
+	ratio := newQty / line.Quantity
+
+	updated := *line
+	updated.Quantity = newQty
+
+	updated.LineTotal = newQty * line.UnitPrice
+	if err := updated.Validate(); err != nil {
+		return nil, apperror.New(400, err.Error(), err)
+	}
+
+	// Vật tư thuộc dòng scale theo tỷ lệ; delta giữ chỗ tính base.
+	materialQtys := map[string]float64{}
+	deltas := map[string]float64{}
+	if line.ItemType == domain.ItemTypeProduct {
+		deltas[strings.TrimSpace(*line.ProductID)] = (newQty - line.Quantity) * large
+	}
+	for _, m := range materials {
+		if m.OrderItemID != itemID {
+			continue
+		}
+		nq := m.Quantity * ratio
+		materialQtys[m.ID] = nq
+		deltas[m.ProductID] += nq - m.Quantity
+	}
+
+	newSubtotal := order.SubtotalAmount - line.LineTotal + updated.LineTotal
+	if order.DiscountAmount > newSubtotal {
+		return nil, apperror.New(400, "Giảm giá không được vượt tổng tiền", nil)
+	}
+	newTotal := newSubtotal - order.DiscountAmount
+	totalPaid, err := u.repo.GetTotalPaidByOrder(ctx, orgID, order.ID)
+	if err != nil {
+		return nil, apperror.New(500, "Lỗi khi tính tổng đã thu", err)
+	}
+	if totalPaid > newTotal {
+		return nil, apperror.New(400, "Đã thu vượt tổng mới, không thể giảm đơn", nil)
+	}
+
+	var deductList []domain.StockDeduction
+	for pid, qty := range deltas {
+		if qty == 0 {
+			continue
+		}
+		deductList = append(deductList, domain.StockDeduction{ProductID: pid, Quantity: qty})
+	}
+	if err := u.repo.ApplyItemQtyUpdate(ctx, orgID, order.ID, &updated, materialQtys, deductList, newSubtotal, newTotal); err != nil {
+		log.Println("Error updating order item qty:", err)
+		if errors.Is(err, domain.ErrOrderNotFound) {
+			return nil, apperror.New(404, "Không tìm thấy đơn hàng", err)
+		}
+		if errors.Is(err, domain.ErrOrderNotEditable) {
+			return nil, apperror.New(400, "Đơn đã khóa, không sửa được dòng hàng", err)
+		}
+		if errors.Is(err, domain.ErrInsufficientStock) {
+			return nil, apperror.New(400, "Tồn kho không đủ cho số lượng mới", err)
+		}
+		return nil, apperror.New(500, "Lỗi khi đổi số lượng dòng hàng", err)
+	}
+
+	return toItemResponse(&updated), nil
+}
+
+// DeleteOrderItem xóa 1 dòng đơn (chỉ pending/confirm): cascade vật tư + NV
+// của dòng, nhả giữ chỗ kho, chốt tổng mới. Cấm xóa dòng cuối cùng —
+// muốn bỏ cả đơn thì dùng Hủy đơn.
+func (u *OrderUsecase) DeleteOrderItem(ctx context.Context, orderID, itemID string) (string, error) {
+	itemID, err := requireID(itemID, "Thiếu id dòng đơn hàng")
+	if err != nil {
+		return "", err
+	}
+
+	order, orgID, err := u.withEditableOrder(ctx, orderID)
+	if err != nil {
+		return "", err
+	}
+
+	items, materials, err := u.loadItemsAndMaterials(ctx, orgID, order.ID)
+	if err != nil {
+		return "", err
+	}
+	var line *domain.OrderItem
+	for _, it := range items {
+		if it.ID == itemID {
+			line = it
+			break
+		}
+	}
+	if line == nil {
+		return "", apperror.New(404, "Không tìm thấy dòng đơn trong tổ chức", nil)
+	}
+	if len(items) <= 1 {
+		return "", apperror.New(400, "Không thể xóa dòng cuối cùng — hãy Hủy đơn nếu muốn bỏ cả đơn", nil)
+	}
+
+	// Số cần nhả (base): dòng SP quy từ đơn vị lớn, vật tư đã base.
+	releases := map[string]float64{}
+	if line.ItemType == domain.ItemTypeProduct {
+		if line.ProductID == nil || strings.TrimSpace(*line.ProductID) == "" {
+			return "", apperror.New(500, "Dữ liệu dòng đơn không hợp lệ", nil)
+		}
+		pid := strings.TrimSpace(*line.ProductID)
+		units, err := u.fetchUnits(ctx, orgID, []string{pid})
+		if err != nil {
+			return "", err
+		}
+		pu := units[pid]
+		factor, ferr := productdomain.BaseFactor(pu.Unit, pu.Unit, pu.NetUnit, pu.NetAmount)
+		if ferr != nil {
+			return "", apperror.New(400, fmt.Sprintf("Lỗi khi chuyển đổi đơn vị sản phẩm: %s", ferr.Error()), ferr)
+		}
+		releases[pid] = line.Quantity * factor
+	}
+	for _, m := range materials {
+		if m.OrderItemID == itemID {
+			releases[m.ProductID] += m.Quantity
+		}
+	}
+
+	newSubtotal := order.SubtotalAmount - line.LineTotal
+	if order.DiscountAmount > newSubtotal {
+		return "", apperror.New(400, "Giảm giá không được vượt tổng tiền", nil)
+	}
+	newTotal := newSubtotal - order.DiscountAmount
+	totalPaid, err := u.repo.GetTotalPaidByOrder(ctx, orgID, order.ID)
+	if err != nil {
+		return "", apperror.New(500, "Lỗi khi tính tổng đã thu", err)
+	}
+	if totalPaid > newTotal {
+		return "", apperror.New(400, "Đã thu vượt tổng mới, không thể xóa dòng", nil)
+	}
+
+	var releaseList []domain.StockDeduction
+	for pid, qty := range releases {
+		if qty == 0 {
+			continue
+		}
+		releaseList = append(releaseList, domain.StockDeduction{ProductID: pid, Quantity: qty})
+	}
+	if err := u.repo.ApplyDeleteItem(ctx, orgID, order.ID, itemID, releaseList, newSubtotal, newTotal); err != nil {
+		log.Println("Error deleting order item:", err)
+		if errors.Is(err, domain.ErrOrderNotFound) {
+			return "", apperror.New(404, "Không tìm thấy đơn hàng", err)
+		}
+		if errors.Is(err, domain.ErrOrderNotEditable) {
+			return "", apperror.New(400, "Đơn đã khóa, không xóa được dòng hàng", err)
+		}
+		return "", apperror.New(500, "Lỗi khi xóa dòng hàng", err)
+	}
+
+	return itemID, nil
+}
+
 // closeOrder khung chung cho hủy/hoàn: check trạng thái cho phép, gom tồn cần
 // xử lý từ snapshot live, rồi giao repo ApplyCancel (1 tx).
 // Refund (đã trừ thật) thì hoàn tồn; cancel (mới giữ chỗ) thì chỉ nhả giữ chỗ.
@@ -553,14 +833,24 @@ func (u *OrderUsecase) closeOrder(ctx context.Context, id, newStatus string, all
 		return nil, err
 	}
 
-	restores := map[string]float64{}
+	// Dòng SP lưu theo đơn vị lớn nên phải quy về base mới khớp số đã giữ/trừ.
+	var productIDs []string
+	seenPID := map[string]struct{}{}
 	for _, it := range items {
 		if it.ItemType == domain.ItemTypeProduct && it.ProductID != nil {
-			restores[*it.ProductID] += it.Quantity
+			if _, ok := seenPID[*it.ProductID]; !ok {
+				seenPID[*it.ProductID] = struct{}{}
+				productIDs = append(productIDs, *it.ProductID)
+			}
 		}
 	}
-	for _, m := range materials {
-		restores[m.ProductID] += m.Quantity
+	units, err := u.fetchUnits(ctx, orgID, productIDs)
+	if err != nil {
+		return nil, err
+	}
+	restores, err := restoreQuantities(items, materials, units)
+	if err != nil {
+		return nil, err
 	}
 	// Chỉ đơn đã chốt (refund) mới từng bị trừ kho thật nên cần hoàn.
 	// Đơn hủy trước chốt chỉ nhả giữ chỗ (releases), tồn thật không đổi.
@@ -676,8 +966,10 @@ func (u *OrderUsecase) CreatePayment(ctx context.Context, orderID string, req *d
 // ---------- 5. Gán lại NV thực hiện / vật tư tiêu hao ----------
 
 // ReplaceStaffOrderItems gán lại toàn bộ NV thực hiện cho 1 dòng đơn.
-// type = loại hoa hồng (percent | fixed | profit), hoa hồng do UI tự nhập.
+// type = loại hoa hồng (percent | fixed | profit); percent/profit do server
+// tự tính, chỉ fixed lấy số client gửi.
 // Tổng share_pct của các dòng percent/profit trong 1 món phải bằng 100.
+// Danh sách rỗng = gỡ hết NV của dòng.
 func (u *OrderUsecase) ReplaceStaffOrderItems(ctx context.Context, orderItemID string, staffItems []*domain.StaffOrderItemInput) ([]*domain.StaffOrderItemResponse, error) {
 	orgID, err := requireOrgID(ctx)
 	if err != nil {
@@ -686,9 +978,6 @@ func (u *OrderUsecase) ReplaceStaffOrderItems(ctx context.Context, orderItemID s
 	orderItemID, err = requireID(orderItemID, "Thiếu id dòng đơn hàng")
 	if err != nil {
 		return nil, err
-	}
-	if len(staffItems) == 0 {
-		return nil, apperror.New(400, "Danh sách nhân viên trống", nil)
 	}
 
 	// Validate từng dòng + chống trùng NV + cộng tổng share (bỏ dòng fixed).
@@ -718,12 +1007,14 @@ func (u *OrderUsecase) ReplaceStaffOrderItems(ctx context.Context, orderItemID s
 		return nil, apperror.New(400, fmt.Sprintf("Tổng share_pct phải bằng 100 (đang %.2f)", totalShare), nil)
 	}
 
-	// Dòng đơn phải thuộc đúng salon (chống lẫn tenant).
-	exists, err := u.repo.OrderItemExistsInOrg(ctx, orgID, orderItemID)
+	// Dòng đơn phải thuộc đúng salon (chống lẫn tenant), đồng thời suy đơn
+	// chứa nó để tải dữ liệu tính hoa hồng server-side.
+	itemOrders, err := u.repo.MapItemOrders(ctx, orgID, []string{orderItemID})
 	if err != nil {
 		return nil, apperror.New(500, "Lỗi khi kiểm tra dòng đơn hàng", err)
 	}
-	if !exists {
+	orderID, ok := itemOrders[orderItemID]
+	if !ok {
 		return nil, apperror.New(404, "Không tìm thấy dòng đơn hàng trong tổ chức", nil)
 	}
 
@@ -732,25 +1023,72 @@ func (u *OrderUsecase) ReplaceStaffOrderItems(ctx context.Context, orderItemID s
 		return nil, err
 	}
 
+	// Tải dòng + cả đơn: mẫu số margin cho profit (service: cả đơn,
+	// SP: giá vốn chính dòng), line_total làm gốc cho percent/profit.
+	items, materials, err := u.loadItemsAndMaterials(ctx, orgID, orderID)
+	if err != nil {
+		return nil, err
+	}
+	var line *domain.OrderItem
+	for _, it := range items {
+		if it.ID == orderItemID {
+			line = it
+			break
+		}
+	}
+	if line == nil {
+		return nil, apperror.New(404, "Không tìm thấy dòng đơn hàng trong tổ chức", nil)
+	}
+	var serviceRevenue, materialCost float64
+	for _, it := range items {
+		if it.ItemType == domain.ItemTypeService {
+			serviceRevenue += it.LineTotal
+		}
+	}
+	for _, m := range materials {
+		materialCost += m.Quantity * m.UnitCostAtTime
+	}
+	costPrice := 0.0
+	if line.ItemType == domain.ItemTypeProduct && line.ProductID != nil {
+		for _, in := range staffItems {
+			if in.NormalizeType() == domain.StaffTypeProfit {
+				pricing, _, err := u.fetchPricingUnits(ctx, orgID, []string{strings.TrimSpace(*line.ProductID)})
+				if err != nil {
+					return nil, err
+				}
+				costPrice = pricing[strings.TrimSpace(*line.ProductID)].CostPrice
+				break
+			}
+		}
+	}
+
 	staffs := make([]*domain.StaffOrderItem, 0, len(staffItems))
 	for _, item := range staffItems {
 		id := strings.TrimSpace(item.StaffID)
-		var commission float64
+		typ := item.NormalizeType()
+		// commission_amount client gửi chỉ dùng cho fixed (nhập tay);
+		// percent/profit do server tự tính, gửi kèm sẽ bị bỏ qua.
+		fixed := 0.0
 		if item.CommissionAmount != nil {
-			commission = *item.CommissionAmount
+			fixed = *item.CommissionAmount
+		}
+		revenue, cost := serviceRevenue, materialCost
+		if line.ItemType == domain.ItemTypeProduct {
+			revenue = line.LineTotal
+			cost = line.Quantity * costPrice
 		}
 		staffs = append(staffs, &domain.StaffOrderItem{
 			ID:               utils.NewID(),
 			OrganizationID:   orgID,
 			OrderItemID:      orderItemID,
 			StaffID:          id,
-			Type:             item.NormalizeType(),
+			Type:             typ,
 			SharePct:         *item.SharePct,
-			CommissionAmount: commission,
+			CommissionAmount: computeCommission(typ, *item.SharePct, line.LineTotal, revenue, cost, fixed),
 		})
 	}
 
-	if err := u.repo.ReplaceStaffOrderItems(ctx, orderItemID, staffs); err != nil {
+	if err := u.repo.ReplaceStaffOrderItems(ctx, orgID, orderItemID, staffs); err != nil {
 		log.Println("Error replacing staff order items:", err)
 		return nil, apperror.New(500, "Lỗi khi gán nhân viên cho dòng đơn hàng", err)
 	}
@@ -914,6 +1252,7 @@ func (u *OrderUsecase) GetPosItemsByOrgID(ctx context.Context, limit int, name, 
 
 	items, err := u.repo.GetPosItemsByOrgID(ctx, orgID, limit, name, itemType, id, search, categoryFilter)
 	if err != nil {
+		log.Println("Error getting POS items:", err)
 		return nil, apperror.New(500, "Lỗi khi lấy danh sách sản phẩm/dịch vụ", err)
 	}
 

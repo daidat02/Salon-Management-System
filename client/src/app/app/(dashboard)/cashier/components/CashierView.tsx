@@ -10,27 +10,13 @@ import { getApiErrorMessage } from '@/services/apiClient';
 import { getOrdersByOrgID } from '@/services/order';
 import useCustomer from '@/hooks/use-customer';
 import type { Order, OrderStatus } from '@/types/order';
-import CashierStats from './CashierStats';
+import { formatVND } from '@/lib/format';
 import CashierOrderCard from './CashierOrderCard';
+import OrderStats from '../../orders/components/OrderStats';
 
 export const ACTIVE_STATUSES: OrderStatus[] = ['pending', 'confirm', 'delivery'];
 
 type TabKey = 'all' | 'pending' | 'confirm' | 'delivery';
-
-function formatVND(value: number): string {
-  return `${value.toLocaleString('vi-VN')} đ`;
-}
-
-function isToday(value: string | null): boolean {
-  if (!value) return false;
-  const d = new Date(value);
-  const now = new Date();
-  return (
-    d.getFullYear() === now.getFullYear() &&
-    d.getMonth() === now.getMonth() &&
-    d.getDate() === now.getDate()
-  );
-}
 
 export default function CashierView() {
   const router = useRouter();
@@ -81,12 +67,6 @@ export default function CashierView() {
     [active],
   );
 
-  const completedToday = React.useMemo(
-    () =>
-      allRows.filter((o) => o.status === 'completed' && isToday(o.updated_at ?? o.created_at)),
-    [allRows],
-  );
-
   const latestCompleted = React.useMemo(() => {
     const rows = allRows.filter((o) => o.status === 'completed');
     return rows.sort((a, b) => {
@@ -112,16 +92,8 @@ export default function CashierView() {
 
   return (
     <div className="space-y-4">
-      {/* 4 thẻ metric — theo preview/code.html */}
-      <CashierStats
-        stats={{
-          waitingTotal: active.length,
-          confirmedCount: counts.confirm,
-          pendingCount: counts.pending,
-          revenueToday: completedToday.reduce((s, o) => s + o.total_amount, 0),
-          completedCountToday: completedToday.length,
-        }}
-      />
+      {/* 4 thẻ thống kê đơn (số server) */}
+      <OrderStats />
 
       {/* Tiêu đề + toolbar dùng chung — trạng thái lọc qua dropdown của DashToolbar */}
       <div className="flex items-center gap-2">

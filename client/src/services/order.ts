@@ -47,6 +47,7 @@ export const getOrderDetail = async (id: string) => {
     items: detail.items || [],
     materials: detail.materials || [],
     payments: detail.payments || [],
+    commissions: detail.commissions || [],
   };
 };
 
@@ -166,6 +167,27 @@ export const getOrdersByOrgID = async ({
   return data;
 };
 
+export type OrderStats = {
+  today_total: number;
+  today_completed: number;
+  today_processing: number;
+  today_revenue: number;
+  yesterday_revenue: number;
+  revenue_change_pct: number;
+  pending_count: number;
+  pending_amount: number;
+  cancel_refund_today: number;
+  cancel_refund_month: number;
+  cancel_refund_rate: number;
+  month_total: number;
+};
+
+/** Thống kê 4 thẻ đơn hàng (tổng/doanh thu hôm nay, chờ thanh toán, hủy/hoàn). */
+export const getOrderStats = async (): Promise<OrderStats> => {
+  const res = await apiClient.get<ApiResponse<OrderStats>>(ORDERS_ENDPOINT.GET_ORDER_STATS);
+  return res.data.data;
+};
+
 export type PaymentMethod = 'cash' | 'bank_transfer' | 'card' | 'gateway';
 
 export type CreatePaymentPayload = {
@@ -181,7 +203,8 @@ export type SaveItemStaffPayload = {
   staff_id: string;
   type: ItemStaffType;
   share_pct: number;
-  commission_amount: number;
+  /** Chỉ dùng khi type fixed (nhập tay); percent/profit do server tự tính. */
+  commission_amount?: number;
 };
 
 /** Gán lại toàn bộ NV thực hiện cho 1 dòng đơn (replace). */
@@ -192,7 +215,7 @@ export const saveItemStaff = async (orderItemId: string, staffs: SaveItemStaffPa
       staff_id: s.staff_id,
       type: s.type,
       share_pct: s.share_pct,
-      commission_amount: s.commission_amount,
+      commission_amount: s.commission_amount ?? null,
     })),
   );
   return res.data.data;
@@ -249,4 +272,135 @@ export const createPayment = async (orderId: string, payload: CreatePaymentPaylo
     },
   );
   return res.data.data;
+};
+
+export type AddOrderItemsPayload = {
+  items: CreateOrderItemPayload[];
+};
+
+/** Thêm dòng hàng vào đơn có sẵn (chỉ pending/confirm) — server trả đơn đã cộng tổng. */
+export const addOrderItems = async (
+  orderId: string,
+  payload: AddOrderItemsPayload,
+): Promise<CreatedOrder> => {
+  const res = await apiClient.post<ApiResponse<RawCreatedOrder>>(
+    ORDERS_ENDPOINT.ADD_ORDER_ITEMS(orderId),
+    {
+      items: payload.items.map((it) => ({
+        item_type: it.item_type,
+        service_id: it.service_id ?? null,
+        product_id: it.product_id ?? null,
+        staff_id: it.staff_id ?? null,
+        quantity: it.quantity,
+        materials: [],
+      })),
+    },
+  );
+
+  const o = res.data.data;
+  return {
+    id: o.id,
+    organization_id: o.organization_id,
+    code: o.code,
+    customer_id: o.customer_id,
+    appointment_id: o.appointment_id,
+    subtotal_amount: o.subtotal_amount,
+    discount_amount: o.discount_amount,
+    total_amount: o.total_amount,
+    status: o.status,
+    created_at: o.created_at,
+    updated_at: o.updated_at,
+  };
+};
+
+export type UpdateOrderItemQtyPayload = {
+  /** Số lượng mới (theo unit gửi kèm, rỗng = đơn vị lớn). */
+  quantity: number;
+  unit?: string | null;
+};
+
+export type UpdatedOrderItem = {
+  id: string;
+  quantity: number;
+  unit: string | null;
+  unit_price: number;
+  line_total: number;
+};
+
+/** Đổi số lượng 1 dòng đơn (chỉ pending/confirm) — server quy đơn vị + chỉnh kho. */
+export const updateOrderItemQty = async (
+  orderId: string,
+  itemId: string,
+  payload: UpdateOrderItemQtyPayload,
+): Promise<UpdatedOrderItem> => {
+  const res = await apiClient.patch<
+    ApiResponse<{
+      id: string;
+      quantity: number;
+      unit: string | null;
+      unit_price: number;
+      line_total: number;
+    }>
+  >(ORDERS_ENDPOINT.UPDATE_ORDER_ITEM_QTY(orderId, itemId), {
+    quantity: payload.quantity,
+    unit: payload.unit ?? null,
+  });
+  const it = res.data.data;
+  return {
+    id: it.id,
+    quantity: it.quantity,
+    unit: it.unit,
+    unit_price: it.unit_price,
+    line_total: it.line_total,
+  };
+};
+
+/** Xóa 1 dòng đơn (chỉ pending/confirm, cấm xóa dòng cuối) — server nhả kho + chốt tổng. */
+export const deleteOrderItem = async (orderId: string, itemId: string): Promise<string> => {
+  const res = await apiClient.delete<ApiResponse<string>>(
+    ORDERS_ENDPOINT.DELETE_ORDER_ITEM(orderId, itemId),
+  );
+  return res.data.data;
+};
+
+/** Hủy đơn chưa chốt (server nhả giữ chỗ kho). */
+export const cancelOrder = async (orderId: string): Promise<CreatedOrder> => {
+  const res = await apiClient.post<ApiResponse<RawCreatedOrder>>(
+    ORDERS_ENDPOINT.CANCEL_ORDER(orderId),
+  );
+  const o = res.data.data;
+  return {
+    id: o.id,
+    organization_id: o.organization_id,
+    code: o.code,
+    customer_id: o.customer_id,
+    appointment_id: o.appointment_id,
+    subtotal_amount: o.subtotal_amount,
+    discount_amount: o.discount_amount,
+    total_amount: o.total_amount,
+    status: o.status,
+    created_at: o.created_at,
+    updated_at: o.updated_at,
+  };
+};
+
+/** Hoàn đơn đã chốt (server hoàn kho đã trừ). */
+export const refundOrder = async (orderId: string): Promise<CreatedOrder> => {
+  const res = await apiClient.post<ApiResponse<RawCreatedOrder>>(
+    ORDERS_ENDPOINT.REFUND_ORDER(orderId),
+  );
+  const o = res.data.data;
+  return {
+    id: o.id,
+    organization_id: o.organization_id,
+    code: o.code,
+    customer_id: o.customer_id,
+    appointment_id: o.appointment_id,
+    subtotal_amount: o.subtotal_amount,
+    discount_amount: o.discount_amount,
+    total_amount: o.total_amount,
+    status: o.status,
+    created_at: o.created_at,
+    updated_at: o.updated_at,
+  };
 };

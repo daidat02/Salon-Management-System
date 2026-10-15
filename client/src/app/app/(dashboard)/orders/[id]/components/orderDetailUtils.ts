@@ -7,15 +7,6 @@ import type { Product } from '@/types/product';
 import type { Service } from '@/types/service';
 import type { Staff } from '@/types/staff';
 
-export function formatVND(value: number): string {
-  return `${value.toLocaleString('vi-VN')} đ`;
-}
-
-export function formatDateTime(value: string | null): string {
-  if (!value) return '—';
-  return new Date(value).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' });
-}
-
 export type EnrichedServiceLine = {
   id: string;
   name: string;
@@ -55,7 +46,12 @@ export type EnrichedRetailLine = {
   name: string;
   desc: string;
   sku: string;
+  staffId: string | null;
+  staffName: string;
+  staffRole: string;
   quantity: number;
+  /** Đơn vị lưu của dòng (đơn vị lớn của SP). */
+  unit: string;
   qtyText: string;
   sellTotal: number;
   sellUnit: number;
@@ -105,29 +101,36 @@ export function buildServiceLines(
     .filter((it) => it.item_type === 'service')
     .map((it) => {
       const svc = it.service_id ? services.get(it.service_id) : undefined;
-      // Ưu tiên tên server trả về (kể cả NV đã nghỉ), fallback sang staff_id cũ.
-      const serverNames = (it.staff ?? [])
-        .map((s) => s.full_name ?? staff.get(s.staff_id ?? '')?.full_name ?? 'NV')
-        .filter(Boolean);
-      const st = it.staff_id ? staff.get(it.staff_id) : undefined;
-      const staffName =
-        serverNames.length > 0 ? serverNames.join(', ') : st ? `Stylist ${st.full_name}` : '—';
-      const staffRole =
-        serverNames.length > 1
-          ? `${serverNames.length} nhân viên`
-          : (st?.position ?? '');
+      const assigned = resolveStaffDisplay(it, staff);
       return {
         id: it.id,
         name: svc?.name ?? 'Dịch vụ',
         desc: svc?.description ?? '',
         duration: svc ? `${svc.duration_minutes} phút` : '—',
-        staffId: it.staff?.[0]?.staff_id ?? it.staff_id,
-        staffName,
-        staffRole,
+        ...assigned,
         quantity: it.quantity,
         lineTotal: it.line_total,
       };
     });
+}
+
+/** Tên + vai trò NV hiển thị cho 1 dòng đơn (service/retail logic giống nhau).
+ * Ưu tiên tên server trả về (kể cả NV đã nghỉ), fallback sang staff_id cũ. */
+export function resolveStaffDisplay(
+  it: Pick<OrderDetailItem, 'staff' | 'staff_id'>,
+  staff: Map<string, Staff>,
+): { staffId: string | null; staffName: string; staffRole: string } {
+  const serverNames = (it.staff ?? [])
+    .map((s) => s.full_name ?? staff.get(s.staff_id ?? '')?.full_name ?? 'NV')
+    .filter(Boolean);
+  const st = it.staff_id ? staff.get(it.staff_id) : undefined;
+  return {
+    staffId: it.staff?.[0]?.staff_id ?? it.staff_id,
+    staffName:
+      serverNames.length > 0 ? serverNames.join(', ') : st ? `Stylist ${st.full_name}` : '—',
+    staffRole:
+      serverNames.length > 1 ? `${serverNames.length} nhân viên` : (st?.position ?? ''),
+  };
 }
 
 export function buildMaterialLines(
@@ -158,6 +161,7 @@ export function buildMaterialLines(
 export function buildRetailLines(
   items: OrderDetailItem[],
   products: Map<string, Product>,
+  staff: Map<string, Staff>,
 ): EnrichedRetailLine[] {
   return items
     .filter((it) => it.item_type === 'product')
@@ -170,7 +174,9 @@ export function buildRetailLines(
         name: p?.name ?? 'Sản phẩm',
         desc: p ? `Đơn vị: ${p.unit}` : '',
         sku: p?.sku ?? '—',
+        ...resolveStaffDisplay(it, staff),
         quantity: it.quantity,
+        unit: it.unit ?? p?.unit ?? '',
         qtyText: `x${it.quantity}${p ? ` ${p.unit}` : ''}`,
         sellTotal: it.line_total,
         sellUnit: it.quantity > 0 ? it.line_total / it.quantity : 0,
@@ -220,81 +226,6 @@ export function calcOrderProfit(detail: OrderDetail, retailLines: EnrichedRetail
     totalRevenue,
     totalMargin: pct(totalProfit, totalRevenue),
   };
-}
-
-export function buildStaffCommissions(
-  items: OrderDetailItem[],
-  staff: Map<string, Staff>,
-  assignments?: Record<string, StaffAssignment[]>,
-  /** Biên lợi nhuận dịch vụ (%) — dùng khi loại hoa hồng là % lợi nhuận. */
-  serviceMarginPct = 0,
-): StaffCommission[] {
-  const byStaff = new Map<string, StaffCommission>();
-  const merge = (c: StaffCommission) => {
-    const prev = byStaff.get(c.staffId);
-    byStaff.set(c.staffId, prev ? { ...c, amount: prev.amount + c.amount } : c);
-  };
-  for (const it of items) {
-    if (it.item_type !== 'service') continue;
-    const manual = assignments?.[it.id];
-    const saved = !manual || manual.length === 0 ? (it.staff ?? []) : [];
-    if (saved.length > 0) {
-      for (const s of saved) {
-        if (!s.staff_id) continue;
-        const st = staff.get(s.staff_id);
-        const rateText =
-          s.type === 'percent'
-            ? `${s.share_pct}% doanh thu`
-            : s.type === 'profit'
-              ? `${s.share_pct}% lợi nhuận`
-              : 'Cố định';
-        merge({
-          staffId: s.staff_id,
-          name: s.full_name ?? st?.full_name ?? 'Nhân viên',
-          role: st?.position ?? '',
-          rateText,
-          amount: Math.round(s.commission_amount),
-        });
-      }
-      continue;
-    }
-    if (manual && manual.length > 0) {
-      for (const a of manual) {
-        const st = staff.get(a.staffId);
-        const amount =
-          a.kind === 'percent'
-            ? Math.round((it.line_total * a.value) / 100)
-            : a.kind === 'profit'
-              ? Math.round(((it.line_total * serviceMarginPct) / 100) * (a.value / 100))
-              : Math.round(a.value);
-        const rateText =
-          a.kind === 'percent'
-            ? `${a.value}% doanh thu (nhập tay)`
-            : a.kind === 'profit'
-              ? `${a.value}% lợi nhuận (nhập tay)`
-              : `Cố định (nhập tay)`;
-        merge({
-          staffId: a.staffId,
-          name: st?.full_name ?? 'Nhân viên',
-          role: st?.position ?? '',
-          rateText,
-          amount,
-          manual: true,
-        });
-      }
-    } else if (it.staff_id) {
-      const st = staff.get(it.staff_id);
-      const rate = st?.commission_rate ?? 0;
-      merge({
-        staffId: it.staff_id,
-        name: st?.full_name ?? 'Nhân viên',
-        role: st?.position ?? '',
-        rateText: `${rate}% doanh thu đảm nhận`,
-        amount: Math.round((it.line_total * rate) / 100),
-      });
-    }
-  }
-  return Array.from(byStaff.values());
 }
 
 export function customerTier(totalSpent: number): { label: string; sub: string } {

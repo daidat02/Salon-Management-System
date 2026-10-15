@@ -13,16 +13,18 @@ type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   serviceName: string;
+  /** 'service' = dòng dịch vụ, 'retail' = dòng SP bán lẻ (đổi nhãn dialog). */
+  subjectKind?: 'service' | 'retail';
   staffList: Staff[];
   initialAssignments: StaffAssignment[];
   onApply: (assignments: StaffAssignment[]) => Promise<void>;
 };
 
-const KIND_OPTIONS: { label: string; value: CommissionKind }[] = [
-  { label: '% Dịch vụ', value: 'percent' },
-  { label: 'Số tiền cố định (VNĐ)', value: 'fixed' },
-  { label: '% Lợi nhuận dịch vụ', value: 'profit' },
-];
+const KIND_LABEL: Record<'service' | 'retail', { percent: string; profit: string; noun: string }> =
+  {
+    service: { percent: '% Dịch vụ', profit: '% Lợi nhuận dịch vụ', noun: 'dịch vụ' },
+    retail: { percent: '% Doanh thu SP', profit: '% Lợi nhuận SP', noun: 'sản phẩm' },
+  };
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -39,6 +41,7 @@ export default function StaffUpdateDialog({
   open,
   onOpenChange,
   serviceName,
+  subjectKind = 'service',
   staffList,
   initialAssignments,
   onApply,
@@ -79,7 +82,7 @@ export default function StaffUpdateDialog({
       open={open}
       onOpenChange={onOpenChange}
       title={`Cập nhật nhân viên — ${serviceName}`}
-      description="Thiết lập nhân viên thực hiện và mức hoa hồng cho dịch vụ này. Bấm Áp dụng để lưu thẳng lên server."
+      description={`Thiết lập nhân viên thực hiện và mức hoa hồng cho ${KIND_LABEL[subjectKind].noun} này. Bấm Áp dụng để lưu thẳng lên server.`}
       maxWidth="max-w-[672px]"
       footer={
         <div className="flex w-full items-center justify-between gap-3">
@@ -103,7 +106,9 @@ export default function StaffUpdateDialog({
           <h4 className="text-[11px] font-semibold tracking-wider text-on-surface-variant uppercase">
             Nhân viên thực hiện
           </h4>
-          <span className="text-[11px] font-medium text-primary">Tỷ lệ theo dịch vụ</span>
+          <span className="text-[11px] font-medium text-primary">
+            Tỷ lệ theo {KIND_LABEL[subjectKind].noun}
+          </span>
         </div>
         <div className="space-y-2.5">
           {staffRows.map((row) => (
@@ -132,7 +137,13 @@ export default function StaffUpdateDialog({
                   value={row.kind}
                   onValueChange={(v) => updateStaffRow(row.key, { kind: v as StaffRow['kind'] })}
                   triggerClassName="h-8 bg-surface text-xs!"
-                  options={KIND_OPTIONS}
+                  options={
+                    [
+                      { label: KIND_LABEL[subjectKind].percent, value: 'percent' },
+                      { label: 'Số tiền cố định (VNĐ)', value: 'fixed' },
+                      { label: KIND_LABEL[subjectKind].profit, value: 'profit' },
+                    ] satisfies { label: string; value: CommissionKind }[]
+                  }
                 />
               </div>
               <div className="col-span-3 min-w-0">

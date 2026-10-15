@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Tag } from '@/components/ui/tag';
 import type { DashColumn } from '@/components/dashboard/DashTable';
 import type { InventoryDocument, InventoryDocumentType } from '@/types/inventory';
+import { formatVND } from '@/lib/format';
 
 const typeMeta: Record<
   InventoryDocumentType,
@@ -13,10 +14,6 @@ const typeMeta: Record<
   sale: { label: 'Bán hàng', variant: 'purple' },
   return: { label: 'Trả hàng', variant: 'teal' },
 };
-
-function formatVND(value: number): string {
-  return `${value.toLocaleString('vi-VN')} đ`;
-}
 
 function formatPartner(row: InventoryDocument): string {
   if (row.supplier_name) return row.supplier_name;

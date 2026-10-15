@@ -33,11 +33,11 @@ type OrderItemInput struct {
 	StaffID   *string `json:"staff_id"`
 	Quantity  float64 `json:"quantity"`
 	// Unit đơn vị của Quantity (rỗng = đơn vị lớn của SP).
-	// Server tự quy về đơn vị nhỏ nhất để lưu kho + tính tiền.
+	// Server chuẩn hóa về đơn vị lớn để lưu dòng đơn; giữ chỗ/chốt/hoàn
+	// kho quy về đơn vị nhỏ nhất ở tầng usecase lúc xử lý.
 	Unit      *string             `json:"unit"`
 	Materials []ItemMaterialInput `json:"materials"`
 }
-
 type CreateOrderRequest struct {
 	CustomerID     *string          `json:"customer_id"`
 	AppointmentID  *string          `json:"appointment_id"`
@@ -46,6 +46,12 @@ type CreateOrderRequest struct {
 	// Khách mới ghi tại POS: server tự tìm theo SĐT (dùng luôn nếu có),
 	// chưa có thì tạo mới rồi gán vào đơn.
 	NewCustomer *NewCustomerInput `json:"new_customer"`
+}
+
+// AddOrderItemsRequest thêm dòng hàng vào đơn có sẵn (chỉ pending/confirm).
+// Items cùng ngữ nghĩa OrderItemInput lúc tạo đơn.
+type AddOrderItemsRequest struct {
+	Items []OrderItemInput `json:"items"`
 }
 
 type NewCustomerInput struct {
@@ -68,6 +74,14 @@ type UpdateOrderCustomerRequest struct {
 	NewCustomer *NewCustomerInput `json:"new_customer"`
 }
 
+// UpdateOrderItemQtyRequest đổi số lượng 1 dòng đơn (chỉ pending/confirm).
+// Quantity + Unit cùng ngữ nghĩa lúc tạo đơn: Unit rỗng = đơn vị lớn của SP,
+// server tự chuẩn hóa về đơn vị lớn để lưu. Dòng service bỏ qua Unit.
+type UpdateOrderItemQtyRequest struct {
+	Quantity float64 `json:"quantity"`
+	Unit     *string `json:"unit"`
+}
+
 type OrderItemResponse struct {
 	ID        string  `json:"id"`
 	ItemType  string  `json:"item_type"`
@@ -75,6 +89,8 @@ type OrderItemResponse struct {
 	ProductID *string `json:"product_id"`
 	StaffID   *string `json:"staff_id"`
 	Quantity  float64 `json:"quantity"`
+	// Unit đơn vị của Quantity (đơn vị lớn của SP, nil với dòng dịch vụ).
+	Unit      *string `json:"unit"`
 	UnitPrice float64 `json:"unit_price"`
 	LineTotal float64 `json:"line_total"`
 	// Staff NV thực hiện theo bảng order_item_staff (join sẵn ở query).
@@ -133,10 +149,39 @@ type OrderResponse struct {
 }
 
 type OrderDetailResponse struct {
-	Order     *OrderResponse           `json:"order"`
-	Items     []*OrderItemResponse     `json:"items"`
-	Materials []*OrderMaterialResponse `json:"materials"`
-	Payments  []*PaymentResponse       `json:"payments"`
+	Order       *OrderResponse           `json:"order"`
+	Items       []*OrderItemResponse     `json:"items"`
+	Materials   []*OrderMaterialResponse `json:"materials"`
+	Payments    []*PaymentResponse       `json:"payments"`
+	Commissions []*StaffCommission       `json:"commissions"`
+}
+
+// StaffCommission 1 dòng hoa hồng trong mảng commissions của chi tiết đơn.
+// Dựng từ order_item_staff đã lưu (server join sẵn, không query thêm).
+type StaffCommission struct {
+	StaffID     string  `json:"staff_id"`
+	FullName    string  `json:"full_name"`
+	Type        string  `json:"type"`
+	SharePct    float64 `json:"share_pct"`
+	Amount      float64 `json:"amount"`
+	OrderItemID string  `json:"order_item_id"`
+}
+
+// OrderStatsResponse 4 số thẻ thống kê đơn hàng:
+// tổng đơn + doanh thu hôm nay, chờ thanh toán, hủy/hoàn.
+type OrderStatsResponse struct {
+	TodayTotal        int64   `json:"today_total" db:"today_total"`
+	TodayCompleted    int64   `json:"today_completed" db:"today_completed"`
+	TodayProcessing   int64   `json:"today_processing" db:"today_processing"`
+	TodayRevenue      float64 `json:"today_revenue" db:"today_revenue"`
+	YesterdayRevenue  float64 `json:"yesterday_revenue" db:"yesterday_revenue"`
+	RevenueChangePct  float64 `json:"revenue_change_pct"`
+	PendingCount      int64   `json:"pending_count" db:"pending_count"`
+	PendingAmount     float64 `json:"pending_amount" db:"pending_amount"`
+	CancelRefundToday int64   `json:"cancel_refund_today" db:"cancel_refund_today"`
+	CancelRefundMonth int64   `json:"cancel_refund_month" db:"cancel_refund_month"`
+	CancelRefundRate  float64 `json:"cancel_refund_rate"`
+	MonthTotal        int64   `json:"month_total" db:"month_total"`
 }
 
 // OrderCompleteResponse kết quả chốt đơn kèm phiếu bán hàng vừa sinh.
@@ -169,7 +214,8 @@ const (
 // StaffOrderItemInput NV tham gia 1 dòng đơn.
 // type = loại hoa hồng (percent | fixed | profit, mặc định percent).
 // share_pct: % chia khi type percent/profit, = 0 khi fixed.
-// commission_amount do UI tự nhập.
+// commission_amount: chỉ dùng khi type fixed (nhập tay); percent/profit
+// do server tự tính, gửi kèm sẽ bị bỏ qua.
 type StaffOrderItemInput struct {
 	StaffID          string   `json:"staff_id"`
 	Type             *string  `json:"type"`

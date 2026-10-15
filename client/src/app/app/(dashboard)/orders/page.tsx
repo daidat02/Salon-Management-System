@@ -11,7 +11,7 @@ export default function DonHangPage() {
   return (
     <div className="space-y-4">
       <OrdersHeading />
-      <OrderStats />
+      <OrderStats mock />
       <section className="space-y-3">
         <div>
           <h2 className="flex items-center gap-2 text-sm font-bold text-on-surface">

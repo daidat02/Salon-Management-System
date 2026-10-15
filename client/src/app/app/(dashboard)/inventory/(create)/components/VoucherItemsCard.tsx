@@ -17,9 +17,9 @@ import {
 import {
   formatConversionDetail,
   formatConvertedQty,
-  formatVND,
   type VoucherLine,
 } from './voucherUtils';
+import { formatPlain as formatVND } from '@/lib/format';
 
 type VoucherItemsCardProps = {
   lines: VoucherLine[];

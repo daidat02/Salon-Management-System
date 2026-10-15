@@ -31,6 +31,14 @@ func (m *MockOrderRepository) CountOrdersByOrgID(ctx context.Context, orgID, sta
 	return args.Get(0).(int64), args.Error(1)
 }
 
+func (m *MockOrderRepository) GetOrderStats(ctx context.Context, orgID string) (*domain.OrderStatsResponse, error) {
+	args := m.Called(ctx, orgID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*domain.OrderStatsResponse), args.Error(1)
+}
+
 func (m *MockOrderRepository) GetOrderByID(ctx context.Context, orgID, id string) (*domain.Order, error) {
 	args := m.Called(ctx, orgID, id)
 	if args.Get(0) == nil {
@@ -89,13 +97,28 @@ func (m *MockOrderRepository) MapItemOrders(ctx context.Context, orgID string, i
 	return args.Get(0).(map[string]string), args.Error(1)
 }
 
-func (m *MockOrderRepository) ReplaceStaffOrderItems(ctx context.Context, orderItemID string, staffItems []*domain.StaffOrderItem) error {
-	args := m.Called(ctx, orderItemID, staffItems)
+func (m *MockOrderRepository) ReplaceStaffOrderItems(ctx context.Context, orgID, orderItemID string, staffItems []*domain.StaffOrderItem) error {
+	args := m.Called(ctx, orgID, orderItemID, staffItems)
 	return args.Error(0)
 }
 
 func (m *MockOrderRepository) ReplaceOrderMaterials(ctx context.Context, orgID string, orderIDs []string, materials []*domain.OrderItemMaterial) error {
 	args := m.Called(ctx, orgID, orderIDs, materials)
+	return args.Error(0)
+}
+
+func (m *MockOrderRepository) ApplyItemQtyUpdate(ctx context.Context, orgID, orderID string, item *domain.OrderItem, materialQtys map[string]float64, deltas []domain.StockDeduction, newSubtotal, newTotal float64) error {
+	args := m.Called(ctx, orgID, orderID, item, materialQtys, deltas, newSubtotal, newTotal)
+	return args.Error(0)
+}
+
+func (m *MockOrderRepository) AddOrderItems(ctx context.Context, orgID, orderID string, items []*domain.OrderItem, materials []*domain.OrderItemMaterial, deductions []domain.StockDeduction, newSubtotal, newTotal float64) error {
+	args := m.Called(ctx, orgID, orderID, items, materials, deductions, newSubtotal, newTotal)
+	return args.Error(0)
+}
+
+func (m *MockOrderRepository) ApplyDeleteItem(ctx context.Context, orgID, orderID, itemID string, releases []domain.StockDeduction, newSubtotal, newTotal float64) error {
+	args := m.Called(ctx, orgID, orderID, itemID, releases, newSubtotal, newTotal)
 	return args.Error(0)
 }
 

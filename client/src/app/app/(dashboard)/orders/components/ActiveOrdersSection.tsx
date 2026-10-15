@@ -11,6 +11,7 @@ import { getApiErrorMessage } from '@/services/apiClient';
 import { getOrdersByOrgID } from '@/services/order';
 import useCustomer from '@/hooks/use-customer';
 import type { Order, OrderStatus } from '@/types/order';
+import { formatDateTime, formatVND } from '@/lib/format';
 
 export const ACTIVE_STATUSES: OrderStatus[] = ['pending', 'confirm', 'delivery'];
 export const TERMINAL_STATUSES: OrderStatus[] = ['completed', 'cancelled', 'refunded'];
@@ -26,15 +27,6 @@ const statusMeta: Record<
   cancelled: { label: 'Đã hủy', variant: 'gray' },
   refunded: { label: 'Đã hoàn tiền', variant: 'error' },
 };
-
-function formatVND(value: number): string {
-  return `${value.toLocaleString('vi-VN')} đ`;
-}
-
-function formatTime(value: string | null): string {
-  if (!value) return '—';
-  return new Date(value).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' });
-}
 
 const ACTIVE_LIMIT = 8;
 
@@ -162,7 +154,7 @@ export default function ActiveOrdersSection() {
                     {customer?.name ?? 'Khách lẻ'}
                   </div>
                   <div className="text-[11px] text-on-surface-variant">
-                    {customer?.phone ?? '—'} · {formatTime(order.created_at)}
+                    {customer?.phone ?? '—'} · {formatDateTime(order.created_at)}
                   </div>
                   <div className="mt-2 text-sm font-semibold text-on-surface">
                     {formatVND(order.total_amount)}

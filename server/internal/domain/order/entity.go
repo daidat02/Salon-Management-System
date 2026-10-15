@@ -78,7 +78,8 @@ type OrderItem struct {
 	ProductID      *string `json:"product_id" db:"product_id"`
 	StaffID        *string `json:"staff_id" db:"staff_id"`
 	Quantity       float64 `json:"quantity" db:"quantity"`
-	// Unit đơn vị của Quantity (đơn vị nhỏ nhất sau quy đổi, NULL với dòng dịch vụ).
+	// Unit đơn vị của Quantity (đơn vị lớn của SP, NULL với dòng dịch vụ).
+	// Giữ chỗ/chốt/hoàn kho quy về đơn vị nhỏ nhất ở tầng usecase lúc xử lý.
 	Unit      *string `json:"unit" db:"unit"`
 	UnitPrice float64 `json:"unit_price" db:"unit_price"`
 	LineTotal float64 `json:"line_total" db:"line_total"`

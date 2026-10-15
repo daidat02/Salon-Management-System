@@ -36,6 +36,8 @@ export interface OrderDetailItem {
   product_id: string | null;
   staff_id: string | null;
   quantity: number;
+  /** Đơn vị của quantity (đơn vị lớn của SP, null với dòng dịch vụ). */
+  unit?: string | null;
   unit_price: number;
   line_total: number;
   /** NV thực hiện do server join sẵn (có thể vắng khi đơn cũ). */
@@ -69,4 +71,15 @@ export interface OrderDetail {
   items: OrderDetailItem[];
   materials: OrderDetailMaterial[];
   payments: OrderDetailPayment[];
+  /** Hoa hồng do server tính lúc gán NV (client render trực tiếp, không tự tính). */
+  commissions: OrderDetailCommission[];
+}
+
+export interface OrderDetailCommission {
+  staff_id: string;
+  full_name: string;
+  type: 'percent' | 'fixed' | 'profit';
+  share_pct: number;
+  amount: number;
+  order_item_id: string;
 }

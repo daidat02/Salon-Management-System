@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import ServiceCatalog, { dotFor, type CatalogItem } from './ServiceCatalog';
 import InvoicePanel, {
   type InvoiceItem,
@@ -10,16 +10,30 @@ import InvoicePanel, {
 } from './InvoicePanel';
 import { normalizePhone } from '@/services/customer';
 import { useCreateOrder } from '@/hooks/use-create-order';
+import { useAddOrderItems } from '@/hooks/use-add-order-items';
+import useOrderDetail from '@/hooks/use-order-detail';
 import { getApiErrorMessage } from '@/services/apiClient';
 import { toast } from '@/components/ui/toast';
 
+const EDITABLE_STATUSES = ['pending', 'confirm'];
+
 export default function PosContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const orderId = searchParams.get('orderId');
+  // Chế độ thêm món vào đơn có sẵn (đi từ nút Chỉnh sửa ở order_detail).
+  const isEditMode = !!orderId;
+  const { data: editDetail } = useOrderDetail(orderId ?? undefined);
+  const editOrder = editDetail?.order;
+  const canEditOrder =
+    !isEditMode || (editOrder != null && EDITABLE_STATUSES.includes(editOrder.status));
+
   const [cart, setCart] = React.useState<InvoiceItem[]>([]);
   const [customer, setCustomer] = React.useState<SelectedCustomer>(null);
   const [newCustomer, setNewCustomer] = React.useState<NewCustomerDraft | null>(null);
   const [submitError, setSubmitError] = React.useState<string | null>(null);
   const { mutate, isPending } = useCreateOrder();
+  const { mutate: addMutate, isPending: isAddPending } = useAddOrderItems(orderId);
 
   const handleAdd = (item: CatalogItem) => {
     setCart((prev) => {
@@ -46,8 +60,44 @@ export default function PosContent() {
   };
 
   const handleCreateOrder = () => {
-    if (cart.length === 0 || isPending) return;
+    if (cart.length === 0 || isPending || isAddPending) return;
     setSubmitError(null);
+
+    const items = cart.map((it) => ({
+      item_type: it.type,
+      service_id: it.type === 'service' ? it.id : null,
+      product_id: it.type === 'product' ? it.id : null,
+      staff_id: null,
+      quantity: it.quantity,
+    }));
+
+    // Chế độ thêm món: đơn đã có khách, chỉ cần đẩy items lên rồi quay về chi tiết đơn.
+    if (isEditMode && orderId) {
+      if (!canEditOrder) {
+        const msg = 'Đơn đã khóa (chỉ thêm món khi chờ/xác nhận).';
+        setSubmitError(msg);
+        toast.add({ title: 'Không thể thêm món', description: msg, type: 'error' });
+        return;
+      }
+      addMutate(items, {
+        onSuccess: (order) => {
+          toast.add({
+            title: 'Đã thêm món vào đơn',
+            description: `Đơn ${order.code} — ${order.total_amount.toLocaleString('vi-VN')} đ`,
+            type: 'success',
+          });
+          setCart([]);
+          setSubmitError(null);
+          router.push(`/app/orders/${orderId}`);
+        },
+        onError: (err) => {
+          const msg = getApiErrorMessage(err);
+          setSubmitError(msg);
+          toast.add({ title: 'Thêm món thất bại', description: msg, type: 'error' });
+        },
+      });
+      return;
+    }
 
     const draftName = newCustomer?.full_name.trim() || '';
     const draftPhone = normalizePhone(newCustomer?.phone || '');
@@ -67,13 +117,7 @@ export default function PosContent() {
           : newCustomer
             ? { full_name: draftName, phone: draftPhone }
             : undefined,
-        items: cart.map((it) => ({
-          item_type: it.type,
-          service_id: it.type === 'service' ? it.id : null,
-          product_id: it.type === 'product' ? it.id : null,
-          staff_id: null,
-          quantity: it.quantity,
-        })),
+        items,
       },
       {
         onSuccess: (order) => {
@@ -115,8 +159,13 @@ export default function PosContent() {
         onCustomerChange={setCustomer}
         newCustomer={newCustomer}
         onNewCustomerChange={setNewCustomer}
-        isPending={isPending}
+        isPending={isPending || isAddPending}
         error={submitError}
+        title={isEditMode ? `Đơn ${editOrder?.code ?? ''}`.trim() : undefined}
+        tagText={isEditMode ? 'Thêm món' : undefined}
+        hideCustomer={isEditMode}
+        submitLabel={isEditMode ? 'Thêm vào đơn' : undefined}
+        pendingLabel={isEditMode ? 'Đang thêm...' : undefined}
       />
     </div>
   );

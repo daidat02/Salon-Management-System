@@ -27,6 +27,12 @@ type Props = {
   onNewCustomerChange: (draft: NewCustomerDraft | null) => void
   isPending?: boolean
   error?: string | null
+  /** Chế độ thêm món vào đơn có sẵn: đổi tiêu đề thành mã đơn + ẩn chọn khách. */
+  title?: string
+  tagText?: string
+  hideCustomer?: boolean
+  submitLabel?: string
+  pendingLabel?: string
 }
 
 function formatPrice(n: number) {
@@ -45,6 +51,11 @@ export default function InvoicePanel({
   onNewCustomerChange,
   isPending,
   error,
+  title = "Hóa đơn mới",
+  tagText = "Đang tạo",
+  hideCustomer = false,
+  submitLabel = "Tạo đơn",
+  pendingLabel = "Đang tạo...",
 }: Props) {
   const [pickerOpen, setPickerOpen] = React.useState(false)
   const [findPhone, setFindPhone] = React.useState("")
@@ -101,12 +112,13 @@ export default function InvoicePanel({
       <div className="bg-surface-container-low border-outline flex shrink-0 flex-col gap-1 border-b px-2.5 py-2">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 shrink-0">
-            <h2 className="text-[13px] font-bold leading-none text-on-surface">Hóa đơn mới</h2>
+            <h2 className="text-[13px] font-bold leading-none text-on-surface">{title}</h2>
             <Tag variant="warning" size="sm" shape="rounded" className="px-1.5 py-0 text-[10px] leading-none">
-              Đang tạo
+              {tagText}
             </Tag>
           </div>
-          {/* Nút khách hàng -> mở div bên dưới */}
+          {/* Nút khách hàng -> mở div bên dưới (ẩn ở chế độ thêm món vào đơn có sẵn) */}
+          {!hideCustomer && (
           <div className="min-w-0 flex-1 sm:max-w-[240px]">
             <button
               type="button"
@@ -133,9 +145,10 @@ export default function InvoicePanel({
               />
             </button>
           </div>
+          )}
         </div>
-        {/* Div tìm / thêm khách ngay bên dưới header */}
-        {pickerOpen && (
+        {/* Div tìm / thêm khách ngay bên dưới header (ẩn ở chế độ thêm món) */}
+        {!hideCustomer && pickerOpen && (
           <div className="rounded-md border border-dashed border-primary/40 bg-primary/5 p-1.5">
             {customer && (
               <div className="mb-1 flex items-center justify-between rounded bg-white px-1.5 py-1">
@@ -320,11 +333,11 @@ export default function InvoicePanel({
         >
           {isPending ? (
             <>
-              <Loader2 className="h-4 w-4 animate-spin" /> Đang tạo...
+              <Loader2 className="h-4 w-4 animate-spin" /> {pendingLabel}
             </>
           ) : (
             <>
-              <Plus className="h-4 w-4" /> Tạo đơn
+              <Plus className="h-4 w-4" /> {submitLabel}
             </>
           )}
         </Button>

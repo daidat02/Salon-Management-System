@@ -50,13 +50,21 @@ export const API_ENDPOINTS = {
 
   ORDERS: {
     GET_ORDERS: `${API_BASE}/orders`,
+    GET_ORDER_STATS: `${API_BASE}/orders/stats`,
     GET_ORDER_DETAIL: (orderId: string) => `${API_BASE}/orders/${orderId}`,
     CREATE_ORDER: `${API_BASE}/orders`,
     GET_POS_ITEMS: `${API_BASE}/orders/pos-items`,
     SAVE_ITEMS_STAFF: (itemId: string) => `${API_BASE}/orders/items/${itemId}/staff`,
+    ADD_ORDER_ITEMS: (orderId: string) => `${API_BASE}/orders/${orderId}/items`,
+    UPDATE_ORDER_ITEM_QTY: (orderId: string, itemId: string) =>
+      `${API_BASE}/orders/${orderId}/items/${itemId}`,
+    DELETE_ORDER_ITEM: (orderId: string, itemId: string) =>
+      `${API_BASE}/orders/${orderId}/items/${itemId}`,
     SAVE_ORDER_MATERIALS: `${API_BASE}/orders/materials`,
     UPDATE_ORDER_CUSTOMER: (orderId: string) => `${API_BASE}/orders/${orderId}/customer`,
 
     CREATE_PAYMENT: (orderId: string) => `${API_BASE}/orders/${orderId}/payments`,
+    CANCEL_ORDER: (orderId: string) => `${API_BASE}/orders/${orderId}/cancel`,
+    REFUND_ORDER: (orderId: string) => `${API_BASE}/orders/${orderId}/refund`,
   },
 };

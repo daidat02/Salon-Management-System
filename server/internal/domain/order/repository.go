@@ -60,10 +60,16 @@ var ErrOrderNotEditable = errors.New("order not editable")
 type OrderRepository interface {
 	// 1. Tạo đơn: ghi đơn + items + materials snapshot + giữ chỗ kho (1 tx).
 	CreateOrder(ctx context.Context, order *Order, items []*OrderItem, materials []*OrderItemMaterial, deductions []StockDeduction) error
+	// AddOrderItems thêm dòng đơn + vật tư snapshot + giữ chỗ kho + chốt tổng mới
+	// (1 tx: khóa đơn + check lại pending/confirm). Tổng mới do caller tính sẵn.
+	AddOrderItems(ctx context.Context, orgID, orderID string, items []*OrderItem, materials []*OrderItemMaterial, deductions []StockDeduction, newSubtotal, newTotal float64) error
+
 	// 2. Đọc đơn.
 	GetOrdersByOrgID(ctx context.Context, orgID, status string, limit, offset int) ([]*Order, error)
 	CountOrdersByOrgID(ctx context.Context, orgID, status string) (int64, error)
 	GetOrderByID(ctx context.Context, orgID, id string) (*Order, error)
+	// GetOrderStats gom 4 số thẻ thống kê đơn (1 query aggregate).
+	GetOrderStats(ctx context.Context, orgID string) (*OrderStatsResponse, error)
 	// ListHistoriesOrderByCustomerId lịch sử đơn hàng của 1 khách (mới nhất trước).
 	ListHistoriesOrderByCustomerId(ctx context.Context, orgID, customerID string, limit, offset int) ([]*Order, error)
 	// CountHistoriesOrderByCustomerId đếm lịch sử đơn hàng của 1 khách.
@@ -81,11 +87,20 @@ type OrderRepository interface {
 	MapItemOrders(ctx context.Context, orgID string, itemIDs []string) (map[string]string, error)
 	// ReplaceStaffOrderItems thay toàn bộ NV của 1 dòng đơn (xóa cũ + chèn mới, 1 tx)
 	// để dialog Áp dụng nhiều lần không bị trùng UNIQUE.
-	ReplaceStaffOrderItems(ctx context.Context, orderItemID string, staffItems []*StaffOrderItem) error
+	// Danh sách rỗng = gỡ hết NV của dòng (kèm null staff_id legacy).
+	ReplaceStaffOrderItems(ctx context.Context, orgID, orderItemID string, staffItems []*StaffOrderItem) error
 	// ReplaceOrderMaterials thay toàn bộ vật tư của các đơn trong payload (1 tx):
 	// khóa đơn + check trạng thái (chỉ pending/confirm/delivery) + đọc snapshot cũ
 	// + xóa/chèn log + chỉnh giữ chỗ kho theo delta. Tồn thật không đổi.
 	ReplaceOrderMaterials(ctx context.Context, orgID string, orderIDs []string, materials []*OrderItemMaterial) error
+	// ApplyItemQtyUpdate đổi SL 1 dòng đơn + vật tư theo (scale) + delta giữ chỗ
+	// + tổng mới trong 1 tx: khóa đơn + check lại trạng thái (chỉ pending/confirm,
+	// chống race chốt đơn xen giữa). materialQtys: materialID -> số mới (base).
+	ApplyItemQtyUpdate(ctx context.Context, orgID, orderID string, item *OrderItem, materialQtys map[string]float64, deltas []StockDeduction, newSubtotal, newTotal float64) error
+	// ApplyDeleteItem xóa 1 dòng đơn + vật tư của dòng + nhả giữ chỗ + chốt tổng
+	// mới trong 1 tx (khóa đơn + check lại pending/confirm). Link NV tự cascade
+	// theo FK. releases: số base cần nhả theo từng SP.
+	ApplyDeleteItem(ctx context.Context, orgID, orderID, itemID string, releases []StockDeduction, newSubtotal, newTotal float64) error
 	// 4. Hủy/hoàn + hoàn tất (trạng thái + kho trong 1 tx).
 	// ApplyCancel chuyển trạng thái + hoàn kho (restores) + nhả giữ chỗ (releases)
 	// + vô hiệu phiếu xuất + sổ trả trong 1 transaction.

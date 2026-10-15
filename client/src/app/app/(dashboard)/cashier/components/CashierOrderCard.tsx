@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { Tag } from '@/components/ui/tag';
 import { cn } from '@/lib/utils';
+import { formatVND } from '@/lib/format';
 import type { Order, OrderStatus } from '@/types/order';
 
 const statusMeta: Record<
@@ -44,10 +45,6 @@ function avatarBg(key: string): string {
   let hash = 0;
   for (let i = 0; i < key.length; i++) hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
   return AVATAR_BG[hash % AVATAR_BG.length];
-}
-
-function formatVND(value: number): string {
-  return `${value.toLocaleString('vi-VN')} đ`;
 }
 
 function formatHour(value: string | null): string {

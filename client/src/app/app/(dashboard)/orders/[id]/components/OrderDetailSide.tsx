@@ -8,7 +8,8 @@ import { Tag } from '@/components/ui/tag';
 import type { Customer } from '@/types/customer';
 import type { Order, OrderDetailPayment } from '@/types/order';
 import type { EnrichedRetailLine, EnrichedServiceLine, OrderProfit, StaffCommission } from './orderDetailUtils';
-import { customerTier, formatDateTime, formatVND } from './orderDetailUtils';
+import { customerTier } from './orderDetailUtils';
+import { formatDateTime, formatVND } from '@/lib/format';
 import CustomerPicker from './CustomerPicker';
 import PaymentDialog from './PaymentDialog';
 

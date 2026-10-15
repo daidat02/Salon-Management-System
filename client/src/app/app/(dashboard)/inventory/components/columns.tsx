@@ -3,9 +3,9 @@ import { cn } from 'cn';
 import { Tag } from '@/components/ui/tag';
 import type { DashColumn } from '@/components/dashboard/DashTable';
 import type { Product } from '@/types/product';
+import { formatVND } from '@/lib/format';
 import {
   formatStockQuantity,
-  formatVND,
   getDisplayMinStock,
   getDisplayStock,
   getInventoryStatus,

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"strings"
 
 	"github.com/daidat02/server/internal/delivery/http/middlewares"
@@ -41,6 +42,30 @@ func requireOrderStatus(order *domain.Order, allowed []string, denyMsg string) e
 		}
 	}
 	return apperror.New(400, denyMsg, nil)
+}
+
+// withEditableOrder load đơn + chặn sửa khi đã khóa.
+// Sửa items chỉ cho pending/confirm (chặt hơn chốt/hủy cho phép delivery,
+// vì hàng đã ra khỏi kho thì không đổi dòng nữa).
+func (u *OrderUsecase) withEditableOrder(ctx context.Context, orderID string) (order *domain.Order, orgID string, err error) {
+	orderID, err = requireID(orderID, "Thiếu id đơn hàng")
+	if err != nil {
+		return nil, "", err
+	}
+	orgID, err = requireOrgID(ctx)
+	if err != nil {
+		return nil, "", err
+	}
+	order, err = u.loadOrder(ctx, orgID, orderID)
+	if err != nil {
+		return nil, "", err
+	}
+	if err := requireOrderStatus(order,
+		[]string{domain.StatusPending, domain.StatusConfirm},
+		"Chỉ sửa đơn ở trạng thái chờ/xác nhận"); err != nil {
+		return nil, "", err
+	}
+	return order, orgID, nil
 }
 
 // ---------- Loader dùng chung ----------
@@ -190,12 +215,79 @@ func (u *OrderUsecase) ensureCustomerInOrg(ctx context.Context, orgID, customerI
 	return nil
 }
 
+// orderCatalog gom dữ liệu tra cứu tại thời điểm bán cho 1 tập dòng:
+// giá + đơn vị SP, định mức + giá dịch vụ (batch, tránh N+1), kèm đơn vị
+// SP vật tư để snapshot. Dùng chung cho tạo đơn và thêm dòng.
+type orderCatalog struct {
+	pricing       map[string]domain.ProductPricing
+	units         map[string]domain.ProductUnit
+	materialMap   map[string][]domain.ServiceMaterialUsage
+	servicePrices map[string]float64
+}
+
+// fetchOrderCatalog check catalog + fetch giá/đơn vị/định mức trong 1 chỗ.
+// Giá + đơn vị tại thời điểm bán do server quyết định, không tin client.
+func (u *OrderUsecase) fetchOrderCatalog(ctx context.Context, orgID string, serviceIDs, productIDs []string) (*orderCatalog, error) {
+	if err := u.ensureServicesInOrg(ctx, orgID, serviceIDs); err != nil {
+		return nil, err
+	}
+	if err := u.ensureProductsInOrg(ctx, orgID, productIDs); err != nil {
+		return nil, err
+	}
+
+	pricing, units, err := u.fetchPricingUnits(ctx, orgID, productIDs)
+	if err != nil {
+		return nil, err
+	}
+	cat := &orderCatalog{
+		pricing: pricing, units: units,
+		materialMap:   map[string][]domain.ServiceMaterialUsage{},
+		servicePrices: map[string]float64{},
+	}
+	if len(serviceIDs) > 0 {
+		materialMap, err := u.services.GetServiceMaterials(ctx, orgID, serviceIDs)
+		if err != nil {
+			return nil, apperror.New(500, "Lỗi khi lấy định mức vật tư", err)
+		}
+		// Giá dịch vụ lấy 1 lần cho cả đơn (tránh N+1 query theo từng dòng).
+		servicePrices, err := u.services.GetServicePrices(ctx, orgID, serviceIDs)
+		if err != nil {
+			return nil, apperror.New(500, "Lỗi khi lấy giá dịch vụ", err)
+		}
+		cat.materialMap, cat.servicePrices = materialMap, servicePrices
+	}
+
+	// Định mức có thể lưu đơn vị lớn hoặc nhỏ (cột service_materials.unit) nên
+	// nạp thêm đơn vị các SP vật tư để quy về đơn vị nhỏ nhất lúc snapshot.
+	if err := u.ensureRecipeUnits(ctx, orgID, cat.materialMap, cat.units); err != nil {
+		return nil, err
+	}
+	return cat, nil
+}
+
+// fetchUnits lấy đơn vị các SP (nhẹ hơn fetchPricingUnits khi chỉ cần
+// quy đổi số lượng mà không cần giá, vd lúc hoàn/nhả kho).
+func (u *OrderUsecase) fetchUnits(ctx context.Context, orgID string, productIDs []string) (map[string]domain.ProductUnit, error) {
+	if len(productIDs) == 0 {
+		return map[string]domain.ProductUnit{}, nil
+	}
+	units, err := u.products.GetProductUnits(ctx, orgID, productIDs)
+	if err != nil {
+		return nil, apperror.New(500, "Lỗi khi lấy đơn vị sản phẩm", err)
+	}
+	for _, id := range productIDs {
+		if _, ok := units[id]; !ok {
+			return nil, apperror.New(404, fmt.Sprintf("Không tìm thấy sản phẩm trong tổ chức: %s", id), nil)
+		}
+	}
+	return units, nil
+}
+
 // ---------- Phiếu bán hàng ----------
 
-// saleSlipLines dựng dòng phiếu bán hàng từ snapshot đã lưu (đơn vị nhỏ nhất):
-// SP lấy số lượng đã lưu + giá vốn base (giá vốn store theo đơn vị lớn nên
-// chia cho hệ số — cùng cách tính với nhánh giá của ToBase);
-// vật tư lấy số lượng + giá vốn đã snapshot.
+// saleSlipLines dựng dòng phiếu bán hàng, quy về đơn vị nhỏ nhất:
+// dòng SP lưu theo đơn vị lớn nên quy SL + giá vốn về base tại lúc chốt;
+// vật tư đã snapshot base thì lấy thẳng số đã lưu.
 func saleSlipLines(items []*domain.OrderItem, materials []*domain.OrderItemMaterial, pricing map[string]domain.ProductPricing, units map[string]domain.ProductUnit) ([]domain.SaleSlipLine, error) {
 	lines := make([]domain.SaleSlipLine, 0, len(items)+len(materials))
 	for _, it := range items {
@@ -210,14 +302,14 @@ func saleSlipLines(items []*domain.OrderItem, materials []*domain.OrderItemMater
 		if !ok {
 			return nil, apperror.New(404, fmt.Sprintf("Không tìm thấy sản phẩm trong tổ chức: %s", *it.ProductID), nil)
 		}
-		large := productdomain.LargeFactor(pu.Unit, pu.NetUnit, pu.NetAmount)
-		if large <= 0 {
-			large = 1
+		baseQty, baseCost, convErr := productdomain.ToBase(pu.Unit, pu.Unit, pu.NetUnit, pu.NetAmount, it.Quantity, cost.CostPrice)
+		if convErr != nil {
+			return nil, apperror.New(400, fmt.Sprintf("Lỗi khi chuyển đổi đơn vị sản phẩm: %s", convErr.Error()), convErr)
 		}
 		lines = append(lines, domain.SaleSlipLine{
 			ProductID: *it.ProductID,
-			Quantity:  it.Quantity,
-			UnitPrice: cost.CostPrice / large,
+			Quantity:  baseQty,
+			UnitPrice: baseCost,
 		})
 	}
 	for _, m := range materials {
@@ -228,6 +320,30 @@ func saleSlipLines(items []*domain.OrderItem, materials []*domain.OrderItemMater
 		})
 	}
 	return lines, nil
+}
+
+// restoreQuantities quy đổi dòng SP (lưu theo đơn vị lớn) + vật tư (base)
+// về đơn vị nhỏ nhất để hoàn/nhả kho cho khớp số đã giữ/trừ.
+func restoreQuantities(items []*domain.OrderItem, materials []*domain.OrderItemMaterial, units map[string]domain.ProductUnit) (map[string]float64, error) {
+	restores := map[string]float64{}
+	for _, it := range items {
+		if it.ItemType != domain.ItemTypeProduct || it.ProductID == nil {
+			continue
+		}
+		pu, ok := units[*it.ProductID]
+		if !ok {
+			return nil, apperror.New(404, fmt.Sprintf("Không tìm thấy sản phẩm trong tổ chức: %s", *it.ProductID), nil)
+		}
+		factor, ferr := productdomain.BaseFactor(pu.Unit, pu.Unit, pu.NetUnit, pu.NetAmount)
+		if ferr != nil {
+			return nil, apperror.New(400, fmt.Sprintf("Lỗi khi chuyển đổi đơn vị sản phẩm: %s", ferr.Error()), ferr)
+		}
+		restores[*it.ProductID] += it.Quantity * factor
+	}
+	for _, m := range materials {
+		restores[m.ProductID] += m.Quantity
+	}
+	return restores, nil
 }
 
 // ---------- Dựng dòng đơn ----------
@@ -266,7 +382,10 @@ func splitItemIDs(inputs []domain.OrderItemInput) (serviceIDs, productIDs []stri
 }
 
 // buildOrderLines dựng dòng đơn + snapshot vật tư + giữ chỗ kho + tổng tiền.
-// Không chạm DB, chỉ tính toán thuần túy nên dễ unit-test trực tiếp.
+// Dòng SP lưu theo đơn vị lớn (đúng hợp đồng OrderItem.Unit); giữ chỗ kho
+// và snapshot vật tư tính bằng đơn vị nhỏ nhất. Giá SP/dịch vụ tại thời
+// điểm bán do server quyết, không tin client.
+// Không chạm DB, chỉ tính toán thuần túy trực tiếp.
 func buildOrderLines(orgID, orderID string, inputs []domain.OrderItemInput, pricing map[string]domain.ProductPricing, units map[string]domain.ProductUnit, materialMap map[string][]domain.ServiceMaterialUsage, servicePrices map[string]float64) (items []*domain.OrderItem, materials []*domain.OrderItemMaterial, deductions map[string]float64, subtotal float64, err error) {
 	deductions = map[string]float64{}
 	for _, in := range inputs {
@@ -275,13 +394,35 @@ func buildOrderLines(orgID, orderID string, inputs []domain.OrderItemInput, pric
 		var unit *string
 		quantity := in.Quantity
 		if itemType == domain.ItemTypeProduct {
-			pu := units[*in.ProductID]
-			price,ok := pricing[*in.ProductID]
+			// Client gửi base (ml/g) thì quy về lớn: SL_lớn = SL_gửi × factor / large.
+			// Đơn vị lạ (không phải unit/net_unit) thì 400.
+			pid := strings.TrimSpace(*in.ProductID)
+			pu, ok := units[pid]
 			if !ok {
-				return nil, nil, nil, 0, apperror.New(404, fmt.Sprintf("Không tìm thấy sản phẩm trong tổ chức: %s", *in.ProductID), nil)
+				return nil, nil, nil, 0, apperror.New(404, fmt.Sprintf("Không tìm thấy sản phẩm trong tổ chức: %s", pid), nil)
 			}
-			unitPrice = price.SellPrice
-			unit = &pu.Unit
+			sell, ok := pricing[pid]
+			if !ok {
+				return nil, nil, nil, 0, apperror.New(404, fmt.Sprintf("Không tìm thấy sản phẩm trong tổ chức: %s", pid), nil)
+			}
+			fromUnit := ""
+			if in.Unit != nil {
+				fromUnit = strings.TrimSpace(*in.Unit)
+			}
+			factor, ferr := productdomain.BaseFactor(pu.Unit, fromUnit, pu.NetUnit, pu.NetAmount)
+			if ferr != nil {
+				return nil, nil, nil, 0, apperror.New(400, fmt.Sprintf("Lỗi khi chuyển đổi đơn vị sản phẩm: %s", ferr.Error()), ferr)
+			}
+			large := productdomain.LargeFactor(pu.Unit, pu.NetUnit, pu.NetAmount)
+			if large <= 0 {
+				large = 1
+			}
+			quantity, unitPrice = in.Quantity*factor/large, sell.SellPrice
+			lu := strings.TrimSpace(pu.Unit)
+			unit = &lu
+			// Giữ chỗ kho tính bằng đơn vị nhỏ nhất (quy đổi riêng,
+			// không phụ thuộc số đã lưu trên dòng đơn).
+			deductions[pid] += in.Quantity * factor
 		} else {
 			// Giá dịch vụ tại thời điểm bán do server quyết (đã batch ở ngoài),
 			// thiếu giá nghĩa là dịch vụ sai org/hết hiệu lực.
@@ -320,10 +461,7 @@ func buildOrderLines(orgID, orderID string, inputs []domain.OrderItemInput, pric
 		items = append(items, item)
 		subtotal += item.LineTotal
 
-		if itemType == domain.ItemTypeProduct {
-			// Dòng SP đã lưu ở đơn vị nhỏ nhất nên giữ chỗ đúng bằng số đã lưu.
-			deductions[*item.ProductID] += item.Quantity
-		} else {
+		if itemType != domain.ItemTypeProduct {
 			// Snapshot vật tư: quy định mức về đơn vị nhỏ nhất (recipe có thể
 			// lưu đơn vị lớn như tuýp/can hoặc nhỏ như ml/g) và giá vốn về
 			// giá trên đơn vị nhỏ nhất để cặp (quantity, unit_cost) đồng nhất.
@@ -360,6 +498,57 @@ func buildOrderLines(orgID, orderID string, inputs []domain.OrderItemInput, pric
 	return items, materials, deductions, subtotal, nil
 }
 
+// ---------- Hoa hồng ----------
+
+// computeCommission tính hoa hồng 1 NV, làm tròn nguyên đồng, kẹp âm về 0.
+//   - percent: line_total × share (không cần revenue/cost).
+//   - profit: line_total × margin × share, với margin = (revenue-cost)/revenue
+//     (dòng service: margin cả đơn; dòng SP: margin của chính dòng).
+//   - fixed: số client gửi (bản chất nhập tay, server chỉ kiểm không âm).
+func computeCommission(typ string, share, lineTotal, revenue, cost, fixedAmount float64) float64 {
+	var amount float64
+	switch typ {
+	case domain.StaffTypeProfit:
+		margin := 0.0
+		if revenue > 0 {
+			margin = (revenue - cost) / revenue
+		}
+		amount = lineTotal * margin * share / 100
+	case domain.StaffTypeFixed:
+		amount = fixedAmount
+	default:
+		amount = lineTotal * share / 100
+	}
+	amount = math.Round(amount)
+	if amount < 0 {
+		amount = 0
+	}
+	return amount
+}
+
+// buildCommissions gom hoa hồng đã lưu theo từng dòng (server join sẵn,
+// không query thêm) để trả trong chi tiết đơn.
+func buildCommissions(items []*domain.OrderItem) []*domain.StaffCommission {
+	commissions := []*domain.StaffCommission{}
+	for _, it := range items {
+		for _, s := range it.Staff {
+			if s.StaffID == nil || strings.TrimSpace(*s.StaffID) == "" {
+				continue
+			}
+			name := ""
+			if s.FullName != nil {
+				name = *s.FullName
+			}
+			commissions = append(commissions, &domain.StaffCommission{
+				StaffID: *s.StaffID, FullName: name, Type: s.Type,
+				SharePct: s.SharePct, Amount: s.CommissionAmount,
+				OrderItemID: it.ID,
+			})
+		}
+	}
+	return commissions
+}
+
 // ---------- Mapping response ----------
 
 // toResponse map entity Order sang response (chưa kèm tên khách POS).
@@ -393,7 +582,7 @@ func toItemResponse(it *domain.OrderItem) *domain.OrderItemResponse {
 	return &domain.OrderItemResponse{
 		ID: it.ID, ItemType: it.ItemType, ServiceID: it.ServiceID,
 		ProductID: it.ProductID, StaffID: it.StaffID,
-		Quantity: it.Quantity, UnitPrice: it.UnitPrice, LineTotal: it.LineTotal,
+		Quantity: it.Quantity, Unit: it.Unit, UnitPrice: it.UnitPrice, LineTotal: it.LineTotal,
 		Staff: it.Staff,
 	}
 }

@@ -4,10 +4,7 @@ import * as React from 'react';
 import DashTable, { type DashColumn } from '@/components/dashboard/DashTable';
 import type { InventoryDocumentItem } from '@/types/inventory';
 import { formatStockQuantity } from '../../components/inventoryUtils';
-
-function formatVND(n: number): string {
-  return n.toLocaleString('vi-VN');
-}
+import { formatPlain as formatVND } from '@/lib/format';
 
 export default function VoucherDetailItemsCard({ items }: { items: InventoryDocumentItem[] }) {
   const rows = React.useMemo(

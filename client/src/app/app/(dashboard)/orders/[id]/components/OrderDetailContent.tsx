@@ -3,15 +3,21 @@
 import * as React from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
-import { Link, Pencil, Printer, Undo2 } from 'lucide-react';
+import { Link, Pencil, Printer, Undo2, X } from 'lucide-react';
 import PageHeading from '@/components/dashboard/PageHeading';
+import { DashDialog } from '@/components/dashboard/DashDialog';
+import { Button } from '@/components/ui/button';
 import { Tag } from '@/components/ui/tag';
 import { toast } from '@/components/ui/toast';
 import { DashboardSkeleton } from '@/components/dashboard/DashboardSkeletons';
 import { getApiErrorMessage } from '@/services/apiClient';
 import {
+  cancelOrder,
+  deleteOrderItem,
+  refundOrder,
   saveItemStaff,
   saveOrderMaterials,
+  updateOrderItemQty,
   type SaveItemStaffPayload,
   type SaveOrderMaterialPayload,
 } from '@/services/order';
@@ -31,13 +37,12 @@ import {
   buildMaterialLines,
   buildRetailLines,
   buildServiceLines,
-  buildStaffCommissions,
   calcOrderProfit,
-  formatDateTime,
   materialSpec,
   staffInfoToAssignments,
   type StaffAssignment,
 } from './orderDetailUtils';
+import { formatDateTime } from '@/lib/format';
 import { priceForUnit } from '@/app/app/(dashboard)/inventory/(create)/components/voucherData';
 
 const statusMeta: Record<
@@ -114,34 +119,113 @@ export default function OrderDetailContent() {
 
   const queryClient = useQueryClient();
 
-  // Dialog Áp dụng -> gọi API trực tiếp, không giữ trạng thái chờ ngoài.
+  // Tích xác nhận ở bảng dịch vụ/SP -> PATCH số lượng, server quy đơn vị + chỉnh kho.
+  const handleUpdateItemQty = React.useCallback(
+    async (itemId: string, quantity: number, unit?: string) => {
+      if (!id) return;
+      try {
+        await updateOrderItemQty(id, itemId, { quantity, unit: unit || null });
+      } catch (err) {
+        toast.add({
+          title: 'Đổi số lượng thất bại',
+          description: getApiErrorMessage(err),
+          type: 'error',
+        });
+        throw err;
+      }
+      await queryClient.invalidateQueries({ queryKey: ['order-detail', id] });
+      toast.add({
+        title: 'Đã đổi số lượng',
+        description: 'Dòng hàng và giữ chỗ kho đã đồng bộ.',
+        type: 'success',
+      });
+    },
+    [id, queryClient],
+  );
+
+  const handleUpdateServiceQty = React.useCallback(
+    (itemId: string, quantity: number) => handleUpdateItemQty(itemId, quantity),
+    [handleUpdateItemQty],
+  );
+
+  const handleUpdateRetailQty = React.useCallback(
+    (itemId: string, quantity: number, unit: string) =>
+      handleUpdateItemQty(itemId, quantity, unit || undefined),
+    [handleUpdateItemQty],
+  );
+
+  // Nút Xóa ở 2 bảng: confirm dialog rồi gọi API xóa dòng (server nhả kho + chốt tổng).
+  const [deleteTarget, setDeleteTarget] = React.useState<{ id: string; name: string } | null>(
+    null,
+  );
+  const [isDeleting, setIsDeleting] = React.useState(false);
+
+  // Hủy / Hoàn cả đơn: confirm dialog rồi gọi API (server xử lý kho + trạng thái).
+  const [orderAction, setOrderAction] = React.useState<'cancel' | 'refund' | null>(null);
+  const [isActing, setIsActing] = React.useState(false);
+
+  const confirmOrderAction = React.useCallback(async () => {
+    if (!id || !orderAction || isActing) return;
+    setIsActing(true);
+    try {
+      const acted = orderAction === 'cancel' ? await cancelOrder(id) : await refundOrder(id);
+      setOrderAction(null);
+      await queryClient.invalidateQueries({ queryKey: ['order-detail', id] });
+      await queryClient.invalidateQueries({ queryKey: ['orders'] });
+      toast.add({
+        title: orderAction === 'cancel' ? 'Đã hủy đơn hàng' : 'Đã hoàn đơn hàng',
+        description: `Đơn ${acted.code} — kho và trạng thái đã cập nhật.`,
+        type: 'success',
+      });
+    } catch (err) {
+      toast.add({
+        title: orderAction === 'cancel' ? 'Hủy đơn thất bại' : 'Hoàn đơn thất bại',
+        description: getApiErrorMessage(err),
+        type: 'error',
+      });
+    } finally {
+      setIsActing(false);
+    }
+  }, [id, orderAction, isActing, queryClient]);
+
+  const handleDeleteLine = React.useCallback((line: { id: string; name: string }) => {
+    setDeleteTarget(line);
+  }, []);
+
+  const confirmDeleteLine = React.useCallback(async () => {
+    if (!id || !deleteTarget || isDeleting) return;
+    setIsDeleting(true);
+    try {
+      await deleteOrderItem(id, deleteTarget.id);
+    } catch (err) {
+      toast.add({
+        title: 'Xóa dòng thất bại',
+        description: getApiErrorMessage(err),
+        type: 'error',
+      });
+      return;
+    } finally {
+      setIsDeleting(false);
+    }
+    setDeleteTarget(null);
+    await queryClient.invalidateQueries({ queryKey: ['order-detail', id] });
+    toast.add({
+      title: 'Đã xóa dòng hàng',
+      description: `"${deleteTarget.name}" đã gỡ khỏi đơn, kho và tổng tiền cập nhật theo.`,
+      type: 'success',
+    });
+  }, [id, deleteTarget, isDeleting, queryClient]);
+
+  // Dialog Áp dụng -> gửi share thuần, server tự tính tiền (chỉ fixed gửi số nhập tay).
   const handleApplyStaff = React.useCallback(
     async (itemId: string, assignments: StaffAssignment[]) => {
-      const items = detail?.items ?? [];
-      const line = items.find((it) => it.id === itemId);
-      const lineTotal = line?.line_total ?? 0;
-      const serviceRevenue = items
-        .filter((it) => it.item_type === 'service')
-        .reduce((s, it) => s + it.line_total, 0);
-      const materialCost = (detail?.materials ?? []).reduce(
-        (s, m) => s + m.quantity * m.unit_cost_at_time,
-        0,
-      );
-      const marginPct =
-        serviceRevenue > 0 ? ((serviceRevenue - materialCost) / serviceRevenue) * 100 : 0;
-
       const payload: SaveItemStaffPayload[] = assignments
         .filter((a) => a.staffId)
         .map((a) => ({
           staff_id: a.staffId,
           type: a.kind,
           share_pct: a.kind === 'fixed' ? 0 : Math.max(0, a.value),
-          commission_amount:
-            a.kind === 'fixed'
-              ? Math.max(0, Math.round(a.value))
-              : a.kind === 'profit'
-                ? Math.round(((lineTotal * marginPct) / 100) * (a.value / 100))
-                : Math.round((lineTotal * a.value) / 100),
+          commission_amount: a.kind === 'fixed' ? Math.max(0, Math.round(a.value)) : undefined,
         }));
 
       try {
@@ -162,7 +246,7 @@ export default function OrderDetailContent() {
         type: 'success',
       });
     },
-    [detail, id, queryClient],
+    [id, queryClient],
   );
 
   // TODO(api): thay bằng endpoint vật tư khi backend có — tạm giữ local.
@@ -375,14 +459,31 @@ export default function OrderDetailContent() {
         }),
       ],
     };
-    const retailLines = buildRetailLines(items, products);
+    const retailLines = buildRetailLines(items, products, staff);
     const profit = calcOrderProfit(adjustedDetail, retailLines);
+    // Hoa hồng do server tính sẵn (detail.commissions) — client chỉ map hiển thị.
+    const itemTypeById = new Map(items.map((it) => [it.id, it.item_type] as const));
     return {
       serviceLines,
       materialLines: [...serverMaterials, ...localLines],
       retailLines,
       profit,
-      commissions: buildStaffCommissions(items, staff, undefined, profit.serviceMargin),
+      commissions: (detail.commissions ?? []).map((c) => {
+        const st = staff.get(c.staff_id);
+        const suffix = itemTypeById.get(c.order_item_id) === 'product' ? ' SP' : '';
+        return {
+          staffId: c.staff_id,
+          name: c.full_name || st?.full_name || 'Nhân viên',
+          role: st?.position ?? '',
+          rateText:
+            c.type === 'percent'
+              ? `${c.share_pct}% doanh thu${suffix}`
+              : c.type === 'profit'
+                ? `${c.share_pct}% lợi nhuận${suffix}`
+                : 'Cố định',
+          amount: Math.round(c.amount),
+        };
+      }),
       customer: detail.order.customer_id ? customers.get(detail.order.customer_id) : undefined,
       hasPendingChanges:
         Object.keys(materialOverrides).length > 0 ||
@@ -425,6 +526,8 @@ export default function OrderDetailContent() {
 
   const { order } = detail;
   const meta = statusMeta[order.status] ?? { label: order.status, variant: 'slate' as const };
+  // Chỉ đơn chờ/xác nhận mới sửa được (thêm món qua POS) — khớp guard backend.
+  const canEditOrder = order.status === 'pending' || order.status === 'confirm';
 
   return (
     <div className="space-y-4">
@@ -445,13 +548,36 @@ export default function OrderDetailContent() {
         }
         actions={[
           { label: 'In hóa đơn', icon: Printer, variant: 'outline', onClick: () => window.print() },
-          { label: 'Hoàn tiền', icon: Undo2, variant: 'outline' },
-          {
-            label: 'Chỉnh sửa',
-            icon: Pencil,
-            variant: 'primary',
-            onClick: () => router.push(`/app/cashier/pos?orderId=${order.id}`),
-          },
+          ...(order.status === 'pending' || order.status === 'confirm'
+            ? [
+                {
+                  label: 'Hủy đơn',
+                  icon: X,
+                  variant: 'outline' as const,
+                  onClick: () => setOrderAction('cancel'),
+                },
+              ]
+            : []),
+          ...(order.status === 'completed'
+            ? [
+                {
+                  label: 'Hoàn đơn',
+                  icon: Undo2,
+                  variant: 'outline' as const,
+                  onClick: () => setOrderAction('refund'),
+                },
+              ]
+            : []),
+          ...(canEditOrder
+            ? [
+                {
+                  label: 'Chỉnh sửa',
+                  icon: Pencil,
+                  variant: 'primary' as const,
+                  onClick: () => router.push(`/app/cashier/pos?orderId=${order.id}`),
+                },
+              ]
+            : []),
         ]}
       />
       <div className="flex items-center gap-2">
@@ -469,6 +595,8 @@ export default function OrderDetailContent() {
             staffList={staffList}
             products={productList}
             hasPendingChanges={enriched.hasPendingChanges}
+            canEditItems={canEditOrder}
+            canEditMaterials={canEditOrder}
             getInitialAssignments={(itemId) => {
               const it = detail.items.find((x) => x.id === itemId);
               if (!it) return [];
@@ -480,6 +608,10 @@ export default function OrderDetailContent() {
             onAddMaterial={handleAddMaterial}
             onSaveMaterials={handleSaveMaterials}
             isSavingMaterials={isSavingMaterials}
+            onUpdateServiceQty={handleUpdateServiceQty}
+            onDeleteService={handleDeleteLine}
+            onUpdateRetailQty={handleUpdateRetailQty}
+            onDeleteRetail={handleDeleteLine}
           />
         </div>
         <div className="space-y-6 lg:col-span-4">
@@ -495,6 +627,82 @@ export default function OrderDetailContent() {
           />
         </div>
       </div>
+
+      <DashDialog
+        open={deleteTarget !== null}
+        onOpenChange={(v) => {
+          if (!v) setDeleteTarget(null);
+        }}
+        title="Xóa dòng hàng?"
+        description={
+          deleteTarget
+            ? `"${deleteTarget.name}" sẽ bị gỡ khỏi đơn ${order.code}. Tiền đơn và giữ chỗ kho cập nhật theo.`
+            : undefined
+        }
+        maxWidth="max-w-[480px]"
+        footer={
+          <div className="flex w-full items-center justify-end gap-2.5">
+            <Button
+              variant="outline"
+              disabled={isDeleting}
+              onClick={() => setDeleteTarget(null)}
+            >
+              Hủy
+            </Button>
+            <Button
+              disabled={isDeleting}
+              onClick={() => void confirmDeleteLine()}
+              className="bg-error text-white hover:bg-error/90"
+            >
+              {isDeleting ? 'Đang xóa...' : 'Xóa dòng'}
+            </Button>
+          </div>
+        }
+      >
+        <p className="text-xs text-on-surface-variant">
+          Hành động này không thể hoàn tác. Muốn bỏ cả đơn thì dùng Hủy đơn thay thế.
+        </p>
+      </DashDialog>
+
+      <DashDialog
+        open={orderAction !== null}
+        onOpenChange={(v) => {
+          if (!v) setOrderAction(null);
+        }}
+        title={orderAction === 'cancel' ? 'Hủy đơn hàng?' : 'Hoàn đơn hàng?'}
+        description={
+          orderAction === 'cancel'
+            ? `Đơn ${order.code} sẽ bị hủy, giữ chỗ kho được nhả.`
+            : `Đơn ${order.code} sẽ được hoàn, kho đã trừ được cộng lại.`
+        }
+        maxWidth="max-w-[480px]"
+        footer={
+          <div className="flex w-full items-center justify-end gap-2.5">
+            <Button
+              variant="outline"
+              disabled={isActing}
+              onClick={() => setOrderAction(null)}
+            >
+              Hủy
+            </Button>
+            <Button
+              disabled={isActing}
+              onClick={() => void confirmOrderAction()}
+              className="bg-error text-white hover:bg-error/90"
+            >
+              {isActing
+                ? 'Đang xử lý...'
+                : orderAction === 'cancel'
+                  ? 'Hủy đơn'
+                  : 'Hoàn đơn'}
+            </Button>
+          </div>
+        }
+      >
+        <p className="text-xs text-on-surface-variant">
+          Hành động này không thể hoàn tác.
+        </p>
+      </DashDialog>
     </div>
   );
 }

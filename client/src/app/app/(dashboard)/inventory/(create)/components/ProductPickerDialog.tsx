@@ -9,7 +9,7 @@ import DashTable, { type DashColumn } from '@/components/dashboard/DashTable';
 import useProduct from '@/hooks/use-product';
 import type { Category } from '@/types/category';
 import type { Product } from '@/types/product';
-import { formatVND } from './voucherUtils';
+import { formatPlain as formatVND } from '@/lib/format';
 
 type ProductPickerDialogProps = {
   open: boolean;

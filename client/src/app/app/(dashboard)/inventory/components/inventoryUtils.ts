@@ -55,10 +55,6 @@ export function getStockProgress(product: Product): number {
   const pct = (stockQuantity / minStock) * 100;
   return Math.max(0, Math.min(100, Math.round(pct)));
 }
-export function formatVND(value: number): string {
-  return `${value.toLocaleString('vi-VN')} đ`;
-}
-
 /** Đơn vị hiển thị tồn kho: ưu tiên `unit`, fallback `net_unit`. */
 export function getStockUnit(product: Product): string {
   return product.unit || product.net_unit || '';

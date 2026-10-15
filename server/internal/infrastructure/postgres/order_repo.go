@@ -67,6 +67,7 @@ type orderItemRow struct {
 	ProductID      *string `db:"product_id"`
 	StaffID        *string  `db:"staff_id"`
 	Quantity       float64  `db:"quantity"`
+	Unit           *string  `db:"unit"`
 	UnitPrice      float64  `db:"unit_price"`
 	LineTotal      float64 `db:"line_total"`
 	StaffJSON      string  `db:"staff"`
@@ -125,6 +126,54 @@ func (r *PostgresOrderRepository) CreateOrder(ctx context.Context, order *domain
 	}
 	return nil
 }
+
+// AddOrderItems thêm dòng đơn + vật tư snapshot + giữ chỗ kho + chốt tổng mới
+// trong 1 tx: khóa đơn + check lại trạng thái (chỉ pending/confirm, chống race
+// chốt đơn xen giữa lúc usecase kiểm tra và lúc commit).
+func (r *PostgresOrderRepository) AddOrderItems(ctx context.Context, orgID, orderID string, items []*domain.OrderItem, materials []*domain.OrderItemMaterial, deductions []domain.StockDeduction, newSubtotal, newTotal float64) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("lỗi khi bắt đầu transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	var status string
+	if err := tx.QueryRow(ctx, lockOrderRowQuery, orgID, orderID).Scan(&status); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return fmt.Errorf("đơn hàng %s: %w", orderID, domain.ErrOrderNotFound)
+		}
+		return fmt.Errorf("lỗi khi khóa đơn hàng: %w", err)
+	}
+	switch status {
+	case domain.StatusPending, domain.StatusConfirm:
+	default:
+		return fmt.Errorf("đơn hàng %s: %w", orderID, domain.ErrOrderNotEditable)
+	}
+
+	if err := bulkInsertOrderItems(ctx, tx, items); err != nil {
+		return fmt.Errorf("lỗi khi thêm dòng đơn hàng: %w", err)
+	}
+
+	if err := bulkInsertOrderItemMaterials(ctx, tx, materials); err != nil {
+		return fmt.Errorf("lỗi khi lưu vật tư tiêu hao: %w", err)
+	}
+
+	if err := adjustReservations(ctx, tx, orgID, deductionQtyByProduct(deductions)); err != nil {
+		return err
+	}
+
+	if _, err := tx.Exec(ctx, updateOrderTotalsQuery, orgID, orderID, newSubtotal, newTotal); err != nil {
+		return fmt.Errorf("lỗi khi chốt tổng mới của đơn: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("lỗi khi commit thêm dòng đơn: %w", err)
+	}
+	return nil
+}
+
+
+
 
 // bulkInsertOrderItems chèn nhiều dòng đơn trong tx có sẵn (nhận tx, không tự mở).
 func bulkInsertOrderItems(ctx context.Context, tx pgx.Tx, items []*domain.OrderItem) error {
@@ -205,6 +254,15 @@ func (r *PostgresOrderRepository) CountOrdersByOrgID(ctx context.Context, orgID,
 	return total, nil
 }
 
+// GetOrderStats gom 4 số thẻ thống kê đơn của salon trong 1 query.
+func (r *PostgresOrderRepository) GetOrderStats(ctx context.Context, orgID string) (*domain.OrderStatsResponse, error) {
+	var stats domain.OrderStatsResponse
+	if err := r.qx.GetContext(ctx, &stats, getOrderStatsQuery, orgID); err != nil {
+		return nil, fmt.Errorf("lỗi khi lấy thống kê đơn hàng: %w", err)
+	}
+	return &stats, nil
+}
+
 // ListHistoriesOrderByCustomerId lịch sử đơn hàng của 1 khách (mới nhất trước).
 func (r *PostgresOrderRepository) ListHistoriesOrderByCustomerId(ctx context.Context, orgID, customerID string, limit, offset int) ([]*domain.Order, error) {
 	orders := make([]*domain.Order, 0)
@@ -254,7 +312,7 @@ func (r *PostgresOrderRepository) GetOrderItems(ctx context.Context, orgID, orde
 		items = append(items, &domain.OrderItem{
 			ID: row.ID, OrganizationID: row.OrganizationID, OrderID: row.OrderID,
 			ItemType: row.ItemType, ServiceID: row.ServiceID, ProductID: row.ProductID,
-			StaffID: row.StaffID, Quantity: row.Quantity, UnitPrice: row.UnitPrice,
+			StaffID: row.StaffID, Quantity: row.Quantity, Unit: row.Unit, UnitPrice: row.UnitPrice,
 			LineTotal: row.LineTotal, Staff: staff,
 		})
 	}
@@ -317,7 +375,8 @@ func (r *PostgresOrderRepository) MapItemOrders(ctx context.Context, orgID strin
 
 // ReplaceStaffOrderItems thay toàn bộ NV của 1 dòng đơn trong 1 tx
 // (xóa cũ + chèn mới) để gọi lại nhiều lần không trùng UNIQUE.
-func (r *PostgresOrderRepository) ReplaceStaffOrderItems(ctx context.Context, orderItemID string, staffItems []*domain.StaffOrderItem) error {
+// Danh sách rỗng = gỡ hết NV của dòng (kèm null staff_id legacy).
+func (r *PostgresOrderRepository) ReplaceStaffOrderItems(ctx context.Context, orgID, orderItemID string, staffItems []*domain.StaffOrderItem) error {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("lỗi khi bắt đầu transaction: %w", err)
@@ -326,6 +385,11 @@ func (r *PostgresOrderRepository) ReplaceStaffOrderItems(ctx context.Context, or
 
 	if _, err := tx.Exec(ctx, deleteStaffOrderItemsQuery, orderItemID); err != nil {
 		return fmt.Errorf("lỗi khi xóa nhân viên cũ của dòng đơn: %w", err)
+	}
+	if len(staffItems) == 0 {
+		if _, err := tx.Exec(ctx, clearOrderItemStaffQuery, orgID, orderItemID); err != nil {
+			return fmt.Errorf("lỗi khi gỡ nhân viên của dòng đơn: %w", err)
+		}
 	}
 	if len(staffItems) > 0 {
 		var args []any
@@ -429,6 +493,116 @@ func materialDeductions(materials []*domain.OrderItemMaterial) []domain.StockDed
 		out = append(out, domain.StockDeduction{ProductID: m.ProductID, Quantity: m.Quantity})
 	}
 	return out
+}
+
+// ApplyItemQtyUpdate đổi SL 1 dòng đơn + vật tư theo + delta giữ chỗ + tổng mới
+// trong 1 tx: khóa đơn + check lại trạng thái (chỉ pending/confirm, chống race
+// chốt đơn xen giữa lúc usecase kiểm tra và lúc commit).
+func (r *PostgresOrderRepository) ApplyItemQtyUpdate(ctx context.Context, orgID, orderID string, item *domain.OrderItem, materialQtys map[string]float64, deltas []domain.StockDeduction, newSubtotal, newTotal float64) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("lỗi khi bắt đầu transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	var status string
+	if err := tx.QueryRow(ctx, lockOrderRowQuery, orgID, orderID).Scan(&status); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return fmt.Errorf("đơn hàng %s: %w", orderID, domain.ErrOrderNotFound)
+		}
+		return fmt.Errorf("lỗi khi khóa đơn hàng: %w", err)
+	}
+	switch status {
+	case domain.StatusPending, domain.StatusConfirm:
+	default:
+		return fmt.Errorf("đơn hàng %s: %w", orderID, domain.ErrOrderNotEditable)
+	}
+
+	var unitVal any
+	if item.Unit != nil {
+		unitVal = nullableUnit(*item.Unit)
+	}
+	tag, err := tx.Exec(ctx, updateOrderItemQtyQuery, orgID, item.ID, item.Quantity, unitVal, item.LineTotal)
+	if err != nil {
+		return fmt.Errorf("lỗi khi đổi số lượng dòng hàng: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("dòng hàng %s: %w", item.ID, domain.ErrOrderNotFound)
+	}
+
+	// Thứ tự id cố định để các tx đồng thời không deadlock nhau.
+	matIDs := make([]string, 0, len(materialQtys))
+	for id := range materialQtys {
+		matIDs = append(matIDs, id)
+	}
+	sort.Strings(matIDs)
+	for _, id := range matIDs {
+		if _, err := tx.Exec(ctx, updateOrderMaterialQtyQuery, id, item.ID, materialQtys[id]); err != nil {
+			return fmt.Errorf("lỗi khi đổi số lượng vật tư: %w", err)
+		}
+	}
+
+	if err := adjustReservations(ctx, tx, orgID, deductionQtyByProduct(deltas)); err != nil {
+		return err
+	}
+
+	if _, err := tx.Exec(ctx, updateOrderTotalsQuery, orgID, orderID, newSubtotal, newTotal); err != nil {
+		return fmt.Errorf("lỗi khi chốt tổng mới của đơn: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("lỗi khi commit đổi số lượng: %w", err)
+	}
+	return nil
+}
+
+// ApplyDeleteItem xóa 1 dòng đơn + vật tư của dòng + nhả giữ chỗ + chốt tổng
+// mới trong 1 tx (khóa đơn + check lại pending/confirm). Link NV tự cascade
+// theo FK nên không cần xóa tay.
+func (r *PostgresOrderRepository) ApplyDeleteItem(ctx context.Context, orgID, orderID, itemID string, releases []domain.StockDeduction, newSubtotal, newTotal float64) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("lỗi khi bắt đầu transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	var status string
+	if err := tx.QueryRow(ctx, lockOrderRowQuery, orgID, orderID).Scan(&status); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return fmt.Errorf("đơn hàng %s: %w", orderID, domain.ErrOrderNotFound)
+		}
+		return fmt.Errorf("lỗi khi khóa đơn hàng: %w", err)
+	}
+	switch status {
+	case domain.StatusPending, domain.StatusConfirm:
+	default:
+		return fmt.Errorf("đơn hàng %s: %w", orderID, domain.ErrOrderNotEditable)
+	}
+
+	// Vật tư FK không cascade nên xóa trước, rồi mới xóa dòng.
+	if _, err := tx.Exec(ctx, deleteOrderItemMaterialsQuery, itemID); err != nil {
+		return fmt.Errorf("lỗi khi xóa vật tư của dòng hàng: %w", err)
+	}
+	tag, err := tx.Exec(ctx, deleteOrderItemQuery, orgID, itemID)
+	if err != nil {
+		return fmt.Errorf("lỗi khi xóa dòng hàng: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("dòng hàng %s: %w", itemID, domain.ErrOrderNotFound)
+	}
+
+	if err := adjustReservations(ctx, tx, orgID, deductionQtyByProduct(releases)); err != nil {
+		return err
+	}
+
+	if _, err := tx.Exec(ctx, updateOrderTotalsQuery, orgID, orderID, newSubtotal, newTotal); err != nil {
+		return fmt.Errorf("lỗi khi chốt tổng mới của đơn: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("lỗi khi commit xóa dòng hàng: %w", err)
+	}
+	return nil
 }
 
 // ---------- 4. Hủy/hoàn + phục vụ (trạng thái + kho trong 1 tx) ----------

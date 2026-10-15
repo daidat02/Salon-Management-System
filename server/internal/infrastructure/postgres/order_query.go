@@ -21,7 +21,6 @@ const (
 		INSERT INTO order_item_materials (id, order_item_id, product_id, quantity, unit_cost_at_time, unit)
 		VALUES
 	`
-
 	// ---------- 2. Đọc đơn ----------
 	orderColumns      = `id, organization_id, code, customer_id, appointment_id, subtotal_amount, discount_amount, total_amount, status, created_by, created_at, updated_at`
 	getOrderByIDQuery = `
@@ -46,7 +45,7 @@ const (
 	// để 1 item = 1 row; item chưa gán NV thì staff = []).
 	listOrderItemsQuery = `
 		SELECT i.id, i.organization_id, i.order_id, i.item_type, i.service_id, i.product_id,
-		       i.staff_id, i.quantity, i.unit_price, i.line_total,
+		       i.staff_id, i.quantity, i.unit, i.unit_price, i.line_total,
 		       COALESCE(json_agg(
 		           json_build_object(
 		               'id', s.id,
@@ -94,6 +93,23 @@ const (
 	deleteStaffOrderItemsQuery = `
 		DELETE FROM order_item_staff WHERE order_item_id = $1
 	`
+	// Xóa vật tư của 1 dòng (bảng này FK không cascade nên phải xóa tay
+	// trước khi xóa dòng, không sẽ dính lỗi khóa ngoại).
+	deleteOrderItemMaterialsQuery = `
+		DELETE FROM order_item_materials WHERE order_item_id = $1
+	`
+	// Xóa 1 dòng đơn; scope org + id để chống lẫn tenant.
+	deleteOrderItemQuery = `
+		DELETE FROM order_items
+		WHERE organization_id = $1 AND id = $2
+	`
+	// Gỡ NV legacy của dòng (khi gán danh sách rỗng) để fallback staff_id
+	// cũ không hồi sinh tên NV đã gỡ.
+	clearOrderItemStaffQuery = `
+		UPDATE order_items
+		SET staff_id = NULL
+		WHERE organization_id = $1 AND id = $2
+	`
 	deleteOrderMaterialsByOrderQuery = `
 		DELETE FROM order_item_materials
 		WHERE order_item_id IN (
@@ -108,6 +124,24 @@ const (
 			SELECT id FROM order_items WHERE organization_id = $1 AND order_id = ANY($2)
 		)
 		GROUP BY product_id
+	`
+	// Đổi SL 1 dòng đơn (đơn vị lớn) + tổng dòng; scope org + item để chống lẫn tenant.
+	updateOrderItemQtyQuery = `
+		UPDATE order_items
+		SET quantity = $3, unit = $4, line_total = $5
+		WHERE organization_id = $1 AND id = $2
+	`
+	// Đổi SL vật tư theo id (đã base); kèm order_item_id để chặn vật tư dòng khác.
+	updateOrderMaterialQtyQuery = `
+		UPDATE order_item_materials
+		SET quantity = $3
+		WHERE id = $1 AND order_item_id = $2
+	`
+	// Chốt tổng mới sau khi sửa dòng (discount giữ nguyên như usecase đã check).
+	updateOrderTotalsQuery = `
+		UPDATE orders
+		SET subtotal_amount = $3, total_amount = $4, updated_at = now()
+		WHERE organization_id = $1 AND id = $2
 	`
 
 	// ---------- 4. Kho + chuyển trạng thái ----------
@@ -194,4 +228,34 @@ const (
         ORDER BY type ASC, name ASC, id ASC
         LIMIT $9
     `
+
+	// ---------- 7. Thống kê 4 thẻ đơn hàng (1 query aggregate) ----------
+	// today_* theo ngày DB (CURRENT_DATE); doanh thu = đơn completed;
+	// chờ thanh toán = đơn chưa chốt, số còn phải thu = tổng − đã thu (kẹp >= 0).
+	getOrderStatsQuery = `
+		SELECT
+			COUNT(o.id) FILTER (WHERE DATE(o.created_at) = CURRENT_DATE) AS today_total,
+			COUNT(o.id) FILTER (WHERE o.status = 'completed' AND DATE(o.created_at) = CURRENT_DATE) AS today_completed,
+			COUNT(o.id) FILTER (WHERE o.status IN ('pending', 'confirm', 'delivery') AND DATE(o.created_at) = CURRENT_DATE) AS today_processing,
+			COALESCE(SUM(o.total_amount) FILTER (WHERE o.status = 'completed' AND DATE(o.created_at) = CURRENT_DATE), 0) AS today_revenue,
+			COALESCE(SUM(o.total_amount) FILTER (WHERE o.status = 'completed' AND DATE(o.created_at) = CURRENT_DATE - INTERVAL '1 day'), 0) AS yesterday_revenue,
+			COUNT(o.id) FILTER (WHERE o.status IN ('pending', 'confirm', 'delivery')) AS pending_count,
+			COALESCE((
+				SELECT SUM(GREATEST(o2.total_amount - COALESCE(p.paid, 0), 0))
+				FROM orders o2
+				LEFT JOIN (
+					SELECT order_id, SUM(amount) AS paid
+					FROM payments
+					WHERE status = 'succeeded'
+					GROUP BY order_id
+				) p ON p.order_id = o2.id
+				WHERE o2.organization_id = $1
+					AND o2.status IN ('pending', 'confirm', 'delivery')
+			), 0) AS pending_amount,
+			COUNT(o.id) FILTER (WHERE o.status IN ('cancelled', 'refunded') AND DATE(o.created_at) = CURRENT_DATE) AS cancel_refund_today,
+			COUNT(o.id) FILTER (WHERE o.status IN ('cancelled', 'refunded') AND date_trunc('month', o.created_at) = date_trunc('month', NOW())) AS cancel_refund_month,
+			COUNT(o.id) FILTER (WHERE date_trunc('month', o.created_at) = date_trunc('month', NOW())) AS month_total
+		FROM orders o
+		WHERE o.organization_id = $1
+	`
 )

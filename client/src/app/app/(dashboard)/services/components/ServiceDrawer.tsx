@@ -5,6 +5,7 @@ import { Banknote, Clock3, Scissors, TrendingUp, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DashDrawer } from '@/components/dashboard/DashDrawer';
 import type { Service } from '@/types/service';
+import { formatVND } from '@/lib/format';
 
 // Mock data cho drawer chi tiết dịch vụ — bám cấu trúc ProductDrawer.
 // Chưa kết nối API (riêng định mức vật tư đã có API GET /services/:id/details, đấu sau).
@@ -23,10 +24,6 @@ const mockMaterials = [
   { id: 'm-02', name: 'Oxy trợ nhuộm 9% 1000ml', qty: '0,2 can', cost: '22.000 đ' },
   { id: 'm-03', name: 'Găng tay nilon (100 cái)', qty: '2 đôi', cost: '1.000 đ' },
 ];
-
-function formatVND(n: number): string {
-  return `${n.toLocaleString('vi-VN')} đ`;
-}
 
 function formatDuration(min: number): string {
   if (min >= 60) {

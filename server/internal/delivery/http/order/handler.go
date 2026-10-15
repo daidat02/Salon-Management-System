@@ -77,6 +77,25 @@ func (h *OrderHandler) GetOrdersByOrgID(c *gin.Context) {
 	response.Success(c, 200, "Danh sách đơn hàng", result)
 }
 
+// GetOrderStats godoc
+// @Summary      Thống kê đơn hàng (tổng/doanh thu hôm nay, chờ thanh toán, hủy/hoàn)
+// @Tags         Orders
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200  {object}  response.SuccessResponse  "Thống kê đơn hàng"
+// @Failure      400  {object}  response.ErrorResponse    "Thiếu organization"
+// @Failure      401  {object}  response.ErrorResponse    "Thiếu token / token không hợp lệ"
+// @Router       /orders/stats [get]
+func (h *OrderHandler) GetOrderStats(c *gin.Context) {
+	result, err := h.uc.GetOrderStats(c.Request.Context())
+	if err != nil {
+		response.Error(c, err)
+		c.Abort()
+		return
+	}
+	response.Success(c, 200, "Thống kê đơn hàng", result)
+}
+
 // GetOrderDetail godoc
 // @Summary      Lấy chi tiết đơn hàng (dòng hàng + vật tư + thanh toán)
 // @Tags         Orders
@@ -176,6 +195,97 @@ func (h *OrderHandler) UpdateOrderCustomer(c *gin.Context) {
 		return
 	}
 	response.Success(c, 200, "Gán khách hàng thành công", result)
+}
+
+// UpdateOrderItemQty godoc
+// @Summary      Đổi số lượng 1 dòng đơn (chỉ đơn chờ/xác nhận)
+// @Tags         Orders
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id      path      string  true  "ID đơn hàng"
+// @Param        itemId  path      string  true  "ID dòng đơn hàng"
+// @Param        body    body      domain.UpdateOrderItemQtyRequest  true  "Số lượng + đơn vị mới"
+// @Success      200     {object}  response.SuccessResponse  "Đổi số lượng thành công"
+// @Failure      400     {object}  response.ErrorResponse    "Dữ liệu không hợp lệ / đơn đã khóa / tồn không đủ"
+// @Failure      401     {object}  response.ErrorResponse    "Thiếu token / token không hợp lệ"
+// @Failure      404     {object}  response.ErrorResponse    "Không tìm thấy đơn/dòng đơn"
+// @Router       /orders/{id}/items/{itemId} [patch]
+func (h *OrderHandler) UpdateOrderItemQty(c *gin.Context) {
+	id := c.Param("id")
+	itemID := c.Param("itemId")
+	var req domain.UpdateOrderItemQtyRequest
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, apperror.New(400, "Dữ liệu không hợp lệ", err))
+		c.Abort()
+		return
+	}
+
+	result, err := h.uc.UpdateOrderItemQty(c.Request.Context(), id, itemID, &req)
+	if err != nil {
+		response.Error(c, err)
+		c.Abort()
+		return
+	}
+	response.Success(c, 200, "Đổi số lượng dòng hàng thành công", result)
+}
+
+// AddOrderItems godoc
+// @Summary      Thêm dòng hàng vào đơn (chỉ đơn chờ/xác nhận)
+// @Tags         Orders
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id    path      string  true  "ID đơn hàng"
+// @Param        body  body      domain.AddOrderItemsRequest  true  "Danh sách dòng cần thêm"
+// @Success      200   {object}  response.SuccessResponse  "Thêm dòng hàng thành công"
+// @Failure      400   {object}  response.ErrorResponse    "Dữ liệu không hợp lệ / đơn đã khóa / tồn không đủ"
+// @Failure      401   {object}  response.ErrorResponse    "Thiếu token / token không hợp lệ"
+// @Failure      404   {object}  response.ErrorResponse    "Không tìm thấy đơn/dịch vụ/sản phẩm"
+// @Router       /orders/{id}/items [post]
+func (h *OrderHandler) AddOrderItems(c *gin.Context) {
+	id := c.Param("id")
+	var req domain.AddOrderItemsRequest
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, apperror.New(400, "Dữ liệu không hợp lệ", err))
+		c.Abort()
+		return
+	}
+
+	result, err := h.uc.AddOrderItems(c.Request.Context(), id, req.Items)
+	if err != nil {
+		response.Error(c, err)
+		c.Abort()
+		return
+	}
+	response.Success(c, 200, "Thêm dòng hàng thành công", result)
+}
+
+// DeleteOrderItem godoc
+// @Summary      Xóa 1 dòng đơn (chỉ đơn chờ/xác nhận, cấm xóa dòng cuối)
+// @Tags         Orders
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id      path      string  true  "ID đơn hàng"
+// @Param        itemId  path      string  true  "ID dòng đơn hàng"
+// @Success      200     {object}  response.SuccessResponse  "Xóa dòng hàng thành công"
+// @Failure      400     {object}  response.ErrorResponse    "Đơn đã khóa / xóa dòng cuối / thu thừa"
+// @Failure      401     {object}  response.ErrorResponse    "Thiếu token / token không hợp lệ"
+// @Failure      404     {object}  response.ErrorResponse    "Không tìm thấy đơn/dòng đơn"
+// @Router       /orders/{id}/items/{itemId} [delete]
+func (h *OrderHandler) DeleteOrderItem(c *gin.Context) {
+	id := c.Param("id")
+	itemID := c.Param("itemId")
+
+	result, err := h.uc.DeleteOrderItem(c.Request.Context(), id, itemID)
+	if err != nil {
+		response.Error(c, err)
+		c.Abort()
+		return
+	}
+	response.Success(c, 200, "Xóa dòng hàng thành công", result)
 }
 
 // CompleteOrder godoc

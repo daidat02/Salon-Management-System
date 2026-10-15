@@ -10,7 +10,8 @@ import { getApiErrorMessage } from '@/services/apiClient';
 import { toast } from '@/components/ui/toast';
 import type { PaymentMethod } from '@/services/order';
 import { cn } from '@/lib/utils';
-import { formatVND, type EnrichedRetailLine, type EnrichedServiceLine } from './orderDetailUtils';
+import { type EnrichedRetailLine, type EnrichedServiceLine } from './orderDetailUtils';
+import { formatVND } from '@/lib/format';
 
 const METHODS: { label: string; sub: string; value: PaymentMethod; icon: typeof Banknote }[] = [
   { label: 'Tiền mặt', sub: 'Thu trực tiếp', value: 'cash', icon: Banknote },

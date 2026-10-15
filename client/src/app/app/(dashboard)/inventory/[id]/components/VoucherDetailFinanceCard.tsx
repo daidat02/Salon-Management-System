@@ -3,9 +3,9 @@
 import { ReceiptText } from 'lucide-react';
 import type { InventoryDocument, InventoryDocumentItem } from '@/types/inventory';
 import {
-  formatVND,
   numberToVietnameseWords,
 } from '../../(create)/components/voucherUtils';
+import { formatPlain as formatVND } from '@/lib/format';
 import { VAT_RATE } from '../../(create)/components/voucherData';
 
 type VoucherDetailFinanceCardProps = {

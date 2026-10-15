@@ -3,17 +3,17 @@
 import * as React from 'react';
 import type { LucideIcon } from 'lucide-react';
 import {
+  Check,
   CheckCircle2,
   FlaskConical,
-  Pencil,
   PlusCircle,
   Scissors,
   Search,
   ShoppingBag,
-  Timer,
-  Trash2,
   TrendingUp,
+  X,
 } from 'lucide-react';
+import { TextButton } from '@/components/ui/text-button';
 import DashTable, { type DashColumn } from '@/components/dashboard/DashTable';
 import { Button } from '@/components/ui/button';
 import { Tag } from '@/components/ui/tag';
@@ -26,11 +26,60 @@ import type {
   EnrichedServiceLine,
   StaffAssignment,
 } from './orderDetailUtils';
-import { formatVND } from './orderDetailUtils';
+import { formatPlain, formatVND } from '@/lib/format';
 import StaffUpdateDialog from './StaffUpdateDialog';
 
-function formatPlain(n: number): string {
-  return n.toLocaleString('vi-VN');
+// Ô nhập số lượng inline (giống bảng vật tư) + tích xác nhận / X hủy.
+function QtyEditor({
+  initial,
+  unit,
+  saving,
+  onConfirm,
+  onCancel,
+}: {
+  initial: number;
+  unit?: string;
+  saving: boolean;
+  onConfirm: (qty: number) => void;
+  onCancel: () => void;
+}) {
+  const [val, setVal] = React.useState(String(initial));
+  return (
+    <span
+      className="inline-flex items-center gap-1 whitespace-nowrap"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <input
+        type="number"
+        min={0}
+        step="any"
+        value={val}
+        onChange={(e) => setVal(e.target.value)}
+        className="w-16 rounded bg-surface-container px-1.5 py-1 text-center text-xs font-semibold text-on-surface focus:ring-1 focus:ring-primary focus:outline-none"
+      />
+      {unit ? <span className="text-[10px] text-on-surface-variant">{unit}</span> : null}
+      <button
+        type="button"
+        title="Xác nhận"
+        disabled={saving}
+        onClick={() => {
+          const n = Number(val);
+          if (Number.isFinite(n) && n > 0) onConfirm(n);
+        }}
+        className="inline-flex h-6 w-6 items-center justify-center rounded-md text-success transition-colors hover:bg-success/10 disabled:opacity-50"
+      >
+        <Check className="h-3.5 w-3.5" />
+      </button>
+      <button
+        type="button"
+        title="Hủy"
+        onClick={onCancel}
+        className="inline-flex h-6 w-6 items-center justify-center rounded-md text-on-surface-variant transition-colors hover:bg-surface-container"
+      >
+        <X className="h-3.5 w-3.5" />
+      </button>
+    </span>
+  );
 }
 
 function CardHeader({
@@ -62,9 +111,18 @@ function CardHeader({
   );
 }
 
-function serviceColumns(
-  onUpdate: (line: EnrichedServiceLine) => void,
-): DashColumn<EnrichedServiceLine>[] {
+type ServiceTableCtx = {
+  canEdit: boolean;
+  editingId: string | null;
+  saving: boolean;
+  onStartEdit: (id: string) => void;
+  onConfirm: (id: string, qty: number) => void;
+  onCancel: () => void;
+  onEditStaff: (line: { id: string; name: string }) => void;
+  onDelete: (line: { id: string; name: string }) => void;
+};
+
+function serviceColumns(ctx: ServiceTableCtx): DashColumn<EnrichedServiceLine>[] {
   return [
     {
       id: 'name',
@@ -80,6 +138,7 @@ function serviceColumns(
     {
       id: 'duration',
       header: 'Thời lượng',
+      className: 'min-w-[110px] whitespace-nowrap',
       cell: (row) => (
         <span className="inline-flex items-center gap-1.5 text-xs">{row.duration}</span>
       ),
@@ -87,22 +146,46 @@ function serviceColumns(
     {
       id: 'staff',
       header: 'Stylist thực hiện',
+      className: 'min-w-[180px]',
       cell: (row) => (
-        <div>
+        <div className="flex items-center gap-1.5 whitespace-nowrap">
           <div className="text-xs text-on-surface">{row.staffName}</div>
+          {ctx.canEdit && (
+            <TextButton title="Cập nhật nhân viên" onClick={() => ctx.onEditStaff(row)}>
+              Chỉnh sửa
+            </TextButton>
+          )}
         </div>
       ),
     },
     {
       id: 'quantity',
       header: 'Số lượng',
-      className: 'text-center',
-      cell: (row) => <span className="text-xs text-on-surface">x{row.quantity}</span>,
+      className: 'min-w-[150px] text-center whitespace-nowrap',
+      cell: (row) =>
+        ctx.editingId === row.id ? (
+          <QtyEditor
+            key={row.id}
+            initial={row.quantity}
+            saving={ctx.saving}
+            onConfirm={(q) => ctx.onConfirm(row.id, q)}
+            onCancel={ctx.onCancel}
+          />
+        ) : (
+          <span className="inline-flex items-center gap-1 text-xs text-on-surface">
+            x{row.quantity}
+            {ctx.canEdit && (
+              <TextButton title="Đổi số lượng" onClick={() => ctx.onStartEdit(row.id)}>
+                Chỉnh sửa
+              </TextButton>
+            )}
+          </span>
+        ),
     },
     {
       id: 'lineTotal',
       header: 'Đơn giá & Thành tiền',
-      className: 'text-right',
+      className: 'min-w-[150px] text-right whitespace-nowrap',
       cell: (row) => (
         <span className="text-xs font-semibold text-on-surface">{formatVND(row.lineTotal)}</span>
       ),
@@ -111,16 +194,16 @@ function serviceColumns(
       id: 'actions',
       header: '',
       className: 'w-[52px] text-right',
-      cell: (row) => (
-        <button
-          type="button"
-          title="Cập nhật nhân viên"
-          onClick={() => onUpdate(row)}
-          className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-outline text-on-surface-variant transition-colors hover:border-primary hover:text-primary"
-        >
-          <Pencil className="h-3.5 w-3.5" />
-        </button>
-      ),
+      cell: (row) =>
+        ctx.canEdit ? (
+          <TextButton
+            title="Xóa dòng"
+            tone="danger"
+            onClick={() => ctx.onDelete({ id: row.id, name: row.name })}
+          >
+            Xóa
+          </TextButton>
+        ) : null,
     },
   ];
 }
@@ -129,14 +212,88 @@ type MaterialRow = EnrichedMaterialLine & { stt: number; stripe: boolean };
 
 export type MaterialPatch = { unit?: string; quantity?: number; orderItemId?: string | null };
 
+export type MaterialDraft = {
+  id: string;
+  unit: string;
+  quantity: number;
+  orderItemId: string | null;
+};
+
 type MaterialTableCtx = {
   services: EnrichedServiceLine[];
   productById: Map<string, Product>;
+  canEdit: boolean;
+  editing: MaterialDraft | null;
+  onStartEdit: (row: MaterialRow) => void;
+  onDraft: (patch: { unit?: string; quantity?: number; orderItemId?: string | null }) => void;
+  onConfirmEdit: (row: MaterialRow) => void;
+  onCancelEdit: () => void;
   onUpdate: (materialId: string, patch: MaterialPatch) => void;
   onDelete: (materialId: string) => void;
 };
 
 const UNASSIGNED_SERVICE = '__none';
+
+/** true với dòng thêm local (nháp chưa lưu) — luôn nhập trực tiếp, không qua toggle. */
+const isLocalRow = (row: MaterialRow) => row.id.startsWith('local-');
+
+function ServiceSelect({
+  services,
+  value,
+  onChange,
+}: {
+  services: EnrichedServiceLine[];
+  value: string | null;
+  onChange: (orderItemId: string | null) => void;
+}) {
+  return (
+    <select
+      value={value ?? UNASSIGNED_SERVICE}
+      onChange={(e) => {
+        const v = e.target.value;
+        onChange(v === UNASSIGNED_SERVICE ? null : v);
+      }}
+      onClick={(e) => e.stopPropagation()}
+      className="h-8 w-full cursor-pointer rounded bg-surface-container px-1.5 py-1 text-xs focus:ring-1 focus:ring-primary focus:outline-none"
+    >
+      <option value={UNASSIGNED_SERVICE}>—</option>
+      {services.map((s) => (
+        <option key={s.id} value={s.id}>
+          {s.name}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function UnitSelect({
+  product,
+  value,
+  onChange,
+}: {
+  product: Product | undefined;
+  value: string;
+  onChange: (unit: string) => void;
+}) {
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      onClick={(e) => e.stopPropagation()}
+      className="h-8 w-full cursor-pointer rounded bg-surface-container px-1.5 py-1 text-xs font-semibold text-on-surface focus:ring-1 focus:ring-primary focus:outline-none"
+    >
+      {product ? (
+        buildUnitOptions(product).options.map((opt) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
+        ))
+      ) : (
+        <option value={value}>{value || '—'}</option>
+      )}
+    </select>
+  );
+}
 
 // Cột mirror bảng "2. Danh mục sản phẩm & Vật tư" (VoucherDetailItemsCard),
 // thao tác inline như page xuất kho + thêm cột "Dùng cho" chọn dịch vụ trong đơn.
@@ -176,24 +333,36 @@ function materialColumns(ctx: MaterialTableCtx): DashColumn<MaterialRow>[] {
       id: 'service',
       header: 'Dùng cho',
       className: 'min-w-[150px]',
-      cell: (row) => (
-        <select
-          value={row.orderItemId ?? UNASSIGNED_SERVICE}
-          onChange={(e) => {
-            const v = e.target.value;
-            ctx.onUpdate(row.id, { orderItemId: v === UNASSIGNED_SERVICE ? null : v });
-          }}
-          onClick={(e) => e.stopPropagation()}
-          className="h-8 w-full cursor-pointer rounded bg-surface-container px-1.5 py-1 text-xs focus:ring-1 focus:ring-primary focus:outline-none"
-        >
-          <option value={UNASSIGNED_SERVICE}>—</option>
-          {ctx.services.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
-        </select>
-      ),
+      cell: (row) => {
+        if (isLocalRow(row)) {
+          return (
+            <ServiceSelect
+              services={ctx.services}
+              value={row.orderItemId}
+              onChange={(v) => ctx.onUpdate(row.id, { orderItemId: v })}
+            />
+          );
+        }
+        if (ctx.editing?.id === row.id) {
+          return (
+            <ServiceSelect
+              services={ctx.services}
+              value={ctx.editing.orderItemId}
+              onChange={(v) => ctx.onDraft({ orderItemId: v })}
+            />
+          );
+        }
+        return (
+          <span className="inline-flex items-center gap-1 text-xs text-on-surface">
+            {row.serviceName}
+            {ctx.canEdit && (
+              <TextButton title="Đổi dịch vụ" onClick={() => ctx.onStartEdit(row)}>
+                Chỉnh sửa
+              </TextButton>
+            )}
+          </span>
+        );
+      },
     },
     {
       id: 'unit',
@@ -201,23 +370,33 @@ function materialColumns(ctx: MaterialTableCtx): DashColumn<MaterialRow>[] {
       className: 'min-w-[140px]',
       cell: (row) => {
         const p = ctx.productById.get(row.productId);
+        if (isLocalRow(row)) {
+          return (
+            <UnitSelect
+              product={p}
+              value={row.unit}
+              onChange={(v) => ctx.onUpdate(row.id, { unit: v })}
+            />
+          );
+        }
+        if (ctx.editing?.id === row.id) {
+          return (
+            <UnitSelect
+              product={p}
+              value={ctx.editing.unit}
+              onChange={(v) => ctx.onDraft({ unit: v })}
+            />
+          );
+        }
         return (
-          <select
-            value={row.unit}
-            onChange={(e) => ctx.onUpdate(row.id, { unit: e.target.value })}
-            onClick={(e) => e.stopPropagation()}
-            className="h-8 w-full cursor-pointer rounded bg-surface-container px-1.5 py-1 text-xs font-semibold text-on-surface focus:ring-1 focus:ring-primary focus:outline-none"
-          >
-            {p ? (
-              buildUnitOptions(p).options.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))
-            ) : (
-              <option value={row.unit}>{row.unit || '—'}</option>
+          <span className="inline-flex items-center gap-1 text-xs font-semibold text-on-surface">
+            {row.unit || '—'}
+            {ctx.canEdit && (
+              <TextButton title="Đổi đơn vị" onClick={() => ctx.onStartEdit(row)}>
+                Chỉnh sửa
+              </TextButton>
             )}
-          </select>
+          </span>
         );
       },
     },
@@ -227,23 +406,55 @@ function materialColumns(ctx: MaterialTableCtx): DashColumn<MaterialRow>[] {
       className: 'w-20 text-center',
       cell: (row) => {
         const p = ctx.productById.get(row.productId);
+        if (isLocalRow(row)) {
+          return (
+            <div className="flex flex-col items-center gap-0.5">
+              <input
+                type="number"
+                min={0}
+                step="any"
+                value={row.quantity}
+                onClick={(e) => e.stopPropagation()}
+                onChange={(e) =>
+                  ctx.onUpdate(row.id, { quantity: Math.max(0, Number(e.target.value) || 0) })
+                }
+                className="w-16 rounded bg-surface-container px-1.5 py-1 text-center text-xs font-semibold focus:ring-1 focus:ring-primary focus:outline-none"
+              />
+              <span className="text-[10px] text-on-surface-variant">
+                Tồn: {(p?.stock_quantity ?? 0).toLocaleString('vi-VN')} {p?.unit ?? ''}
+              </span>
+            </div>
+          );
+        }
+        if (ctx.editing?.id === row.id) {
+          return (
+            <div className="flex flex-col items-center gap-0.5">
+              <input
+                type="number"
+                min={0}
+                step="any"
+                value={ctx.editing.quantity}
+                onClick={(e) => e.stopPropagation()}
+                onChange={(e) =>
+                  ctx.onDraft({ quantity: Math.max(0, Number(e.target.value) || 0) })
+                }
+                className="w-16 rounded bg-surface-container px-1.5 py-1 text-center text-xs font-semibold focus:ring-1 focus:ring-primary focus:outline-none"
+              />
+              <span className="text-[10px] text-on-surface-variant">
+                Tồn: {(p?.stock_quantity ?? 0).toLocaleString('vi-VN')} {p?.unit ?? ''}
+              </span>
+            </div>
+          );
+        }
         return (
-          <div className="flex flex-col items-center gap-0.5">
-            <input
-              type="number"
-              min={0}
-              step="any"
-              value={row.quantity}
-              onClick={(e) => e.stopPropagation()}
-              onChange={(e) =>
-                ctx.onUpdate(row.id, { quantity: Math.max(0, Number(e.target.value) || 0) })
-              }
-              className="w-16 rounded bg-surface-container px-1.5 py-1 text-center text-xs font-semibold focus:ring-1 focus:ring-primary focus:outline-none"
-            />
-            <span className="text-[10px] text-on-surface-variant">
-              Tồn: {(p?.stock_quantity ?? 0).toLocaleString('vi-VN')} {p?.unit ?? ''}
-            </span>
-          </div>
+          <span className="inline-flex items-center gap-1 text-xs font-semibold text-on-surface">
+            {row.qtyText}
+            {ctx.canEdit && (
+              <TextButton title="Đổi số lượng" onClick={() => ctx.onStartEdit(row)}>
+                Chỉnh sửa
+              </TextButton>
+            )}
+          </span>
         );
       },
     },
@@ -263,21 +474,53 @@ function materialColumns(ctx: MaterialTableCtx): DashColumn<MaterialRow>[] {
       id: 'actions',
       header: '',
       className: 'w-10 text-center',
-      cell: (row) => (
-        <button
-          type="button"
-          title="Xóa dòng"
-          onClick={() => ctx.onDelete(row.id)}
-          className="rounded p-1 text-on-surface-variant transition-colors hover:bg-error/10 hover:text-error"
-        >
-          <Trash2 className="h-4 w-4" />
-        </button>
-      ),
+      cell: (row) => {
+        if (!isLocalRow(row) && ctx.editing?.id === row.id) {
+          return (
+            <span className="inline-flex items-center gap-1">
+              <button
+                type="button"
+                title="Lưu thay đổi dòng này"
+                onClick={() => ctx.onConfirmEdit(row)}
+                className="inline-flex h-6 w-6 items-center justify-center rounded-md text-success transition-colors hover:bg-success/10"
+              >
+                <Check className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                title="Hủy"
+                onClick={ctx.onCancelEdit}
+                className="inline-flex h-6 w-6 items-center justify-center rounded-md text-on-surface-variant transition-colors hover:bg-surface-container"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </span>
+          );
+        }
+        if (!ctx.canEdit) return null;
+        return (
+          <TextButton title="Xóa dòng" tone="danger" onClick={() => ctx.onDelete(row.id)}>
+            Xóa
+          </TextButton>
+        );
+      },
     },
   ];
 }
 
-const retailColumns: DashColumn<EnrichedRetailLine>[] = [
+type RetailTableCtx = {
+  canEdit: boolean;
+  editingId: string | null;
+  saving: boolean;
+  onStartEdit: (id: string) => void;
+  onConfirm: (id: string, qty: number) => void;
+  onCancel: () => void;
+  onEditStaff: (line: { id: string; name: string }) => void;
+  onDelete: (line: { id: string; name: string }) => void;
+};
+
+function retailColumns(ctx: RetailTableCtx): DashColumn<EnrichedRetailLine>[] {
+  return [
   {
     id: 'name',
     header: 'Tên sản phẩm',
@@ -292,18 +535,53 @@ const retailColumns: DashColumn<EnrichedRetailLine>[] = [
   {
     id: 'sku',
     header: 'Mã SKU',
+    className: 'min-w-[110px] whitespace-nowrap',
     cell: (row) => <span className="font-mono text-xs text-on-surface-variant">{row.sku}</span>,
+  },
+  {
+    id: 'staff',
+    header: 'NV bán hàng',
+    className: 'min-w-[180px]',
+    cell: (row) => (
+      <div className="flex items-center gap-1.5 whitespace-nowrap">
+        <div className="text-xs text-on-surface">{row.staffName}</div>
+          {ctx.canEdit && (
+            <TextButton title="Cập nhật nhân viên" onClick={() => ctx.onEditStaff(row)}>
+              Chỉnh sửa
+            </TextButton>
+          )}
+      </div>
+    ),
   },
   {
     id: 'qtyText',
     header: 'Số lượng',
-    className: 'text-center',
-    cell: (row) => <span className="font-medium text-on-surface">{row.qtyText}</span>,
+    className: 'min-w-[170px] text-center whitespace-nowrap',
+    cell: (row) =>
+      ctx.editingId === row.id ? (
+        <QtyEditor
+          key={row.id}
+          initial={row.quantity}
+          unit={row.unit}
+          saving={ctx.saving}
+          onConfirm={(q) => ctx.onConfirm(row.id, q)}
+          onCancel={ctx.onCancel}
+        />
+      ) : (
+        <span className="inline-flex items-center gap-1 font-medium text-on-surface">
+          {row.qtyText}
+            {ctx.canEdit && (
+              <TextButton title="Đổi số lượng" onClick={() => ctx.onStartEdit(row.id)}>
+                Chỉnh sửa
+              </TextButton>
+            )}
+        </span>
+      ),
   },
   {
     id: 'sellTotal',
     header: 'Giá bán lẻ',
-    className: 'text-right',
+    className: 'min-w-[140px] text-right whitespace-nowrap',
     cell: (row) => (
       <div>
         <div className="font-medium text-on-surface">{formatVND(row.sellTotal)}</div>
@@ -314,7 +592,7 @@ const retailColumns: DashColumn<EnrichedRetailLine>[] = [
   {
     id: 'costTotal',
     header: 'Giá vốn nhập',
-    className: 'text-right',
+    className: 'min-w-[140px] text-right whitespace-nowrap',
     cell: (row) => (
       <div className="text-xs text-on-surface-variant">
         <div>{formatVND(row.costTotal)}</div>
@@ -325,10 +603,26 @@ const retailColumns: DashColumn<EnrichedRetailLine>[] = [
   {
     id: 'profit',
     header: 'Lợi nhuận gộp',
-    className: 'text-right',
+    className: 'min-w-[130px] text-right whitespace-nowrap',
     cell: (row) => <span className="font-semibold text-success">+{formatVND(row.profit)}</span>,
   },
-];
+  {
+    id: 'actions',
+    header: '',
+    className: 'w-[52px] text-right',
+      cell: (row) =>
+        ctx.canEdit ? (
+          <TextButton
+            title="Xóa dòng"
+            tone="danger"
+            onClick={() => ctx.onDelete({ id: row.id, name: row.name })}
+          >
+            Xóa
+          </TextButton>
+        ) : null,
+    },
+  ];
+}
 
 export default function OrderDetailMain({
   services,
@@ -344,6 +638,12 @@ export default function OrderDetailMain({
   onAddMaterial,
   onSaveMaterials,
   isSavingMaterials,
+  canEditItems,
+  canEditMaterials,
+  onUpdateServiceQty,
+  onDeleteService,
+  onUpdateRetailQty,
+  onDeleteRetail,
 }: {
   services: EnrichedServiceLine[];
   materials: EnrichedMaterialLine[];
@@ -358,10 +658,90 @@ export default function OrderDetailMain({
   onAddMaterial: (productId: string) => void;
   onSaveMaterials: () => Promise<void>;
   isSavingMaterials: boolean;
+  /** false = đơn đã khóa: ẩn toàn bộ icon sửa/xóa dòng. */
+  canEditItems: boolean;
+  /** false = ẩn thêm/sửa/xóa vật tư (server cũng chặn đơn khóa). */
+  canEditMaterials: boolean;
+  onUpdateServiceQty: (itemId: string, quantity: number) => Promise<void>;
+  onDeleteService: (line: { id: string; name: string }) => void;
+  onUpdateRetailQty: (itemId: string, quantity: number, unit: string) => Promise<void>;
+  onDeleteRetail: (line: { id: string; name: string }) => void;
 }) {
-  const [updateTarget, setUpdateTarget] = React.useState<EnrichedServiceLine | null>(null);
+  const [updateTarget, setUpdateTarget] = React.useState<{
+    id: string;
+    name: string;
+    kind: 'service' | 'retail';
+  } | null>(null);
+  const [editingQtyId, setEditingQtyId] = React.useState<string | null>(null);
+  const [savingQtyId, setSavingQtyId] = React.useState<string | null>(null);
+  // Nháp sửa 1 dòng vật tư: chỉ stage vào mảng replace khi bấm tích xác nhận.
+  const [editingMat, setEditingMat] = React.useState<MaterialDraft | null>(null);
+
+  const startMatEdit = React.useCallback((row: MaterialRow) => {
+    setEditingMat({
+      id: row.id,
+      unit: row.unit,
+      quantity: row.quantity,
+      orderItemId: row.orderItemId ?? null,
+    });
+  }, []);
+
+  const draftMatEdit = React.useCallback(
+    (patch: { unit?: string; quantity?: number; orderItemId?: string | null }) => {
+      setEditingMat((prev) => (prev ? { ...prev, ...patch } : prev));
+    },
+    [],
+  );
+
+  const cancelMatEdit = React.useCallback(() => setEditingMat(null), []);
+
+  const confirmMatEdit = React.useCallback(
+    (row: MaterialRow) => {
+      const draft = editingMat;
+      if (!draft || draft.id !== row.id) return;
+      const patch: MaterialPatch = {};
+      if (draft.unit !== row.unit) patch.unit = draft.unit;
+      if (draft.quantity !== row.quantity) patch.quantity = draft.quantity;
+      if ((draft.orderItemId ?? null) !== (row.orderItemId ?? null)) {
+        patch.orderItemId = draft.orderItemId;
+      }
+      // Không đổi gì thì thoát êm, khỏi hiện nút Lưu thay đổi oan.
+      if (Object.keys(patch).length > 0) onUpdateMaterial(row.id, patch);
+      setEditingMat(null);
+    },
+    [editingMat, onUpdateMaterial],
+  );
   const [matQuery, setMatQuery] = React.useState('');
   const [matFocused, setMatFocused] = React.useState(false);
+
+  const cancelQtyEdit = React.useCallback(() => setEditingQtyId(null), []);
+
+  const confirmServiceQty = React.useCallback(
+    async (itemId: string, quantity: number) => {
+      setSavingQtyId(itemId);
+      try {
+        await onUpdateServiceQty(itemId, quantity);
+        setEditingQtyId(null);
+      } finally {
+        setSavingQtyId(null);
+      }
+    },
+    [onUpdateServiceQty],
+  );
+
+  const confirmRetailQty = React.useCallback(
+    async (itemId: string, quantity: number) => {
+      const line = retail.find((l) => l.id === itemId);
+      setSavingQtyId(itemId);
+      try {
+        await onUpdateRetailQty(itemId, quantity, line?.unit ?? '');
+        setEditingQtyId(null);
+      } finally {
+        setSavingQtyId(null);
+      }
+    },
+    [onUpdateRetailQty, retail],
+  );
   const serviceTotal = services.reduce((s, l) => s + l.lineTotal, 0);
   const materialRows: MaterialRow[] = materials.map((m, i) => ({
     ...m,
@@ -411,7 +791,16 @@ export default function OrderDetailMain({
           />
         </div>
         <DashTable
-          columns={serviceColumns((row) => setUpdateTarget(row))}
+          columns={serviceColumns({
+            canEdit: canEditItems,
+            editingId: editingQtyId,
+            saving: savingQtyId !== null,
+            onStartEdit: (id) => setEditingQtyId(id),
+            onConfirm: (id, qty) => void confirmServiceQty(id, qty),
+            onCancel: cancelQtyEdit,
+            onEditStaff: (row) => setUpdateTarget({ id: row.id, name: row.name, kind: 'service' }),
+            onDelete: onDeleteService,
+          })}
           data={services}
           getRowId={(row) => row.id}
           selectable={false}
@@ -451,8 +840,9 @@ export default function OrderDetailMain({
                 }
               />
             </div>
-            <div className="relative w-full">
-              <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-on-surface-variant" />
+            {canEditMaterials && (
+              <div className="relative w-full">
+                <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-on-surface-variant" />
               <input
                 value={matQuery}
                 onChange={(e) => setMatQuery(e.target.value)}
@@ -493,13 +883,20 @@ export default function OrderDetailMain({
                   )}
                 </div>
               )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
         <DashTable
           columns={materialColumns({
             services,
             productById,
+            canEdit: canEditMaterials,
+            editing: editingMat,
+            onStartEdit: startMatEdit,
+            onDraft: draftMatEdit,
+            onConfirmEdit: confirmMatEdit,
+            onCancelEdit: cancelMatEdit,
             onUpdate: onUpdateMaterial,
             onDelete: onDeleteMaterial,
           })}
@@ -545,7 +942,16 @@ export default function OrderDetailMain({
         </div>
 
         <DashTable
-          columns={retailColumns}
+          columns={retailColumns({
+            canEdit: canEditItems,
+            editingId: editingQtyId,
+            saving: savingQtyId !== null,
+            onStartEdit: (id) => setEditingQtyId(id),
+            onConfirm: (id, qty) => void confirmRetailQty(id, qty),
+            onCancel: cancelQtyEdit,
+            onEditStaff: (row) => setUpdateTarget({ id: row.id, name: row.name, kind: 'retail' }),
+            onDelete: onDeleteRetail,
+          })}
           data={retail}
           getRowId={(row) => row.id}
           selectable={false}
@@ -576,6 +982,7 @@ export default function OrderDetailMain({
             if (!v) setUpdateTarget(null);
           }}
           serviceName={updateTarget.name}
+          subjectKind={updateTarget.kind}
           staffList={staffList}
           initialAssignments={getInitialAssignments(updateTarget.id)}
           onApply={(assignments) => onApplyStaff(updateTarget.id, assignments)}
