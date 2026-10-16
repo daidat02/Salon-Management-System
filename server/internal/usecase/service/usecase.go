@@ -7,7 +7,7 @@ import (
 	"log"
 	"strings"
 
-	"github.com/daidat02/server/internal/delivery/http/middlewares"
+	"github.com/daidat02/server/internal/usecase/shared"
 	domain "github.com/daidat02/server/internal/domain/service"
 	"github.com/daidat02/server/pkg/apperror"
 	"github.com/daidat02/server/pkg/pagination"
@@ -41,9 +41,9 @@ func toResponse(s *domain.Service) *domain.ServiceResponse {
 }
 
 func (u *ServiceUsecase) CreateService(ctx context.Context, service *domain.Service, materials []*domain.ServiceMaterialInput) (*domain.ServiceResponse, error) {
-	orgID, err := middlewares.GetOrgID(ctx)
+	orgID, err := shared.RequireOrgID(ctx)
 	if err != nil {
-		return nil, apperror.New(400, "Không tìm thấy organization_id trong context", err)
+		return nil, err
 	}
 
 	if err := service.Validate(); err != nil {
@@ -151,9 +151,9 @@ func (u *ServiceUsecase) checkCategoryInOrg(ctx context.Context, orgID string, c
 }
 
 func (u *ServiceUsecase) GetServicesByOrgID(ctx context.Context, search string, status string, sort string, page, pageSize int) (*pagination.Result[*domain.ServiceResponse], error) {
-	orgID, err := middlewares.GetOrgID(ctx)
+	orgID, err := shared.RequireOrgID(ctx)
 	if err != nil {
-		return nil, apperror.New(400, "Không tìm thấy organization_id trong context", err)
+		return nil, err
 	}
 
 	params := pagination.Normalize(page, pageSize)
@@ -181,9 +181,9 @@ func (u *ServiceUsecase) UpdateService(ctx context.Context, id string, service *
 		return nil, apperror.New(400, "Thiếu id dịch vụ", nil)
 	}
 
-	orgID, err := middlewares.GetOrgID(ctx)
+	orgID, err := shared.RequireOrgID(ctx)
 	if err != nil {
-		return nil, apperror.New(400, "Không tìm thấy organization_id trong context", err)
+		return nil, err
 	}
 
 	if err := service.Validate(); err != nil {
@@ -211,9 +211,9 @@ func (u *ServiceUsecase) DeleteService(ctx context.Context, id string) (string, 
 		return "", apperror.New(400, "Thiếu id dịch vụ", nil)
 	}
 
-	orgID, err := middlewares.GetOrgID(ctx)
+	orgID, err := shared.RequireOrgID(ctx)
 	if err != nil {
-		return "", apperror.New(400, "Không tìm thấy organization_id trong context", err)
+		return "", err
 	}
 
 	if err := u.repo.DeleteService(ctx, orgID, id); err != nil {
@@ -230,9 +230,9 @@ func (u *ServiceUsecase) DeleteService(ctx context.Context, id string) (string, 
 
 
 func (u *ServiceUsecase) GetServiceDetails(ctx context.Context, serviceID string) (*domain.ServiceResponse, []*domain.ServiceMaterial, error) {
-	orgID,err := middlewares.GetOrgID(ctx)
+	orgID,err := shared.RequireOrgID(ctx)
 	if err != nil {
-		return nil, nil, apperror.New(400, "Không tìm thấy organization_id trong context", err)
+		return nil, nil, err
 	}
 	service, materials, err := u.repo.GetServiceDetails(ctx,orgID,serviceID)
 	if err != nil {

@@ -34,3 +34,25 @@ func GenerateAppointmentCode() string {
 	}
 	return "APT-" + strings.ToUpper(id)
 }
+
+// GenerateCashFlowCode sinh mã phiếu thu/chi dạng PT-yyMM-XXXX (income)
+// hoặc PC-yyMM-XXXX (expense), vd PT-2610-4821. Phần số ngẫu nhiên nên
+// caller phải xử lý unique violation (23505) bằng cách sinh lại.
+func GenerateCashFlowCode(kind string) string {
+	prefix := "PC"
+	if kind == "income" {
+		prefix = "PT"
+	}
+	now := time.Now()
+	var randPart [4]byte
+	for i := range randPart {
+		n, err := rand.Int(rand.Reader, big.NewInt(10))
+		if err != nil {
+			randPart[i] = byte('0' + now.Nanosecond()%10)
+			continue
+		}
+		randPart[i] = byte('0' + n.Int64())
+	}
+	return fmt.Sprintf("%s-%02d%02d-%s",
+		prefix, now.Year()%100, int(now.Month()), string(randPart[:]))
+}

@@ -1,6 +1,10 @@
 -- Down cho 000002_seed_default_salon: xóa dữ liệu demo theo thứ tự ngược phụ thuộc
 -- (bảng con trước, bảng cha sau) để không vi phạm FK.
 
+DELETE FROM payrolls WHERE organization_id = '11111111-1111-1111-1111-111111111111';
+DELETE FROM cash_flows WHERE organization_id = '11111111-1111-1111-1111-111111111111';
+DELETE FROM funds WHERE organization_id = '11111111-1111-1111-1111-111111111111';
+DELETE FROM cash_flow_categories WHERE organization_id = '11111111-1111-1111-1111-111111111111';
 DELETE FROM notifications WHERE organization_id = '11111111-1111-1111-1111-111111111111';
 DELETE FROM payments WHERE organization_id = '11111111-1111-1111-1111-111111111111';
 DELETE FROM order_item_materials WHERE order_item_id IN (SELECT id FROM order_items WHERE organization_id = '11111111-1111-1111-1111-111111111111');

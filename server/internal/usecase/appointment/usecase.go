@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/daidat02/server/internal/delivery/http/middlewares"
+	"github.com/daidat02/server/internal/usecase/shared"
 	domain "github.com/daidat02/server/internal/domain/appointment"
 	customerDomain "github.com/daidat02/server/internal/domain/customer"
 	"github.com/daidat02/server/pkg/apperror"
@@ -60,9 +60,9 @@ func isUniqueViolation(err error) bool {
 
 func (u *AppointmentUseCase) CreateAppointment(ctx context.Context, req *domain.AppointmentCreateRequest) (*domain.Appointment, error){
 
-	orgId, err := middlewares.GetOrgID(ctx)
+	orgId, err := shared.RequireOrgID(ctx)
 	if err != nil {
-		return nil, apperror.New(400, "Không tìm thấy organization_id trong context", err)
+		return nil, err
 	}
 
 	// Giá trị mặc định theo schema khi client không gửi.
@@ -266,9 +266,9 @@ func (u *AppointmentUseCase) resolveCustomerID(ctx context.Context, orgID, name,
 }
 
 func (u *AppointmentUseCase) GetAppointments(ctx context.Context, page, pageSize int, status, from, to string) (*pagination.Result[*domain.Appointment], error) {
-	orgID, err := middlewares.GetOrgID(ctx)
+	orgID, err := shared.RequireOrgID(ctx)
 	if err != nil {
-		return nil, apperror.New(400, "Không tìm thấy organization_id trong context", err)
+		return nil, err
 	}
 
 	status = strings.TrimSpace(status)
@@ -312,9 +312,9 @@ func (u *AppointmentUseCase) GetAppointmentDetail(ctx context.Context, id string
 		return nil, apperror.New(400, "Thiếu id lịch hẹn", nil)
 	}
 
-	orgID, err := middlewares.GetOrgID(ctx)
+	orgID, err := shared.RequireOrgID(ctx)
 	if err != nil {
-		return nil, apperror.New(400, "Không tìm thấy organization_id trong context", err)
+		return nil, err
 	}
 
 	appointment, err := u.repo.GetAppointmentByID(ctx, orgID, id)
@@ -341,9 +341,9 @@ func (u *AppointmentUseCase) RescheduleAppointment(ctx context.Context, id, star
 		return nil, apperror.New(400, "Thiếu id lịch hẹn", nil)
 	}
 
-	orgID, err := middlewares.GetOrgID(ctx)
+	orgID, err := shared.RequireOrgID(ctx)
 	if err != nil {
-		return nil, apperror.New(400, "Không tìm thấy organization_id trong context", err)
+		return nil, err
 	}
 
 	start, ok := parseAppointmentTime(startTime)
@@ -386,9 +386,9 @@ func (u *AppointmentUseCase) CancelAppointment(ctx context.Context, id, reason s
 		return nil, apperror.New(400, "Thiếu id lịch hẹn", nil)
 	}
 
-	orgID, err := middlewares.GetOrgID(ctx)
+	orgID, err := shared.RequireOrgID(ctx)
 	if err != nil {
-		return nil, apperror.New(400, "Không tìm thấy organization_id trong context", err)
+		return nil, err
 	}
 
 	appointment, err := u.repo.GetAppointmentByID(ctx, orgID, id)
@@ -419,9 +419,9 @@ func (u *AppointmentUseCase) UpdateAppointmentStatus(ctx context.Context, id, st
 		return nil, apperror.New(400, "Thiếu id lịch hẹn", nil)
 	}
 
-	orgID, err := middlewares.GetOrgID(ctx)
+	orgID, err := shared.RequireOrgID(ctx)
 	if err != nil {
-		return nil, apperror.New(400, "Không tìm thấy organization_id trong context", err)
+		return nil, err
 	}
 
 	status = strings.TrimSpace(status)
@@ -456,9 +456,9 @@ func (u *AppointmentUseCase) DeleteAppointment(ctx context.Context, id string) (
 		return "", apperror.New(400, "Thiếu id lịch hẹn", nil)
 	}
 
-	orgID, err := middlewares.GetOrgID(ctx)
+	orgID, err := shared.RequireOrgID(ctx)
 	if err != nil {
-		return "", apperror.New(400, "Không tìm thấy organization_id trong context", err)
+		return "", err
 	}
 
 	appointment, err := u.repo.GetAppointmentByID(ctx, orgID, id)

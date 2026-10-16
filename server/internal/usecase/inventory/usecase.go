@@ -7,7 +7,7 @@ import (
 	"log"
 	"strings"
 
-	"github.com/daidat02/server/internal/delivery/http/middlewares"
+	"github.com/daidat02/server/internal/usecase/shared"
 	domain "github.com/daidat02/server/internal/domain/inventory"
 	orderdomain "github.com/daidat02/server/internal/domain/order"
 	productdomain "github.com/daidat02/server/internal/domain/product"
@@ -29,9 +29,9 @@ func NewInventoryUsecase(repo domain.InventoryRepository, products orderdomain.P
 }
 
 func (u *InventoryUsecase) CreateDocument(ctx context.Context, req *domain.CreateDocumentRequest) (*domain.DocumentResponse, error) {
-	orgID, err := middlewares.GetOrgID(ctx)
+	orgID, err := shared.RequireOrgID(ctx)
 	if err != nil {
-		return nil, apperror.New(400, "Không tìm thấy organization_id trong context", err)
+		return nil, err
 	}
 	if req == nil {
 		return nil, apperror.New(400, "Thiếu thông tin phiếu kho", nil)
@@ -151,9 +151,9 @@ func (u *InventoryUsecase) toBaseItems(ctx context.Context, orgID, docType strin
 }
 
 func (u *InventoryUsecase) GetTransactionsByOrgID(ctx context.Context, productID string, page, pageSize int) (*pagination.Result[*domain.InventoryTransaction], error) {
-	orgID, err := middlewares.GetOrgID(ctx)
+	orgID, err := shared.RequireOrgID(ctx)
 	if err != nil {
-		return nil, apperror.New(400, "Không tìm thấy organization_id trong context", err)
+		return nil, err
 	}
 
 	params := pagination.Normalize(page, pageSize)
@@ -173,9 +173,9 @@ func (u *InventoryUsecase) GetTransactionsByOrgID(ctx context.Context, productID
 }
 
 func (u *InventoryUsecase) GetDocumentsByOrgID(ctx context.Context, search string, sort string, filter string, page, pageSize int) (*pagination.Result[*domain.DocumentResponse], error) {
-	orgID, err := middlewares.GetOrgID(ctx)
+	orgID, err := shared.RequireOrgID(ctx)
 	if err != nil {
-		return nil, apperror.New(400, "Không tìm thấy organization_id trong context", err)
+		return nil, err
 	}
 	params := pagination.Normalize(page, pageSize)
 	inventoryDocs, err := u.repo.GetDocumentsByOrgID(ctx, orgID, search, sort, filter, params.PageSize, params.Offset())
@@ -192,9 +192,9 @@ func (u *InventoryUsecase) GetDocumentsByOrgID(ctx context.Context, search strin
 }
 
 func (u *InventoryUsecase) GetLowStockProducts(ctx context.Context, page, pageSize int) (*pagination.Result[*domain.LowStockItem], error) {
-	orgID, err := middlewares.GetOrgID(ctx)
+	orgID, err := shared.RequireOrgID(ctx)
 	if err != nil {
-		return nil, apperror.New(400, "Không tìm thấy organization_id trong context", err)
+		return nil, err
 	}
 
 	params := pagination.Normalize(page, pageSize)
@@ -213,9 +213,9 @@ func (u *InventoryUsecase) GetLowStockProducts(ctx context.Context, page, pageSi
 }
 
 func (u *InventoryUsecase) GetDocumentByID(ctx context.Context, documentID string) (*domain.DocumentDetailResponse, error) {
-	orgID, err := middlewares.GetOrgID(ctx)
+	orgID, err := shared.RequireOrgID(ctx)
 	if err != nil {
-		return nil, apperror.New(400, "Không tìm thấy organization_id trong context", err)
+		return nil, err
 	}
 	
 	document, err := u.repo.GetDocumentByID(ctx, orgID, documentID)
@@ -230,9 +230,9 @@ func (u *InventoryUsecase) GetDocumentByID(ctx context.Context, documentID strin
 }
 
 func (u *InventoryUsecase) GetTransactionsByProductID(ctx context.Context, productID string, page, pageSize int, sort, inventory_type, date string) (*pagination.Result[*domain.InventoryTransactionResponse], error) {
-	orgID, err := middlewares.GetOrgID(ctx)
+	orgID, err := shared.RequireOrgID(ctx)
 	if err != nil {
-		return nil, apperror.New(400, "Không tìm thấy organization_id trong context", err)
+		return nil, err
 	}
 	
 	params := pagination.Normalize(page, pageSize)

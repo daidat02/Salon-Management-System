@@ -11,6 +11,7 @@ import (
 	customerdomain "github.com/daidat02/server/internal/domain/customer"
 	domain "github.com/daidat02/server/internal/domain/order"
 	productdomain "github.com/daidat02/server/internal/domain/product"
+	"github.com/daidat02/server/internal/usecase/shared"
 	"github.com/daidat02/server/pkg/apperror"
 	"github.com/daidat02/server/pkg/pagination"
 	"github.com/daidat02/server/pkg/utils"
@@ -61,7 +62,7 @@ func isUniqueViolation(err error) bool {
 // server tự tra giá + snapshot vật tư, giữ chỗ kho trong 1 tx.
 // Đơn tổng 0đ thì paid luôn, ngược lại pending_payment.
 func (u *OrderUsecase) CreateOrder(ctx context.Context, req *domain.CreateOrderRequest) (*domain.OrderResponse, error) {
-	orgID, err := requireOrgID(ctx)
+	orgID, err := shared.RequireOrgID(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -340,7 +341,7 @@ func (u *OrderUsecase) findOrCreateCustomer(ctx context.Context, orgID, fullName
 
 // GetOrdersByOrgID lấy danh sách đơn phân trang (lọc status tùy chọn).
 func (u *OrderUsecase) GetOrdersByOrgID(ctx context.Context, page, pageSize int, status string) (*pagination.Result[*domain.OrderResponse], error) {
-	orgID, err := requireOrgID(ctx)
+	orgID, err := shared.RequireOrgID(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -368,7 +369,7 @@ func (u *OrderUsecase) GetOrdersByOrgID(ctx context.Context, page, pageSize int,
 // chờ thanh toán, hủy/hoàn. % so hôm qua và % hủy/hoàn tính ở đây
 // (chia cho 0 thì trả 0).
 func (u *OrderUsecase) GetOrderStats(ctx context.Context) (*domain.OrderStatsResponse, error) {
-	orgID, err := requireOrgID(ctx)
+	orgID, err := shared.RequireOrgID(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -391,12 +392,12 @@ func (u *OrderUsecase) GetOrderStats(ctx context.Context) (*domain.OrderStatsRes
 
 // GetOrderDetail lấy chi tiết đơn: header + dòng hàng (kèm NV) + vật tư + thanh toán.
 func (u *OrderUsecase) GetOrderDetail(ctx context.Context, id string) (*domain.OrderDetailResponse, error) {
-	id, err := requireID(id, "Thiếu id đơn hàng")
+	id, err := shared.RequireID(id, "Thiếu id đơn hàng")
 	if err != nil {
 		return nil, err
 	}
 
-	orgID, err := requireOrgID(ctx)
+	orgID, err := shared.RequireOrgID(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -496,12 +497,12 @@ func (u *OrderUsecase) completeWithSlip(ctx context.Context, orgID string, order
 // CompleteOrder chốt tay đơn pending/confirm/delivery: trừ kho thật +
 // nhả giữ chỗ + ghi sổ sale + sinh phiếu bán hàng. Tồn không đủ thì 400.
 func (u *OrderUsecase) CompleteOrder(ctx context.Context, id string) (*domain.OrderCompleteResponse, error) {
-	id, err := requireID(id, "Thiếu id đơn hàng")
+	id, err := shared.RequireID(id, "Thiếu id đơn hàng")
 	if err != nil {
 		return nil, err
 	}
 
-	orgID, err := requireOrgID(ctx)
+	orgID, err := shared.RequireOrgID(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -535,7 +536,7 @@ func (u *OrderUsecase) RefundOrder(ctx context.Context, id string) (*domain.Orde
 // (draft/pending_payment/paid). Nhận customer_id có sẵn hoặc new_customer
 // (tìm theo SĐT, chưa có thì tạo mới — cùng luật với lúc tạo đơn).
 func (u *OrderUsecase) UpdateOrderCustomer(ctx context.Context, id string, req *domain.UpdateOrderCustomerRequest) (*domain.OrderResponse, error) {
-	id, err := requireID(id, "Thiếu id đơn hàng")
+	id, err := shared.RequireID(id, "Thiếu id đơn hàng")
 	if err != nil {
 		return nil, err
 	}
@@ -543,7 +544,7 @@ func (u *OrderUsecase) UpdateOrderCustomer(ctx context.Context, id string, req *
 		return nil, apperror.New(400, "Thiếu thông tin khách hàng", nil)
 	}
 
-	orgID, err := requireOrgID(ctx)
+	orgID, err := shared.RequireOrgID(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -594,7 +595,7 @@ func (u *OrderUsecase) UpdateOrderCustomer(ctx context.Context, id string, req *
 // (giữ chỉnh tay, không regenerate từ định mức).
 // Tổng mới phải chịu được discount và số đã thu, không thì 400.
 func (u *OrderUsecase) UpdateOrderItemQty(ctx context.Context, orderID, itemID string, req *domain.UpdateOrderItemQtyRequest) (*domain.OrderItemResponse, error) {
-	itemID, err := requireID(itemID, "Thiếu id dòng đơn hàng")
+	itemID, err := shared.RequireID(itemID, "Thiếu id dòng đơn hàng")
 	if err != nil {
 		return nil, err
 	}
@@ -719,7 +720,7 @@ func (u *OrderUsecase) UpdateOrderItemQty(ctx context.Context, orderID, itemID s
 // của dòng, nhả giữ chỗ kho, chốt tổng mới. Cấm xóa dòng cuối cùng —
 // muốn bỏ cả đơn thì dùng Hủy đơn.
 func (u *OrderUsecase) DeleteOrderItem(ctx context.Context, orderID, itemID string) (string, error) {
-	itemID, err := requireID(itemID, "Thiếu id dòng đơn hàng")
+	itemID, err := shared.RequireID(itemID, "Thiếu id dòng đơn hàng")
 	if err != nil {
 		return "", err
 	}
@@ -809,12 +810,12 @@ func (u *OrderUsecase) DeleteOrderItem(ctx context.Context, orderID, itemID stri
 // xử lý từ snapshot live, rồi giao repo ApplyCancel (1 tx).
 // Refund (đã trừ thật) thì hoàn tồn; cancel (mới giữ chỗ) thì chỉ nhả giữ chỗ.
 func (u *OrderUsecase) closeOrder(ctx context.Context, id, newStatus string, allowed []string, denyMsg string) (*domain.OrderResponse, error) {
-	id, err := requireID(id, "Thiếu id đơn hàng")
+	id, err := shared.RequireID(id, "Thiếu id đơn hàng")
 	if err != nil {
 		return nil, err
 	}
 
-	orgID, err := requireOrgID(ctx)
+	orgID, err := shared.RequireOrgID(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -880,12 +881,12 @@ func (u *OrderUsecase) closeOrder(ctx context.Context, id, newStatus string, all
 // CreatePayment ghi nhận thanh toán, idempotent theo cặp provider/txn.
 // Thu đủ tổng thì đơn tự chốt sang completed (trừ kho + phiếu bán hàng).
 func (u *OrderUsecase) CreatePayment(ctx context.Context, orderID string, req *domain.CreatePaymentRequest) (*domain.PaymentResponse, error) {
-	orderID, err := requireID(orderID, "Thiếu id đơn hàng")
+	orderID, err := shared.RequireID(orderID, "Thiếu id đơn hàng")
 	if err != nil {
 		return nil, err
 	}
 
-	orgID, err := requireOrgID(ctx)
+	orgID, err := shared.RequireOrgID(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -971,11 +972,11 @@ func (u *OrderUsecase) CreatePayment(ctx context.Context, orderID string, req *d
 // Tổng share_pct của các dòng percent/profit trong 1 món phải bằng 100.
 // Danh sách rỗng = gỡ hết NV của dòng.
 func (u *OrderUsecase) ReplaceStaffOrderItems(ctx context.Context, orderItemID string, staffItems []*domain.StaffOrderItemInput) ([]*domain.StaffOrderItemResponse, error) {
-	orgID, err := requireOrgID(ctx)
+	orgID, err := shared.RequireOrgID(ctx)
 	if err != nil {
 		return nil, err
 	}
-	orderItemID, err = requireID(orderItemID, "Thiếu id dòng đơn hàng")
+	orderItemID, err = shared.RequireID(orderItemID, "Thiếu id dòng đơn hàng")
 	if err != nil {
 		return nil, err
 	}
@@ -1106,7 +1107,7 @@ func (u *OrderUsecase) ReplaceStaffOrderItems(ctx context.Context, orderItemID s
 // Chỉ ghi log tiêu hao, không động kho.
 // unit_cost_at_time do UI gửi (đã quy đổi theo đơn vị xuất).
 func (u *OrderUsecase) ReplaceOrderMaterials(ctx context.Context, inputs []*domain.OrderMaterialInput) ([]*domain.OrderMaterialResponse, error) {
-	orgID, err := requireOrgID(ctx)
+	orgID, err := shared.RequireOrgID(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -1237,7 +1238,7 @@ func (u *OrderUsecase) ReplaceOrderMaterials(ctx context.Context, inputs []*doma
 // GetPosItemsByOrgID lấy danh mục bán hàng POS (union sản phẩm + dịch vụ).
 // Limit clamp 1..100, còn lại (search/category/cursor) repo tự xử.
 func (u *OrderUsecase) GetPosItemsByOrgID(ctx context.Context, limit int, name, itemType string, id string, search string, categoryFilter string) ([]*domain.PosItemResponse, error) {
-	orgID, err := requireOrgID(ctx)
+	orgID, err := shared.RequireOrgID(ctx)
 	if err != nil {
 		return nil, err
 	}

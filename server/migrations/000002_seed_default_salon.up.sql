@@ -345,3 +345,26 @@ VALUES
   ('bbbbbbbb-bbbb-bbbb-bbbb-000000002016', '11111111-1111-1111-1111-111111111111', 'aaaaaaaa-aaaa-aaaa-aaaa-000000001014', 'service', '66666666-6666-6666-6666-000000006620', NULL, 1, 900000, 900000),
   ('bbbbbbbb-bbbb-bbbb-bbbb-000000002017', '11111111-1111-1111-1111-111111111111', 'aaaaaaaa-aaaa-aaaa-aaaa-000000001015', 'service', '66666666-6666-6666-6666-000000006630', NULL, 1, 80000, 80000)
 ON CONFLICT DO NOTHING;
+
+-- ==========================================
+-- 11. CASH_FLOW_CATEGORIES (6 danh mục hệ thống)
+-- ==========================================
+INSERT INTO cash_flow_categories (id, organization_id, code, name, kind, category_type, is_system, sort_order, is_active)
+VALUES
+  ('55555555-5555-5555-5555-000000005501', '11111111-1111-1111-1111-111111111111', 'SALON_REVENUE', 'Thu dịch vụ salon', 'income', 'revenue', true, 1, true),
+  ('55555555-5555-5555-5555-000000005502', '11111111-1111-1111-1111-111111111111', 'RETAIL_COSMETICS', 'Thu bán lẻ mỹ phẩm', 'income', 'revenue', true, 2, true),
+  ('55555555-5555-5555-5555-000000005503', '11111111-1111-1111-1111-111111111111', 'SALARY_ADVANCE', 'Chi lương & ứng thợ', 'expense', 'operating_expense', true, 3, true),
+  ('55555555-5555-5555-5555-000000005504', '11111111-1111-1111-1111-111111111111', 'GOODS_IMPORT', 'Nhập hàng & mỹ phẩm', 'expense', 'operating_expense', true, 4, true),
+  ('55555555-5555-5555-5555-000000005505', '11111111-1111-1111-1111-111111111111', 'RENT_UTILITIES', 'Mặt bằng & vận hành', 'expense', 'operating_expense', true, 5, true),
+  ('55555555-5555-5555-5555-000000005506', '11111111-1111-1111-1111-111111111111', 'MARKETING_OTHER', 'Marketing & Khuyến mãi', 'expense', 'operating_expense', true, 6, true)
+ON CONFLICT DO NOTHING;
+
+-- ==========================================
+-- 12. FUNDS (2 quỹ: tiền mặt tại quầy + Vietcombank)
+-- Số dư đầu kỳ bám mock dashboard cashflow (TM 18.5M | VCB 33.5M).
+-- ==========================================
+INSERT INTO funds (id, organization_id, code, name, fund_type, bank_name, account_number, opening_balance, is_active)
+VALUES
+  ('99999999-9999-9999-9999-000000009901', '11111111-1111-1111-1111-111111111111', 'CASH', 'Tiền mặt tại quầy', 'cash', NULL, NULL, 18500000, true),
+  ('99999999-9999-9999-9999-000000009902', '11111111-1111-1111-1111-111111111111', 'VCB', 'Vietcombank', 'bank', 'Vietcombank', NULL, 33500000, true)
+ON CONFLICT DO NOTHING;

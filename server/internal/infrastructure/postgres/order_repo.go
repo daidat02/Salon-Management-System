@@ -724,8 +724,9 @@ func (r *PostgresOrderRepository) CompleteOrderWithSlip(ctx context.Context, org
 	sort.Strings(pids)
 
 	var orderCode string
-	if err := tx.QueryRow(ctx, `SELECT code FROM orders WHERE organization_id = $1 AND id = $2`, orgID, orderID).Scan(&orderCode); err != nil {
-		return empty, fmt.Errorf("lỗi khi đọc mã đơn hàng: %w", err)
+	var orderTotal float64
+	if err := tx.QueryRow(ctx, `SELECT code, total_amount FROM orders WHERE organization_id = $1 AND id = $2`, orgID, orderID).Scan(&orderCode, &orderTotal); err != nil {
+		return empty, fmt.Errorf("lỗi khi đọc đơn hàng: %w", err)
 	}
 
 	docID := utils.NewID()
@@ -766,6 +767,15 @@ func (r *PostgresOrderRepository) CompleteOrderWithSlip(ctx context.Context, org
 	}
 	if err := insertDocumentItemsCopy(ctx, tx, docID, items, products); err != nil {
 		return empty, err
+	}
+
+	// Sinh phiếu thu tiền mặt cho đơn (hard-code quỹ CASH phase 1):
+	// cùng tx với chốt đơn nên đơn chốt ↔ tiền vào quỹ cùng sống/chết.
+	// Đơn 0đ không có dòng tiền thật thì bỏ qua.
+	if orderTotal > 0 {
+		if err := insertOrderIncomeVoucherTx(ctx, tx, orgID, orderID, orderCode, orderTotal); err != nil {
+			return empty, err
+		}
 	}
 
 	if err := tx.Commit(ctx); err != nil {

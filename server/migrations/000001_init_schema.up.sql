@@ -457,6 +457,108 @@ CREATE TABLE notifications (
 );
 
 -- ==========================================
+-- 17. FUNDS (Nguồn tiền / quỹ: két tiền mặt, TK ngân hàng, ví điện tử)
+-- Số dư quỹ KHÔNG sửa trực tiếp — chỉ biến động qua cash_flows đã duyệt.
+-- ==========================================
+CREATE TABLE funds (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    code VARCHAR(30) NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    fund_type VARCHAR(20) NOT NULL CHECK (fund_type IN ('cash', 'bank', 'e_wallet')),
+    bank_name VARCHAR(100),
+    account_number VARCHAR(50),
+    opening_balance NUMERIC(14,2) NOT NULL DEFAULT 0 CHECK (opening_balance >= 0),
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (organization_id, code)
+);
+CREATE TRIGGER trg_funds_updated_at
+    BEFORE UPDATE ON funds
+    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- ==========================================
+-- 18. CASH_FLOW_CATEGORIES (Danh mục thu/chi)
+-- ==========================================
+CREATE TABLE cash_flow_categories (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    code VARCHAR(30) NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    kind VARCHAR(10) NOT NULL CHECK (kind IN ('income', 'expense')),
+    category_type VARCHAR(20) NOT NULL CHECK (category_type IN ('revenue', 'operating_expense', 'non_pnl')),
+    is_system BOOLEAN NOT NULL DEFAULT false,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (organization_id, code)
+);
+CREATE TRIGGER trg_cash_flow_categories_updated_at
+    BEFORE UPDATE ON cash_flow_categories
+    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- ==========================================
+-- 19. CASH_FLOWS (Phiếu thu/chi)
+-- kind='income'  -> phiếu thu (PT-...)
+-- kind='expense' -> phiếu chi  (PC-...)
+-- ==========================================
+CREATE TABLE cash_flows (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    code VARCHAR(30) NOT NULL,
+    kind VARCHAR(10) NOT NULL CHECK (kind IN ('income', 'expense')),
+    category_id UUID REFERENCES cash_flow_categories(id) ON DELETE SET NULL,
+    fund_id UUID NOT NULL REFERENCES funds(id) ON DELETE RESTRICT,
+    amount NUMERIC(14,2) NOT NULL CHECK (amount >= 0),
+    description TEXT,
+    occurred_at TIMESTAMPTZ NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'cancelled')),
+    order_id UUID REFERENCES orders(id) ON DELETE SET NULL,
+    inventory_document_id UUID REFERENCES inventory_documents(id) ON DELETE SET NULL,
+    created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    approved_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    approved_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    deleted_at TIMESTAMPTZ,
+    UNIQUE (organization_id, code)
+);
+CREATE TRIGGER trg_cash_flows_updated_at
+    BEFORE UPDATE ON cash_flows
+    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- ==========================================
+-- 20. PAYROLLS (Bảng lương theo kỳ tháng)
+-- commission_amount: tổng từ order_item_staff.commission_amount trong kỳ.
+-- net_pay do app tính: base + commission + bonus - advance - deduction.
+-- ==========================================
+CREATE TABLE payrolls (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    staff_id UUID NOT NULL REFERENCES staff(id) ON DELETE RESTRICT,
+    period_month DATE NOT NULL,
+    base_salary NUMERIC(14,2) NOT NULL DEFAULT 0 CHECK (base_salary >= 0),
+    commission_amount NUMERIC(14,2) NOT NULL DEFAULT 0 CHECK (commission_amount >= 0),
+    bonus_amount NUMERIC(14,2) NOT NULL DEFAULT 0 CHECK (bonus_amount >= 0),
+    advance_amount NUMERIC(14,2) NOT NULL DEFAULT 0 CHECK (advance_amount >= 0),
+    deduction_amount NUMERIC(14,2) NOT NULL DEFAULT 0 CHECK (deduction_amount >= 0),
+    net_pay NUMERIC(14,2) NOT NULL CHECK (net_pay >= 0),
+    status VARCHAR(20) NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'approved', 'paid', 'cancelled')),
+    cash_flow_id UUID REFERENCES cash_flows(id) ON DELETE SET NULL,
+    paid_at TIMESTAMPTZ,
+    created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    approved_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (organization_id, staff_id, period_month)
+);
+CREATE TRIGGER trg_payrolls_updated_at
+    BEFORE UPDATE ON payrolls
+    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- ==========================================
 -- INDEXES (multi-tenant + FK + nghiệp vụ)
 -- ==========================================
 CREATE INDEX idx_organizations_slug ON organizations(slug);
@@ -522,3 +624,16 @@ CREATE INDEX idx_payments_status ON payments(organization_id, status);
 
 CREATE INDEX idx_notifications_org_id ON notifications(organization_id);
 CREATE INDEX idx_notifications_status ON notifications(organization_id, status) WHERE status = 'queued';
+
+CREATE INDEX idx_cash_flow_categories_org ON cash_flow_categories(organization_id) WHERE is_active;
+
+CREATE INDEX idx_funds_org ON funds(organization_id) WHERE is_active;
+
+CREATE INDEX idx_cash_flows_org_occurred ON cash_flows(organization_id, occurred_at DESC) WHERE deleted_at IS NULL;
+CREATE INDEX idx_cash_flows_org_status ON cash_flows(organization_id, status) WHERE deleted_at IS NULL;
+CREATE INDEX idx_cash_flows_category ON cash_flows(category_id) WHERE deleted_at IS NULL;
+CREATE INDEX idx_cash_flows_fund ON cash_flows(fund_id) WHERE deleted_at IS NULL;
+CREATE INDEX idx_cash_flows_order ON cash_flows(order_id) WHERE order_id IS NOT NULL;
+
+CREATE INDEX idx_payrolls_org_period ON payrolls(organization_id, period_month DESC);
+CREATE INDEX idx_payrolls_staff ON payrolls(staff_id, period_month DESC);

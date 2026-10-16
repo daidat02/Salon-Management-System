@@ -6,7 +6,7 @@ import (
 	"log"
 	"strings"
 
-	"github.com/daidat02/server/internal/delivery/http/middlewares"
+	"github.com/daidat02/server/internal/usecase/shared"
 	domain "github.com/daidat02/server/internal/domain/category"
 	"github.com/daidat02/server/pkg/apperror"
 	"github.com/daidat02/server/pkg/pagination"
@@ -37,9 +37,9 @@ func toResponse(c *domain.Category) *domain.CategoryResponse {
 }
 
 func (u *CategoryUsecase) CreateCategory(ctx context.Context, category *domain.Category) (*domain.CategoryResponse, error) {
-	orgID, err := middlewares.GetOrgID(ctx)
+	orgID, err := shared.RequireOrgID(ctx)
 	if err != nil {
-		return nil, apperror.New(400, "Không tìm thấy organization_id trong context", err)
+		return nil, err
 	}
 
 	if err := category.Validate(); err != nil {
@@ -57,9 +57,9 @@ func (u *CategoryUsecase) CreateCategory(ctx context.Context, category *domain.C
 }
 
 func (u *CategoryUsecase) GetCategoriesByOrgID(ctx context.Context, page, pageSize int) (*pagination.Result[*domain.CategoryResponse], error) {
-	orgID, err := middlewares.GetOrgID(ctx)
+	orgID, err := shared.RequireOrgID(ctx)
 	if err != nil {
-		return nil, apperror.New(400, "Không tìm thấy organization_id trong context", err)
+		return nil, err
 	}
 
 	params := pagination.Normalize(page, pageSize)
@@ -86,9 +86,9 @@ func (u *CategoryUsecase) UpdateCategory(ctx context.Context, id string, categor
 		return nil, apperror.New(400, "Thiếu id danh mục", nil)
 	}
 
-	orgID, err := middlewares.GetOrgID(ctx)
+	orgID, err := shared.RequireOrgID(ctx)
 	if err != nil {
-		return nil, apperror.New(400, "Không tìm thấy organization_id trong context", err)
+		return nil, err
 	}
 
 	if err := category.Validate(); err != nil {
@@ -113,9 +113,9 @@ func (u *CategoryUsecase) DeleteCategory(ctx context.Context, id string) (string
 		return "", apperror.New(400, "Thiếu id danh mục", nil)
 	}
 
-	orgID, err := middlewares.GetOrgID(ctx)
+	orgID, err := shared.RequireOrgID(ctx)
 	if err != nil {
-		return "", apperror.New(400, "Không tìm thấy organization_id trong context", err)
+		return "", err
 	}
 
 	if err := u.repo.DeleteCategory(ctx, orgID, id); err != nil {

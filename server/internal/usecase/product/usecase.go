@@ -6,7 +6,7 @@ import (
 	"log"
 	"strings"
 
-	"github.com/daidat02/server/internal/delivery/http/middlewares"
+	"github.com/daidat02/server/internal/usecase/shared"
 	domain "github.com/daidat02/server/internal/domain/product"
 	"github.com/daidat02/server/pkg/apperror"
 	"github.com/daidat02/server/pkg/pagination"
@@ -53,9 +53,9 @@ func normalizeDefaults(p *domain.Product) {
 }
 
 func (u *ProductUsecase) CreateProduct(ctx context.Context, product *domain.Product) (*domain.ProductResponse, error) {
-	orgID, err := middlewares.GetOrgID(ctx)
+	orgID, err := shared.RequireOrgID(ctx)
 	if err != nil {
-		return nil, apperror.New(400, "Không tìm thấy organization_id trong context", err)
+		return nil, err
 	}
 
 	normalizeDefaults(product)
@@ -78,9 +78,9 @@ func (u *ProductUsecase) CreateProduct(ctx context.Context, product *domain.Prod
 }
 
 func (u *ProductUsecase) GetProductsByOrgID(ctx context.Context, search string, status string, sort string, page, pageSize int) (*pagination.Result[*domain.ProductResponse], error) {
-	orgID, err := middlewares.GetOrgID(ctx)
+	orgID, err := shared.RequireOrgID(ctx)
 	if err != nil {
-		return nil, apperror.New(400, "Không tìm thấy organization_id trong context", err)
+		return nil, err
 	}
 
 	params := pagination.Normalize(page, pageSize)
@@ -109,9 +109,9 @@ func (u *ProductUsecase) UpdateProduct(ctx context.Context, id string, product *
 		return nil, apperror.New(400, "Thiếu id sản phẩm", nil)
 	}
 
-	orgID, err := middlewares.GetOrgID(ctx)
+	orgID, err := shared.RequireOrgID(ctx)
 	if err != nil {
-		return nil, apperror.New(400, "Không tìm thấy organization_id trong context", err)
+		return nil, err
 	}
 
 	normalizeDefaults(product)
@@ -137,9 +137,9 @@ func (u *ProductUsecase) DeleteProduct(ctx context.Context, id string) (string, 
 		return "", apperror.New(400, "Thiếu id sản phẩm", nil)
 	}
 
-	orgID, err := middlewares.GetOrgID(ctx)
+	orgID, err := shared.RequireOrgID(ctx)
 	if err != nil {
-		return "", apperror.New(400, "Không tìm thấy organization_id trong context", err)
+		return "", err
 	}
 
 	if err := u.repo.DeleteProduct(ctx, orgID, id); err != nil {
@@ -155,9 +155,9 @@ func (u *ProductUsecase) DeleteProduct(ctx context.Context, id string) (string, 
 
 // GetProductStats thống kê tổng quan sản phẩm/kho của salon.
 func (u *ProductUsecase) GetProductStats(ctx context.Context) (*domain.ProductStatsResponse, error) {
-	orgID, err := middlewares.GetOrgID(ctx)
+	orgID, err := shared.RequireOrgID(ctx)
 	if err != nil {
-		return nil, apperror.New(400, "Không tìm thấy organization_id trong context", err)
+		return nil, err
 	}
 
 	stats, err := u.repo.GetProductStats(ctx, orgID)

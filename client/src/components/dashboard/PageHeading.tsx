@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import type { MouseEvent } from 'react';
-import { ChevronRight, type LucideIcon } from 'lucide-react';
+import { CalendarDays, ChevronDown, ChevronRight, type LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import PageHeadingBackButton from './PageHeadingBackButton';
@@ -29,6 +29,12 @@ export type PageHeadingBackButton = {
   href?: string;
 };
 
+export type PageHeadingDateRange = {
+  /** Nhãn hiển thị, vd. "Tháng này (01/10 - 31/10/2024)". */
+  label: string;
+  onClick?: (e: MouseEvent) => void;
+};
+
 type PageHeadingProps = {
   breadcrumbs?: PageHeadingBreadcrumb[];
   title: string;
@@ -40,6 +46,8 @@ type PageHeadingProps = {
   /** Tự style (mỗi preview một kiểu text-xs/text-sm khác nhau). */
   description?: React.ReactNode;
   actions?: PageHeadingAction[];
+  /** Nút chọn khoảng ngày hiển thị cạnh cụm actions (vd. Thu Chi: "Tháng này..."). */
+  dateRange?: PageHeadingDateRange;
   /** Hiện nút quay lại phía trên heading. true = mặc định router.back(). */
   backButton?: boolean | PageHeadingBackButton;
 };
@@ -57,6 +65,7 @@ export default function PageHeading({
   badgeVariant = 'container',
   description,
   actions = [],
+  dateRange,
   backButton = false,
 }: PageHeadingProps) {
   const back = typeof backButton === 'object' && backButton !== null ? backButton : undefined;
@@ -123,8 +132,19 @@ export default function PageHeading({
         {description}
       </div>
 
-      {actions.length > 0 && (
+      {(actions.length > 0 || dateRange) && (
         <div className="flex flex-wrap items-center gap-2.5">
+          {dateRange && (
+            <button
+              type="button"
+              onClick={dateRange.onClick}
+              className="inline-flex items-center gap-2 rounded-lg border border-outline bg-surface px-3 py-2 text-xs text-on-surface shadow-sm transition-colors hover:bg-surface-container"
+            >
+              <CalendarDays className="h-4 w-4 text-on-surface-variant" />
+              <span className="font-medium">{dateRange.label}</span>
+              <ChevronDown className="h-3.5 w-3.5 text-on-surface-variant" />
+            </button>
+          )}
           {actions.map((action) => {
             const Icon = action.icon;
             if (action.variant === 'link') {

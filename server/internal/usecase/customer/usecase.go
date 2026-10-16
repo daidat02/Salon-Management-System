@@ -6,7 +6,7 @@ import (
 	"log"
 	"strings"
 
-	"github.com/daidat02/server/internal/delivery/http/middlewares"
+	"github.com/daidat02/server/internal/usecase/shared"
 	appointmentDomain "github.com/daidat02/server/internal/domain/appointment"
 	domain "github.com/daidat02/server/internal/domain/customer"
 	orderDomain "github.com/daidat02/server/internal/domain/order"
@@ -71,9 +71,9 @@ func toResponse(c *domain.Customer) *domain.CustomerResponse {
 }
 
 func (u *CustomerUsecase) CreateCustomer(ctx context.Context, customer *domain.Customer) (*domain.CustomerResponse, error) {
-	orgID, err := middlewares.GetOrgID(ctx)
+	orgID, err := shared.RequireOrgID(ctx)
 	if err != nil {
-		return nil, apperror.New(400, "Không tìm thấy organization_id trong context", err)
+		return nil, err
 	}
 
 	if err := customer.Validate(); err != nil {
@@ -91,9 +91,9 @@ func (u *CustomerUsecase) CreateCustomer(ctx context.Context, customer *domain.C
 }
 
 func (u *CustomerUsecase) GetCustomersByOrgID(ctx context.Context, page, pageSize int, search string) (*pagination.Result[*domain.CustomerResponse], error) {
-	orgID, err := middlewares.GetOrgID(ctx)
+	orgID, err := shared.RequireOrgID(ctx)
 	if err != nil {
-		return nil, apperror.New(400, "Không tìm thấy organization_id trong context", err)
+		return nil, err
 	}
 
 	params := pagination.Normalize(page, pageSize)
@@ -122,9 +122,9 @@ func (u *CustomerUsecase) GetCustomerDetail(ctx context.Context, id string, hist
 		return nil, apperror.New(400, "Thiếu id khách hàng", nil)
 	}
 
-	orgID, err := middlewares.GetOrgID(ctx)
+	orgID, err := shared.RequireOrgID(ctx)
 	if err != nil {
-		return nil, apperror.New(400, "Không tìm thấy organization_id trong context", err)
+		return nil, err
 	}
 
 	customer, err := u.repo.GetCustomerDetailByID(ctx, orgID, id)
@@ -167,9 +167,9 @@ func (u *CustomerUsecase) GetCustomerDetail(ctx context.Context, id string, hist
 }
 
 func (u *CustomerUsecase) GetCustomerByPhoneNumber(ctx context.Context, phone string) (*domain.CustomerResponse, error) {
-	orgID, err := middlewares.GetOrgID(ctx)
+	orgID, err := shared.RequireOrgID(ctx)
 	if err != nil {
-		return nil, apperror.New(400, "Không tìm thấy organization_id trong context", err)
+		return nil, err
 	}
 
 	customer, err := u.repo.GetCustomerByPhone(ctx, orgID, phone)
@@ -189,9 +189,9 @@ func (u *CustomerUsecase) UpdateCustomer(ctx context.Context, id string, custome
 		return nil, apperror.New(400, "Thiếu id khách hàng", nil)
 	}
 
-	orgID, err := middlewares.GetOrgID(ctx)
+	orgID, err := shared.RequireOrgID(ctx)
 	if err != nil {
-		return nil, apperror.New(400, "Không tìm thấy organization_id trong context", err)
+		return nil, err
 	}
 
 	if err := customer.Validate(); err != nil {
@@ -216,9 +216,9 @@ func (u *CustomerUsecase) DeleteCustomer(ctx context.Context, id string) (string
 		return "", apperror.New(400, "Thiếu id khách hàng", nil)
 	}
 
-	orgID, err := middlewares.GetOrgID(ctx)
+	orgID, err := shared.RequireOrgID(ctx)
 	if err != nil {
-		return "", apperror.New(400, "Không tìm thấy organization_id trong context", err)
+		return "", err
 	}
 
 	if err := u.repo.DeleteCustomer(ctx, orgID, id); err != nil {
@@ -234,9 +234,9 @@ func (u *CustomerUsecase) DeleteCustomer(ctx context.Context, id string) (string
 
 // GetCustomerStats thống kê tổng quan tệp khách của salon.
 func (u *CustomerUsecase) GetCustomerStats(ctx context.Context) (*domain.CustomerStatsResponse, error) {
-	orgID, err := middlewares.GetOrgID(ctx)
+	orgID, err := shared.RequireOrgID(ctx)
 	if err != nil {
-		return nil, apperror.New(400, "Không tìm thấy organization_id trong context", err)
+		return nil, err
 	}
 
 	stats, err := u.repo.GetCustomerStats(ctx, orgID)

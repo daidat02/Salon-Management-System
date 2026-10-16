@@ -6,7 +6,7 @@ import (
 	"log"
 	"strings"
 
-	"github.com/daidat02/server/internal/delivery/http/middlewares"
+	"github.com/daidat02/server/internal/usecase/shared"
 	domain "github.com/daidat02/server/internal/domain/staff"
 	"github.com/daidat02/server/pkg/apperror"
 	"github.com/daidat02/server/pkg/pagination"
@@ -43,9 +43,9 @@ func toResponse(s *domain.Staff) *domain.StaffResponse {
 
 func (u *StaffUsecase) CreateStaff(ctx context.Context, staff *domain.Staff) (*domain.StaffResponse, error) {
 
-	orgID, err := middlewares.GetOrgID(ctx)
+	orgID, err := shared.RequireOrgID(ctx)
 	if err != nil {
-		return nil, apperror.New(400, "Không tìm thấy organization_id trong context", err)
+		return nil, err
 	} 
 
 	if err :=staff.Validate(); err != nil {
@@ -60,7 +60,7 @@ func (u *StaffUsecase) CreateStaff(ctx context.Context, staff *domain.Staff) (*d
 		log.Println("Error creating staff:", err)
 		// Thiếu org_id -> 400, còn lại -> 500. Mỗi nhánh chỉ New 1 lần.
 		if errors.Is(err, domain.ErrMissingOrganizationID) {
-			return nil, apperror.New(400, "Không tìm thấy organization_id trong context", err)
+			return nil, err
 		}
 		return nil, apperror.New(500, "Lỗi khi tạo nhân viên", err)
 	}
@@ -70,9 +70,9 @@ func (u *StaffUsecase) CreateStaff(ctx context.Context, staff *domain.Staff) (*d
 
 
 func (u *StaffUsecase) GetStaffByOrgID(ctx context.Context, search string, status string, sort string, page, pageSize int) (*pagination.Result[*domain.StaffResponse], error) {
-	orgID, err := middlewares.GetOrgID(ctx)
+	orgID, err := shared.RequireOrgID(ctx)
 	if err != nil {
-		return nil, apperror.New(400, "Không tìm thấy organization_id trong context", err)
+		return nil, err
 	}
 
 	params := pagination.Normalize(page, pageSize)
@@ -101,9 +101,9 @@ func (u *StaffUsecase) UpdateStaff(ctx context.Context, id string, staff *domain
 		return nil, apperror.New(400, "Thiếu id nhân viên", nil)
 	}
 
-	orgID, err := middlewares.GetOrgID(ctx)
+	orgID, err := shared.RequireOrgID(ctx)
 	if err != nil {
-		return nil, apperror.New(400, "Không tìm thấy organization_id trong context", err)
+		return nil, err
 	}
 
 	if err := staff.Validate(); err != nil {
@@ -128,9 +128,9 @@ func (u *StaffUsecase) DeleteStaff(ctx context.Context, id string) (string, erro
 		return "", apperror.New(400, "Thiếu id nhân viên", nil)
 	}
 
-	orgID, err := middlewares.GetOrgID(ctx)
+	orgID, err := shared.RequireOrgID(ctx)
 	if err != nil {
-		return "", apperror.New(400, "Không tìm thấy organization_id trong context", err)
+		return "", err
 	}
 
 	if err := u.userRepo.DeleteStaff(ctx, orgID, id); err != nil {

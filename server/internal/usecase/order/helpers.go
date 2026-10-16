@@ -7,32 +7,14 @@ import (
 	"math"
 	"strings"
 
-	"github.com/daidat02/server/internal/delivery/http/middlewares"
 	domain "github.com/daidat02/server/internal/domain/order"
 	productdomain "github.com/daidat02/server/internal/domain/product"
+	"github.com/daidat02/server/internal/usecase/shared"
 	"github.com/daidat02/server/pkg/apperror"
 	"github.com/daidat02/server/pkg/utils"
 )
 
-// ---------- Guard dùng chung ----------
-
-// requireOrgID lấy organization_id từ context, thiếu thì 400.
-func requireOrgID(ctx context.Context) (string, error) {
-	orgID, err := middlewares.GetOrgID(ctx)
-	if err != nil {
-		return "", apperror.New(400, "Không tìm thấy organization_id trong context", err)
-	}
-	return orgID, nil
-}
-
-// requireID trim id, rỗng thì 400 với message của caller.
-func requireID(id, msg string) (string, error) {
-	id = strings.TrimSpace(id)
-	if id == "" {
-		return "", apperror.New(400, msg, nil)
-	}
-	return id, nil
-}
+// ---------- Guard đặc thù đơn hàng ----------
 
 // requireOrderStatus đảm bảo đơn đang ở một trong các trạng thái cho phép.
 func requireOrderStatus(order *domain.Order, allowed []string, denyMsg string) error {
@@ -48,11 +30,11 @@ func requireOrderStatus(order *domain.Order, allowed []string, denyMsg string) e
 // Sửa items chỉ cho pending/confirm (chặt hơn chốt/hủy cho phép delivery,
 // vì hàng đã ra khỏi kho thì không đổi dòng nữa).
 func (u *OrderUsecase) withEditableOrder(ctx context.Context, orderID string) (order *domain.Order, orgID string, err error) {
-	orderID, err = requireID(orderID, "Thiếu id đơn hàng")
+	orderID, err = shared.RequireID(orderID, "Thiếu id đơn hàng")
 	if err != nil {
 		return nil, "", err
 	}
-	orgID, err = requireOrgID(ctx)
+	orgID, err = shared.RequireOrgID(ctx)
 	if err != nil {
 		return nil, "", err
 	}
