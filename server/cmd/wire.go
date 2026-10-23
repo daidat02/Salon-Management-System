@@ -8,6 +8,7 @@ import (
 	config "github.com/daidat02/server/configs"
 	_ "github.com/daidat02/server/docs"
 	appointmenthttp "github.com/daidat02/server/internal/delivery/http/appointment"
+	cashflowhttp "github.com/daidat02/server/internal/delivery/http/cashflow"
 	categoryhttp "github.com/daidat02/server/internal/delivery/http/category"
 	customerhttp "github.com/daidat02/server/internal/delivery/http/customer"
 	inventoryhttp "github.com/daidat02/server/internal/delivery/http/inventory"
@@ -71,5 +72,7 @@ func NewRouter(cfg *config.Config, dbPool *pgxpool.Pool) *gin.Engine {
 	orderDeps := orderhttp.NewDependencies(dbPool)
 	orderhttp.RegisterOrderRoutes(r, orderDeps.Handler, basePath)
 
+	cashflowDeps := cashflowhttp.NewDependencies(dbPool)
+	cashflowhttp.RegisterCashFlowRoutes(r, cashflowDeps.Handler, basePath)
 	return r
 }

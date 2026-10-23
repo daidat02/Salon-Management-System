@@ -5,7 +5,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -97,6 +96,7 @@ export function DashDialogFooter({
   confirmText = 'Lưu khách hàng',
   confirmDisabled,
   isLoading,
+  loadingText = 'Đang lưu...',
 }: {
   onCancel: () => void;
   onConfirm: () => void;
@@ -104,6 +104,7 @@ export function DashDialogFooter({
   confirmText?: string;
   confirmDisabled?: boolean;
   isLoading?: boolean;
+  loadingText?: string;
 }) {
   return (
     <>
@@ -119,7 +120,7 @@ export function DashDialogFooter({
         disabled={confirmDisabled || isLoading}
         className="bg-primary hover:bg-[#436b95] text-on-primary px-5 py-2 text-xs font-semibold shadow-sm"
       >
-        {isLoading ? 'Đang lưu...' : confirmText}
+        {isLoading ? loadingText : confirmText}
       </Button>
     </>
   );

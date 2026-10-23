@@ -4,11 +4,7 @@ import { Provider } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
 import { makePersistor, makeStore } from '@/store/store';
 
-export default function StoreProvider({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function StoreProvider({ children }: { children: React.ReactNode }) {
   // Lazy initializer chạy đúng 1 lần — tạo store + persistor đi kèm.
   const [{ store, persistor }] = useState(() => {
     const store = makeStore();

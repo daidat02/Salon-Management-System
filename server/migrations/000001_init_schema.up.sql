@@ -469,7 +469,12 @@ CREATE TABLE funds (
     bank_name VARCHAR(100),
     account_number VARCHAR(50),
     opening_balance NUMERIC(14,2) NOT NULL DEFAULT 0 CHECK (opening_balance >= 0),
+    -- Số dư lưu trữ (stored balance): lock dòng + cập nhật nguyên tử trong tx
+    -- khi ghi cash_flows (chống race khi 2 thu ngân chốt đơn cùng lúc).
+    current_balance NUMERIC(14,2) NOT NULL DEFAULT 0 CHECK (current_balance >= 0),
     is_active BOOLEAN NOT NULL DEFAULT true,
+    is_default BOOLEAN NOT NULL DEFAULT false,
+    is_configured BOOLEAN NOT NULL DEFAULT false,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE (organization_id, code)
@@ -628,6 +633,7 @@ CREATE INDEX idx_notifications_status ON notifications(organization_id, status) 
 CREATE INDEX idx_cash_flow_categories_org ON cash_flow_categories(organization_id) WHERE is_active;
 
 CREATE INDEX idx_funds_org ON funds(organization_id) WHERE is_active;
+CREATE UNIQUE INDEX idx_funds_one_default ON funds(organization_id) WHERE is_default;
 
 CREATE INDEX idx_cash_flows_org_occurred ON cash_flows(organization_id, occurred_at DESC) WHERE deleted_at IS NULL;
 CREATE INDEX idx_cash_flows_org_status ON cash_flows(organization_id, status) WHERE deleted_at IS NULL;

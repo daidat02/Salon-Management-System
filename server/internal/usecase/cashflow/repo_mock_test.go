@@ -25,12 +25,12 @@ func (m *MockCashFlowRepository) GetCashFlowByID(ctx context.Context, orgID, id 
 	return args.Get(0).(*domain.CashFlow), args.Error(1)
 }
 
-func (m *MockCashFlowRepository) ListCashFlows(ctx context.Context, orgID string, q domain.ListCashFlowsQuery) ([]*domain.CashFlow, int64, error) {
+func (m *MockCashFlowRepository) GetCashFlowByOrgID(ctx context.Context, orgID string, q domain.ListCashFlowsQuery) ([]*domain.CashFlowResponse, int64, error) {
 	args := m.Called(ctx, orgID, q)
 	if args.Get(0) == nil {
 		return nil, 0, args.Error(2)
 	}
-	return args.Get(0).([]*domain.CashFlow), args.Get(1).(int64), args.Error(2)
+	return args.Get(0).([]*domain.CashFlowResponse), args.Get(1).(int64), args.Error(2)
 }
 
 func (m *MockCashFlowRepository) ApproveCashFlow(ctx context.Context, orgID, id, approvedBy string) error {
@@ -41,6 +41,14 @@ func (m *MockCashFlowRepository) ApproveCashFlow(ctx context.Context, orgID, id,
 func (m *MockCashFlowRepository) CancelCashFlow(ctx context.Context, orgID, id string) error {
 	args := m.Called(ctx, orgID, id)
 	return args.Error(0)
+}
+
+func (m *MockCashFlowRepository) GetCashFlowStats(ctx context.Context, orgID, dateFrom, dateTo string) (*domain.CashFlowStats, error) {
+	args := m.Called(ctx, orgID, dateFrom, dateTo)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*domain.CashFlowStats), args.Error(1)
 }
 
 // MockFundRepository giả lập lại interface FundRepository.
@@ -82,6 +90,22 @@ func (m *MockFundRepository) UpdateFund(ctx context.Context, fund *domain.Fund) 
 func (m *MockFundRepository) DeactivateFund(ctx context.Context, orgID, id string) error {
 	args := m.Called(ctx, orgID, id)
 	return args.Error(0)
+}
+
+func (m *MockFundRepository) GetFundStats(ctx context.Context, orgID string) ([]*domain.FundStats, error) {
+	args := m.Called(ctx, orgID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*domain.FundStats), args.Error(1)
+}
+
+func (m *MockFundRepository) GetFundMovementHistory(ctx context.Context, orgID string) ([]*domain.CashFlowResponse, error) {
+	args := m.Called(ctx, orgID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*domain.CashFlowResponse), args.Error(1)
 }
 
 // MockCashFlowCategoryRepository giả lập lại interface CashFlowCategoryRepository.

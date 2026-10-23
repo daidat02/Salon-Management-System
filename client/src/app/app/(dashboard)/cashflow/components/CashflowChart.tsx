@@ -1,5 +1,6 @@
 'use client';
 
+import * as React from 'react';
 import { MoreVertical } from 'lucide-react';
 import {
   Area,
@@ -11,9 +12,15 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { CASHFLOW_DAY_POINTS } from './cashflowData';
+import useCashflowChartData, {
+  createCashflowChartPlaceholder,
+} from '@/hooks/use-cashflow-chart-data';
 
 type ChartTooltipEntry = { dataKey?: string; value?: number | string };
+
+function formatMillions(value: number): string {
+  return `${(value / 1_000_000).toFixed(1)}M`;
+}
 
 function ChartTooltip({
   active,
@@ -37,6 +44,12 @@ function ChartTooltip({
 }
 
 export default function CashflowChart() {
+  const { data, isLoading } = useCashflowChartData();
+  const placeholder = React.useMemo(() => createCashflowChartPlaceholder(), []);
+  const points = data?.points ?? placeholder;
+  const totalIncome = data?.totalIncome ?? 0;
+  const totalExpense = data?.totalExpense ?? 0;
+
   return (
     <div className="flex flex-col justify-between rounded-xl border border-outline bg-surface p-6 shadow-sm lg:col-span-2">
       <div className="mb-4 flex items-center justify-between">
@@ -49,11 +62,15 @@ export default function CashflowChart() {
         <div className="flex items-center gap-4 text-xs font-medium">
           <div className="flex items-center gap-1.5">
             <span className="h-2.5 w-2.5 rounded-full bg-success" />
-            <span className="text-on-surface-variant">Thu (+45.2M)</span>
+            <span className="text-on-surface-variant">
+              Thu ({isLoading ? '...' : `+${formatMillions(totalIncome)}`})
+            </span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="h-2.5 w-2.5 rounded-full bg-error" />
-            <span className="text-on-surface-variant">Chi (-28.5M)</span>
+            <span className="text-on-surface-variant">
+              Chi ({isLoading ? '...' : `-${formatMillions(totalExpense)}`})
+            </span>
           </div>
           <button
             type="button"
@@ -67,7 +84,7 @@ export default function CashflowChart() {
 
       <div className="h-48 w-full">
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={CASHFLOW_DAY_POINTS} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
+          <ComposedChart data={points} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
             <defs>
               <linearGradient id="cashflowThu" x1="0" x2="0" y1="0" y2="1">
                 <stop offset="0%" stopColor="#10B981" stopOpacity={0.22} />
@@ -79,9 +96,23 @@ export default function CashflowChart() {
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="5 5" stroke="#e2e8f0" vertical={false} opacity={0.7} />
-            <XAxis dataKey="day" tick={{ fontSize: 11 }} tickLine={false} axisLine={{ stroke: '#e2e8f0' }} interval={0} />
-            <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} tickFormatter={(v: number) => `${v}M`} />
-            <Tooltip content={<ChartTooltip />} cursor={{ stroke: '#cbd5e1', strokeDasharray: '4 4' }} />
+            <XAxis
+              dataKey="day"
+              tick={{ fontSize: 11 }}
+              tickLine={false}
+              axisLine={{ stroke: '#e2e8f0' }}
+              interval={0}
+            />
+            <YAxis
+              tick={{ fontSize: 11 }}
+              tickLine={false}
+              axisLine={false}
+              tickFormatter={(value: number) => `${value}M`}
+            />
+            <Tooltip
+              content={<ChartTooltip />}
+              cursor={{ stroke: '#cbd5e1', strokeDasharray: '4 4' }}
+            />
             <Area type="monotone" dataKey="thu" fill="url(#cashflowThu)" stroke="none" />
             <Area type="monotone" dataKey="chi" fill="url(#cashflowChi)" stroke="none" />
             <Line
@@ -105,9 +136,12 @@ export default function CashflowChart() {
       </div>
 
       <div className="flex items-center justify-between border-t border-outline pt-3 text-[11px] font-medium text-on-surface-variant">
-        {CASHFLOW_DAY_POINTS.map((d, i) => (
-          <span key={d.day} className={i === CASHFLOW_DAY_POINTS.length - 1 ? 'font-bold text-primary' : undefined}>
-            {d.day}
+        {points.map((point, index) => (
+          <span
+            key={point.day}
+            className={index === points.length - 1 ? 'font-bold text-primary' : undefined}
+          >
+            {point.day}
           </span>
         ))}
       </div>

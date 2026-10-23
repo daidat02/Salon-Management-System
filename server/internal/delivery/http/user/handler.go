@@ -101,6 +101,14 @@ func (h *UserHandler) Login(c *gin.Context){
 }
 
 
+// RefreshToken godoc
+// @Summary      Làm mới access token
+// @Tags         Auth
+// @Produce      json
+// @Success      200   {object}  response.SuccessResponse  "Làm mới token thành công (kèm access_token mới)"
+// @Failure      400   {object}  response.ErrorResponse    "Thiếu cookie refresh_token"
+// @Failure      401   {object}  response.ErrorResponse    "Refresh token không hợp lệ hoặc hết hạn"
+// @Router       /refresh-token [post]
 func (h *UserHandler) RefreshToken(c *gin.Context){
 	refreshToken, err := c.Cookie("refresh_token")	
 	if err != nil {

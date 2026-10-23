@@ -48,6 +48,18 @@ export const API_ENDPOINTS = {
     GET_APPOINTMENT_DETAIL: (id: string) => `${API_BASE}/appointments/${id}`,
   },
 
+  CASHFLOWS: {
+    GET_LIST: `${API_BASE}/cashflows`,
+    CREATE: `${API_BASE}/cashflows`,
+    APPROVE: (cashflowId: string) => `${API_BASE}/cashflows/${cashflowId}/approve`,
+    GET_STATS: `${API_BASE}/cashflows/stats`,
+    GET_CATEGORIES: `${API_BASE}/cashflow-categories`,
+    GET_FUNDS: `${API_BASE}/funds`,
+    CREATE_FUND: `${API_BASE}/funds`,
+    UPDATE_FUND: (fundId: string) => `${API_BASE}/funds/${fundId}`,
+    GET_FUND_HISTORY: `${API_BASE}/funds/history`,
+  },
+
   ORDERS: {
     GET_ORDERS: `${API_BASE}/orders`,
     GET_ORDER_STATS: `${API_BASE}/orders/stats`,

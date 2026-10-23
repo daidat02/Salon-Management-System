@@ -351,20 +351,31 @@ ON CONFLICT DO NOTHING;
 -- ==========================================
 INSERT INTO cash_flow_categories (id, organization_id, code, name, kind, category_type, is_system, sort_order, is_active)
 VALUES
-  ('55555555-5555-5555-5555-000000005501', '11111111-1111-1111-1111-111111111111', 'SALON_REVENUE', 'Thu dịch vụ salon', 'income', 'revenue', true, 1, true),
-  ('55555555-5555-5555-5555-000000005502', '11111111-1111-1111-1111-111111111111', 'RETAIL_COSMETICS', 'Thu bán lẻ mỹ phẩm', 'income', 'revenue', true, 2, true),
-  ('55555555-5555-5555-5555-000000005503', '11111111-1111-1111-1111-111111111111', 'SALARY_ADVANCE', 'Chi lương & ứng thợ', 'expense', 'operating_expense', true, 3, true),
-  ('55555555-5555-5555-5555-000000005504', '11111111-1111-1111-1111-111111111111', 'GOODS_IMPORT', 'Nhập hàng & mỹ phẩm', 'expense', 'operating_expense', true, 4, true),
-  ('55555555-5555-5555-5555-000000005505', '11111111-1111-1111-1111-111111111111', 'RENT_UTILITIES', 'Mặt bằng & vận hành', 'expense', 'operating_expense', true, 5, true),
-  ('55555555-5555-5555-5555-000000005506', '11111111-1111-1111-1111-111111111111', 'MARKETING_OTHER', 'Marketing & Khuyến mãi', 'expense', 'operating_expense', true, 6, true)
-ON CONFLICT DO NOTHING;
+  -- Nhóm Doanh thu chính & Doanh thu khác (revenue)
+  ('55555555-5555-5555-5555-000000005501', '11111111-1111-1111-1111-111111111111', 'SERVICE_REVENUE', 'Thu dịch vụ chính', 'income', 'revenue', true, 1, true),
+  ('55555555-5555-5555-5555-000000005502', '11111111-1111-1111-1111-111111111102', 'RETAIL_REVENUE', 'Thu bán lẻ sản phẩm', 'income', 'revenue', true, 2, true),
+  ('55555555-5555-5555-5555-000000005510', '11111111-1111-1111-1111-111111111111', 'OTHER_REVENUE', 'Thu nhập khác', 'income', 'revenue', true, 3, true),
+
+  -- Nhóm Chi phí vận hành để tính P&L (operating_expense)
+  ('55555555-5555-5555-5555-000000005503', '11111111-1111-1111-1111-111111111111', 'SALARY_EXPENSE', 'Chi lương & ứng thợ/nhân viên', 'expense', 'operating_expense', true, 4, true),
+  ('55555555-5555-5555-5555-000000005505', '11111111-1111-1111-1111-111111111111', 'RENT_UTILITIES', 'Mặt bằng, điện, nước & internet', 'expense', 'operating_expense', true, 5, true),
+  ('55555555-5555-5555-5555-000000005506', '11111111-1111-1111-1111-111111111111', 'MARKETING_EXPENSE', 'Marketing & Khuyến mãi', 'expense', 'operating_expense', true, 6, true),
+  ('55555555-5555-5555-5555-000000005511', '11111111-1111-1111-1111-111111111111', 'SUPPLIES_EXPENSE', 'Vật tư tiêu hao & dụng cụ', 'expense', 'operating_expense', true, 7, true),
+  ('55555555-5555-5555-5555-000000005512', '11111111-1111-1111-1111-111111111111', 'MAINTENANCE_EXPENSE', 'Sửa chữa & bảo dưỡng thiết bị', 'expense', 'operating_expense', true, 8, true),
+
+  -- Nhóm Dòng tiền ngoài P&L (non_pnl) - Quản lý vốn, nhập hàng, nạp rút quỹ
+  ('55555555-5555-5555-5555-000000005504', '11111111-1111-1111-1111-111111111111', 'GOODS_IMPORT', 'Nhập hàng & nguyên vật liệu', 'expense', 'non_pnl', true, 9, true),
+  ('55555555-5555-5555-5555-000000005507', '11111111-1111-1111-1111-111111111111', 'CAPITAL_IN', 'Nạp quỹ / Góp vốn', 'income', 'non_pnl', true, 10, true),
+  ('55555555-5555-5555-5555-000000005508', '11111111-1111-1111-1111-111111111111', 'CAPITAL_OUT', 'Rút quỹ / Rút vốn', 'expense', 'non_pnl', true, 11, true)
+
+ON CONFLICT (id) DO NOTHING;
 
 -- ==========================================
 -- 12. FUNDS (2 quỹ: tiền mặt tại quầy + Vietcombank)
 -- Số dư đầu kỳ bám mock dashboard cashflow (TM 18.5M | VCB 33.5M).
 -- ==========================================
-INSERT INTO funds (id, organization_id, code, name, fund_type, bank_name, account_number, opening_balance, is_active)
+INSERT INTO funds (id, organization_id, code, name, fund_type, bank_name, account_number, opening_balance, current_balance, is_active, is_default, is_configured)
 VALUES
-  ('99999999-9999-9999-9999-000000009901', '11111111-1111-1111-1111-111111111111', 'CASH', 'Tiền mặt tại quầy', 'cash', NULL, NULL, 18500000, true),
-  ('99999999-9999-9999-9999-000000009902', '11111111-1111-1111-1111-111111111111', 'VCB', 'Vietcombank', 'bank', 'Vietcombank', NULL, 33500000, true)
+  ('99999999-9999-9999-9999-000000009901', '11111111-1111-1111-1111-111111111111', 'CASH', 'Tiền mặt tại quầy', 'cash', NULL, NULL, 18500000, 18500000, true, true, true),
+  ('99999999-9999-9999-9999-000000009902', '11111111-1111-1111-1111-111111111111', 'VCB', 'Vietcombank', 'bank', 'Vietcombank', NULL, 33500000, 33500000, true, false, true)
 ON CONFLICT DO NOTHING;

@@ -52,7 +52,10 @@ export function DashDatePicker({
           </span>
           <ChevronDown className="h-4 w-4 shrink-0 text-on-surface-variant" />
         </PopoverTrigger>
-        <PopoverContent align="start" className="w-auto p-0">
+        <PopoverContent
+          align="start"
+          className="w-auto p-0 text-[10px] [&_*]:text-[10px]!"
+        >
           <Calendar
             mode="single"
             selected={value}

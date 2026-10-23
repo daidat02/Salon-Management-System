@@ -163,7 +163,12 @@ export function DashTable<T>({
           )}
         </TableBody>
       </Table>
-      {pagination ? (
+      {footer && (
+        <div className="bg-surface border-t border-outline px-6 py-2.5 text-xs text-on-surface-variant">
+          {footer}
+        </div>
+      )}
+      {pagination && (
         <div className="bg-surface flex flex-col items-center justify-between gap-3 border-t border-outline px-6 py-3.5 text-xs text-on-surface-variant sm:flex-row">
           <div>
             Hiển thị{" "}
@@ -234,12 +239,6 @@ export function DashTable<T>({
             </PaginationContent>
           </Pagination>
         </div>
-      ) : (
-        footer && (
-          <div className="bg-surface flex flex-col items-center justify-between gap-3 border-t border-outline px-6 py-3.5 text-xs text-on-surface-variant sm:flex-row">
-            {footer}
-          </div>
-        )
       )}
     </div>
   )

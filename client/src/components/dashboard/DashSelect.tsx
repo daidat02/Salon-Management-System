@@ -18,13 +18,12 @@ function normalizeOption(opt: DashSelectOption): { label: string; value: string 
 }
 
 type DashSelectProps = {
-  value?: string;
+  value?: string | null;
   defaultValue?: string;
   onValueChange?: (value: string) => void;
   placeholder?: string;
   options: DashSelectOption[];
   disabled?: boolean;
-  className?: string;
   triggerClassName?: string;
 };
 
@@ -35,14 +34,14 @@ export function DashSelect({
   placeholder = 'Chọn...',
   options,
   disabled,
-  className,
   triggerClassName,
 }: DashSelectProps) {
   const normalized = options.map(normalizeOption);
+  const isControlled = value !== undefined;
 
   return (
     <Select
-      value={value}
+      value={isControlled ? value : undefined}
       items={normalized}
       defaultValue={defaultValue}
       onValueChange={(v) => onValueChange?.(v ?? '')}

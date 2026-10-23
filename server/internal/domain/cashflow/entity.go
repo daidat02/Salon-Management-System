@@ -47,17 +47,20 @@ const (
 // Số dư KHÔNG lưu trực tiếp — tính lúc query:
 // opening_balance + Σ(thu approved) - Σ(chi approved) theo fund_id.
 type Fund struct {
-	ID              string     `json:"id" db:"id"`
-	OrganizationID  string     `json:"organization_id" db:"organization_id"`
-	Code            string     `json:"code" db:"code"`
-	Name            string     `json:"name" db:"name"`
-	FundType        string     `json:"fund_type" db:"fund_type"`
-	BankName        *string    `json:"bank_name" db:"bank_name"`
-	AccountNumber   *string    `json:"account_number" db:"account_number"`
-	OpeningBalance  float64    `json:"opening_balance" db:"opening_balance"`
-	IsActive        bool       `json:"is_active" db:"is_active"`
-	CreatedAt       *time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt       *time.Time `json:"updated_at" db:"updated_at"`
+	ID             string     `json:"id" db:"id"`
+	OrganizationID string     `json:"organization_id" db:"organization_id"`
+	Code           string     `json:"code" db:"code"`
+	Name           string     `json:"name" db:"name"`
+	FundType       string     `json:"fund_type" db:"fund_type"`
+	BankName       *string    `json:"bank_name" db:"bank_name"`
+	AccountNumber  *string    `json:"account_number" db:"account_number"`
+	OpeningBalance float64    `json:"opening_balance" db:"opening_balance"`
+	CurrentBalance float64    `json:"current_balance" db:"current_balance"`
+	IsActive       bool       `json:"is_active" db:"is_active"`
+	IsDefault      bool       `json:"is_default" db:"is_default"`
+	IsConfigured   bool       `json:"is_configured" db:"is_configured"`
+	CreatedAt      *time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt      *time.Time `json:"updated_at" db:"updated_at"`
 }
 
 func (f *Fund) Validate() error {
@@ -166,23 +169,23 @@ func (v *CashFlow) Validate() error {
 // Payroll là bảng lương một nhân viên trong một kỳ tháng.
 // net_pay do app tính: base + commission + bonus - advance - deduction.
 type Payroll struct {
-	ID                string     `json:"id" db:"id"`
-	OrganizationID    string     `json:"organization_id" db:"organization_id"`
-	StaffID           string     `json:"staff_id" db:"staff_id"`
-	PeriodMonth       *time.Time `json:"period_month" db:"period_month"`
-	BaseSalary        float64    `json:"base_salary" db:"base_salary"`
-	CommissionAmount  float64    `json:"commission_amount" db:"commission_amount"`
-	BonusAmount       float64    `json:"bonus_amount" db:"bonus_amount"`
-	AdvanceAmount     float64    `json:"advance_amount" db:"advance_amount"`
-	DeductionAmount   float64    `json:"deduction_amount" db:"deduction_amount"`
-	NetPay            float64    `json:"net_pay" db:"net_pay"`
-	Status            string     `json:"status" db:"status"`
-	CashFlowID        *string    `json:"cash_flow_id" db:"cash_flow_id"`
-	PaidAt            *time.Time `json:"paid_at" db:"paid_at"`
-	CreatedBy         *string    `json:"created_by" db:"created_by"`
-	ApprovedBy        *string    `json:"approved_by" db:"approved_by"`
-	CreatedAt         *time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt         *time.Time `json:"updated_at" db:"updated_at"`
+	ID               string     `json:"id" db:"id"`
+	OrganizationID   string     `json:"organization_id" db:"organization_id"`
+	StaffID          string     `json:"staff_id" db:"staff_id"`
+	PeriodMonth      *time.Time `json:"period_month" db:"period_month"`
+	BaseSalary       float64    `json:"base_salary" db:"base_salary"`
+	CommissionAmount float64    `json:"commission_amount" db:"commission_amount"`
+	BonusAmount      float64    `json:"bonus_amount" db:"bonus_amount"`
+	AdvanceAmount    float64    `json:"advance_amount" db:"advance_amount"`
+	DeductionAmount  float64    `json:"deduction_amount" db:"deduction_amount"`
+	NetPay           float64    `json:"net_pay" db:"net_pay"`
+	Status           string     `json:"status" db:"status"`
+	CashFlowID       *string    `json:"cash_flow_id" db:"cash_flow_id"`
+	PaidAt           *time.Time `json:"paid_at" db:"paid_at"`
+	CreatedBy        *string    `json:"created_by" db:"created_by"`
+	ApprovedBy       *string    `json:"approved_by" db:"approved_by"`
+	CreatedAt        *time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt        *time.Time `json:"updated_at" db:"updated_at"`
 }
 
 func (p *Payroll) Validate() error {

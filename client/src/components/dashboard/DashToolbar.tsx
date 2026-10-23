@@ -48,10 +48,12 @@ export default function DashToolbar({
   className,
 }: DashToolbarProps) {
   const [internalSearch, setInternalSearch] = React.useState(searchValue ?? '');
+  const [prevSearchValue, setPrevSearchValue] = React.useState(searchValue);
 
-  React.useEffect(() => {
-    if (searchValue !== undefined) setInternalSearch(searchValue);
-  }, [searchValue]);
+  if (searchValue !== prevSearchValue) {
+    setPrevSearchValue(searchValue);
+    setInternalSearch(searchValue ?? '');
+  }
 
   const handleSearch = (v: string) => {
     if (searchValue === undefined) setInternalSearch(v);

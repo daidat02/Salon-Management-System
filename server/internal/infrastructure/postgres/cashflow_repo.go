@@ -2,7 +2,10 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	domain "github.com/daidat02/server/internal/domain/cashflow"
@@ -18,7 +21,9 @@ type CashFlowRepository struct {
 	qx *sqlx.DB
 }
 
+
 func NewCashFlowRepository(db *pgxpool.Pool) *CashFlowRepository {
+	
 	return &CashFlowRepository{
 		db: db,
 		qx: sqlx.NewDb(stdlib.OpenDBFromPool(db), "pgx"),
@@ -99,7 +104,7 @@ func updateFundBalanceTx(ctx context.Context, tx pgx.Tx, orgID, fundID string, k
 }
 
 func (r *CashFlowRepository) CreateCashFlow(ctx context.Context, voucher *domain.CashFlow) error {
-	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
+	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return err
 	}
@@ -178,4 +183,132 @@ func insertOrderIncomeVoucherTx(ctx context.Context, tx pgx.Tx, orgID, orderID, 
 			return fmt.Errorf("lỗi khi sinh phiếu thu của đơn hàng: %w", err)
 		}
 	}
+}
+
+type FilterCashFlow struct {
+	Search string
+	Status string
+	Kind   string
+
+	DateFrom string
+	DateTo   string
+
+	SortBy string
+}
+
+
+
+func (r *CashFlowRepository) GetCashFlowByOrgID(ctx context.Context, orgID string, filter domain.ListCashFlowsQuery) ([]*domain.CashFlowResponse, int64, error) {
+	query := getCashflowByOrgIDQuery + searchCashflowFilter + 
+			filterCashflow + filterCashflowByDate + sortCashflowFilter
+	formattedSearch := ""
+	if strings.TrimSpace(filter.Search) != "" {
+		formattedSearch = "%" + strings.TrimSpace(filter.Search) + "%"
+	}
+
+	args := []any{
+        orgID,             // $1
+        formattedSearch,   // $2
+        filter.Status,     // $3
+        filter.Kind,       // $4
+        filter.CategoryID, // $5
+        filter.FundID,     // $6
+        filter.DateFrom,   // $7
+        filter.DateTo,     // $8
+        filter.SortBy,     // $9
+    }
+
+	query += fmt.Sprintf("LIMIT $%d OFFSET $%d", len(args)+1, len(args)+2)
+	offset := (filter.Page - 1) * filter.PageSize
+	args = append(args, filter.PageSize, offset)
+
+	cashflows := make([]*domain.CashFlowResponse, 0)
+
+	if err := r.qx.SelectContext(ctx, &cashflows, query, args...); err != nil {
+		return nil, 0, fmt.Errorf("lỗi khi lấy danh sách phiếu thu: %w", err)
+	}
+
+	total := int64(0)
+	countQuery := countCashflowByOrgIDQuery + searchCashflowFilter + filterCashflow + filterCashflowByDate
+	if err := r.qx.QueryRowContext(ctx, countQuery, args[:8]...).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("lỗi khi đếm số lượng phiếu thu: %w", err)
+	}
+
+	return cashflows, total, nil
+}
+
+// ---------- Get / Approve / Cancel ----------
+
+// GetCashFlowByID trả 1 phiếu, không thấy -> ErrCashFlowNotFound.
+func (r *CashFlowRepository) GetCashFlowByID(ctx context.Context, orgID, id string) (*domain.CashFlow, error) {
+	var voucher domain.CashFlow
+	if err := r.qx.GetContext(ctx, &voucher, getCashFlowEntityByIDQuery, orgID, id); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, domain.ErrCashFlowNotFound
+		}
+		return nil, fmt.Errorf("lỗi khi lấy phiếu thu/chi: %w", err)
+	}
+	return &voucher, nil
+}
+
+func (r *CashFlowRepository) GetCashFlowStats(ctx context.Context, orgID, dateFrom, dateTo string) (*domain.CashFlowStats, error) {
+	var stats domain.CashFlowStats
+	if err := r.qx.GetContext(ctx, &stats, getCashFlowStats, orgID, dateFrom, dateTo); err != nil {
+		return nil, fmt.Errorf("lỗi khi lấy thống kê phiếu thu/chi: %w", err)
+	}
+	return &stats, nil
+}
+
+// ApproveCashFlow duyệt phiếu pending: lock phiếu + lock quỹ, check đủ số dư
+// (nếu chi), cập nhật status/approved_by/approved_at và cộng trừ
+// current_balance trong cùng 1 transaction.
+func (r *CashFlowRepository) ApproveCashFlow(ctx context.Context, orgID, id, approvedBy string) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	var kind, fundID, status string
+	var amount float64
+	if err := tx.QueryRow(ctx, lockCashFlowForApproveQuery, orgID, id).
+		Scan(&kind, &fundID, &amount, &status); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.ErrCashFlowNotFound
+		}
+		return fmt.Errorf("lỗi khi khóa phiếu thu/chi: %w", err)
+	}
+	if status != domain.VoucherStatusPending {
+		return domain.ErrCashFlowNotFound
+	}
+
+	if err := lockFundRowTx(ctx, tx, orgID, fundID, kind, amount); err != nil {
+		return err
+	}
+
+	tag, err := tx.Exec(ctx, approveCashFlowQuery, orgID, id, nullableStr(&approvedBy))
+	if err != nil {
+		return fmt.Errorf("lỗi khi duyệt phiếu thu/chi: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return domain.ErrCashFlowNotFound
+	}
+
+	if err := updateFundBalanceTx(ctx, tx, orgID, fundID, kind, amount); err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
+}
+
+// CancelCashFlow hủy phiếu pending (phiếu đã duyệt sửa bằng phiếu đảo).
+func (r *CashFlowRepository) CancelCashFlow(ctx context.Context, orgID, id string) error {
+	tag, err := r.db.Exec(ctx, cancelCashFlowQuery, orgID, id)
+	if err != nil {
+		return fmt.Errorf("lỗi khi hủy phiếu thu/chi: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return domain.ErrCashFlowNotFound
+	}
+	return nil
 }

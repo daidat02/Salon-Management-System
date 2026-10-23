@@ -31,7 +31,7 @@ func NewInventoryHandler(uc *uc.InventoryUsecase) *InventoryHandler {
 // @Success      200   {object}  response.SuccessResponse      "Tạo phiếu kho thành công"
 // @Failure      400   {object}  response.ErrorResponse        "Dữ liệu không hợp lệ / tồn không đủ"
 // @Failure      401   {object}  response.ErrorResponse        "Thiếu token / token không hợp lệ"
-// @Router       /inventory/documents [post]
+// @Router       /inventory/ [post]
 func (h *InventoryHandler) CreateDocument(c *gin.Context) {
 	var req domain.CreateDocumentRequest
 	var userID = c.GetString("userId")

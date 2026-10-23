@@ -28,6 +28,8 @@ type FundRepository interface {
 	GetFundBalance(ctx context.Context, orgID, fundID string) (opening, totalIncome, totalExpense float64, err error)
 	UpdateFund(ctx context.Context, fund *Fund) error
 	DeactivateFund(ctx context.Context, orgID, id string) error
+	GetFundStats(ctx context.Context, orgID string) ([]*FundStats, error)
+	GetFundMovementHistory(ctx context.Context, orgID string) ([]*CashFlowResponse, error)
 }
 
 type CashFlowCategoryRepository interface {
@@ -40,9 +42,10 @@ type CashFlowCategoryRepository interface {
 type CashFlowRepository interface {
 	CreateCashFlow(ctx context.Context, voucher *CashFlow) error
 	GetCashFlowByID(ctx context.Context, orgID, id string) (*CashFlow, error)
-	ListCashFlows(ctx context.Context, orgID string, q ListCashFlowsQuery) ([]*CashFlow, int64, error)
+	GetCashFlowByOrgID(ctx context.Context, orgID string, q ListCashFlowsQuery) ([]*CashFlowResponse, int64, error)
 	ApproveCashFlow(ctx context.Context, orgID, id, approvedBy string) error
 	CancelCashFlow(ctx context.Context, orgID, id string) error
+	GetCashFlowStats(ctx context.Context, orgID, dateFrom, dateTo string) (*CashFlowStats, error)
 }
 
 type PayrollRepository interface {

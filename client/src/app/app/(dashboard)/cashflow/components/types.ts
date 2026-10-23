@@ -1,8 +1,10 @@
 'use client';
 
-export type CashflowType = 'thu' | 'chi';
+import type { CashFlowKind, CashFlowStatus } from '@/types/cashflow';
 
-export type CashflowStatus = 'Đã duyệt' | 'Chờ duyệt';
+export type CashflowType = CashFlowKind;
+
+export type CashflowStatus = CashFlowStatus;
 
 export type CashflowVoucher = {
   id: string;
@@ -12,22 +14,7 @@ export type CashflowVoucher = {
   type: CashflowType;
   category: string;
   description: string;
-  creator: string;
+  fund: string;
   amount: number; // số dương, dấu thể hiện qua type
-  paymentMethod: string;
   status: CashflowStatus;
-};
-
-export type ExpenseSlice = {
-  id: string;
-  label: string;
-  percent: number;
-  amount: number;
-  colorClass: string; // tailwind bg-*
-};
-
-export type CashflowDayPoint = {
-  day: string; // T2 (18/10)
-  thu: number; // triệu đồng
-  chi: number;
 };

@@ -123,3 +123,102 @@ func TestCreateCashFlow_WrongKindCategory(t *testing.T) {
 
 	assertAppErrorCode(t, err, 404)
 }
+
+func TestGetCashFlowStats_Success(t *testing.T) {
+	repo := new(MockCashFlowRepository)
+	funds := new(MockFundRepository)
+	u := NewCashflowUsecase(repo, funds, new(MockCashFlowCategoryRepository))
+
+	repo.On("GetCashFlowStats", mock.Anything, "org-123", "2024-10-01", "2024-10-31").
+		Return(&domain.CashFlowStats{
+			TotalIncome:           1850000,
+			TotalOperatingExpense: 450000,
+			TotalNonPNLExpense:    100000,
+		}, nil)
+	funds.On("GetFundStats", mock.Anything, "org-123").
+		Return([]*domain.FundStats{{ID: "fund-cash", Name: "Tiền mặt tại quầy"}}, nil)
+
+	res, err := u.GetCashFlowStats(withOrgCtx("org-123"), "2024-10-01", "2024-10-31")
+
+	assert.NoError(t, err)
+	assert.Equal(t, 1850000.0, res.TotalIncome)
+	assert.Equal(t, 450000.0, res.TotalOperatingExpense)
+	assert.Equal(t, 100000.0, res.TotalNonPNLExpense)
+	assert.Len(t, res.Funds, 1)
+	repo.AssertExpectations(t)
+	funds.AssertExpectations(t)
+}
+
+func TestGetCashFlowStats_EmptyFundsReturnsEmptySlice(t *testing.T) {
+	repo := new(MockCashFlowRepository)
+	funds := new(MockFundRepository)
+	u := NewCashflowUsecase(repo, funds, new(MockCashFlowCategoryRepository))
+
+	repo.On("GetCashFlowStats", mock.Anything, "org-123", "", "").
+		Return(&domain.CashFlowStats{}, nil)
+	funds.On("GetFundStats", mock.Anything, "org-123").Return(nil, nil)
+
+	res, err := u.GetCashFlowStats(withOrgCtx("org-123"), "", "")
+
+	assert.NoError(t, err)
+	assert.NotNil(t, res.Funds)
+	assert.Empty(t, res.Funds)
+}
+
+func TestGetCashFlowStats_InvalidDateRange(t *testing.T) {
+	u := NewCashflowUsecase(new(MockCashFlowRepository), new(MockFundRepository), new(MockCashFlowCategoryRepository))
+
+	_, err := u.GetCashFlowStats(withOrgCtx("org-123"), "2024-10-31", "2024-10-01")
+
+	assertAppErrorCode(t, err, 400)
+}
+
+func TestGetCashFlowStats_InvalidDate(t *testing.T) {
+	u := NewCashflowUsecase(new(MockCashFlowRepository), new(MockFundRepository), new(MockCashFlowCategoryRepository))
+
+	_, err := u.GetCashFlowStats(withOrgCtx("org-123"), "31/10/2024", "")
+
+	assertAppErrorCode(t, err, 400)
+}
+
+func TestGetFundMovementHistory_Success(t *testing.T) {
+	funds := new(MockFundRepository)
+	u := NewCashflowUsecase(new(MockCashFlowRepository), funds, new(MockCashFlowCategoryRepository))
+
+	funds.On("GetFundMovementHistory", mock.Anything, "org-123").
+		Return([]*domain.CashFlowResponse{
+			{ID: "cf-1", Code: "PT-2610-0001", Kind: domain.KindIncome, FundName: "Tiền mặt tại quầy", Amount: 5000000},
+		}, nil)
+
+	res, err := u.GetFundMovementHistory(withOrgCtx("org-123"))
+
+	assert.NoError(t, err)
+	assert.Len(t, res, 1)
+	assert.Equal(t, "cf-1", res[0].ID)
+	funds.AssertExpectations(t)
+}
+
+func TestGetFundMovementHistory_EmptyReturnsEmptySlice(t *testing.T) {
+	funds := new(MockFundRepository)
+	u := NewCashflowUsecase(new(MockCashFlowRepository), funds, new(MockCashFlowCategoryRepository))
+
+	funds.On("GetFundMovementHistory", mock.Anything, "org-123").Return(nil, nil)
+
+	res, err := u.GetFundMovementHistory(withOrgCtx("org-123"))
+
+	assert.NoError(t, err)
+	assert.NotNil(t, res)
+	assert.Empty(t, res)
+}
+
+func TestGetFundMovementHistory_RepoError(t *testing.T) {
+	funds := new(MockFundRepository)
+	u := NewCashflowUsecase(new(MockCashFlowRepository), funds, new(MockCashFlowCategoryRepository))
+
+	funds.On("GetFundMovementHistory", mock.Anything, "org-123").
+		Return(nil, errors.New("db error"))
+
+	_, err := u.GetFundMovementHistory(withOrgCtx("org-123"))
+
+	assertAppErrorCode(t, err, 500)
+}

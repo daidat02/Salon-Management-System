@@ -2,122 +2,159 @@
 
 import * as React from 'react';
 import DashTable from '@/components/dashboard/DashTable';
-import {
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from '@/components/ui/pagination';
+import { TableSkeleton } from '@/components/dashboard/DashboardSkeletons';
+import { getApiErrorMessage } from '@/services/apiClient';
 import { formatVND } from '@/lib/format';
+import { useRouter, useSearchParams } from 'next/navigation';
+import useCashFlows from '@/hooks/use-cashflows';
+import useApproveCashFlow from '@/hooks/use-approve-cashflow';
+import { toast } from '@/components/ui/toast';
 import { buildCashflowColumns } from './columns';
+import { CashflowApproveDialog } from './CashflowApproveDialog';
+import { mapCashflow } from './cashflowUtils';
 import type { CashflowVoucher } from './types';
 
-const PAGE_SIZE = 8;
+const PAGE_SIZE = 20;
 
-function getPageItems(current: number, totalPages: number): (number | 'ellipsis')[] {
-  if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
-  if (current <= 3) return [1, 2, 3, 'ellipsis', totalPages];
-  if (current >= totalPages - 2) return [1, 'ellipsis', totalPages - 2, totalPages - 1, totalPages];
-  return [1, 'ellipsis', current - 1, current, current + 1, 'ellipsis', totalPages];
-}
+export default function CashflowTable() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
-type CashflowTableProps = {
-  rows: CashflowVoucher[];
-  page: number;
-  onPageChange: (page: number) => void;
-};
+  const search = searchParams.get('search') || '';
+  const kind = searchParams.get('kind') || '';
+  const categoryId = searchParams.get('category_id') || '';
+  const fundId = searchParams.get('fund_id') || '';
+  const status = searchParams.get('status') || '';
+  const sortBy = searchParams.get('sort_by') || '';
+  const dateFrom = searchParams.get('date_from') || undefined;
+  const dateTo = searchParams.get('date_to') || undefined;
+  const pageFromUrl = parseInt(searchParams.get('page') || '1', 10) || 1;
 
-export default function CashflowTable({ rows, page, onPageChange }: CashflowTableProps) {
-  const columns = React.useMemo(() => buildCashflowColumns(), []);
-  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
-  const safePage = Math.min(Math.max(1, page), totalPages);
-  const displayed = rows.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const page = pageFromUrl || 1;
 
-  const pageThu = displayed.filter((r) => r.type === 'thu').reduce((s, r) => s + r.amount, 0);
-  const pageChi = displayed.filter((r) => r.type === 'chi').reduce((s, r) => s + r.amount, 0);
+  const { data, isLoading, isError, error } = useCashFlows({
+    search,
+    kind,
+    categoryId,
+    fundId,
+    status,
+    sortBy,
+    dateFrom,
+    dateTo,
+    page,
+    pageSize: PAGE_SIZE,
+  });
 
-  const from = rows.length === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1;
-  const to = Math.min(safePage * PAGE_SIZE, rows.length);
+  const [approveTarget, setApproveTarget] = React.useState<CashflowVoucher | null>(null);
+  const [approveError, setApproveError] = React.useState<string | null>(null);
+  const { mutate: approveCashflow, isPending: isApproving } = useApproveCashFlow();
+
+  const handleApprove = React.useCallback((row: CashflowVoucher) => {
+    setApproveError(null);
+    setApproveTarget(row);
+  }, []);
+
+  const columns = React.useMemo(
+    () => buildCashflowColumns({ onApprove: handleApprove }),
+    [handleApprove],
+  );
+  const rows = React.useMemo(() => (data?.data ?? []).map(mapCashflow), [data]);
+  const total = data?.total ?? 0;
+
+  const pageIncome = rows
+    .filter((r) => r.type === 'income')
+    .reduce((sum, r) => sum + r.amount, 0);
+  const pageExpense = rows
+    .filter((r) => r.type === 'expense')
+    .reduce((sum, r) => sum + r.amount, 0);
+  const net = pageIncome - pageExpense;
+
+  const handlePageChange = (newPage: number) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('page', newPage.toString());
+    router.push(`?${params.toString()}`, { scroll: false });
+  };
+
+  const handleConfirmApprove = () => {
+    if (!approveTarget) return;
+
+    approveCashflow(approveTarget.id, {
+      onSuccess: () => {
+        toast.add({
+          title: 'Duyệt phiếu thành công',
+          description: `${approveTarget.code} • ${formatVND(approveTarget.amount)}`,
+          type: 'success',
+        });
+        setApproveTarget(null);
+        setApproveError(null);
+      },
+      onError: (error) => {
+        const message = getApiErrorMessage(error);
+        setApproveError(message);
+        toast.add({ title: 'Duyệt phiếu thất bại', description: message, type: 'error' });
+      },
+    });
+  };
+
+  const handleApproveOpenChange = (open: boolean) => {
+    if (!open) {
+      setApproveTarget(null);
+      setApproveError(null);
+    }
+  };
+
+  if (isError) {
+    return (
+      <div className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+        Không tải được phiếu thu chi: {getApiErrorMessage(error)} — thử đăng nhập lại hoặc kiểm tra
+        kết nối API.
+      </div>
+    );
+  }
+
+  if (isLoading && rows.length === 0) {
+    return <TableSkeleton rows={6} cols={9} />;
+  }
 
   return (
-    <DashTable
-      columns={columns}
-      data={displayed}
-      getRowId={(r) => r.id}
-      emptyText="Không tìm thấy phiếu thu chi nào"
-      footer={
-        <div className="w-full space-y-0">
-          <div className="flex w-full flex-wrap items-center justify-between gap-2 border-b border-outline bg-surface-container px-6 py-2.5 text-xs">
+    <>
+      <DashTable
+        columns={columns}
+        data={rows}
+        selectable={false}
+        getRowId={(r) => r.id}
+        emptyText="Không tìm thấy phiếu thu chi nào"
+        footer={
+          <div className="flex w-full flex-wrap items-center justify-between gap-2">
             <span className="font-medium text-on-surface-variant">Tổng trang này:</span>
-            <div className="flex items-center gap-6 font-semibold">
-              <span className="text-success">Thu: +{formatVND(pageThu)}</span>
-              <span className="text-error">Chi: -{formatVND(pageChi)}</span>
+            <div className="flex flex-wrap items-center gap-6 font-semibold">
+              <span className="text-success">Thu: +{formatVND(pageIncome)}</span>
+              <span className="text-error">Chi: -{formatVND(pageExpense)}</span>
               <span className="rounded bg-primary-container px-2.5 py-0.5 text-primary">
-                Chênh lệch ròng: {pageThu - pageChi >= 0 ? '+' : '-'}
-                {formatVND(Math.abs(pageThu - pageChi))}
+                Chênh lệch ròng: {net >= 0 ? '+' : '-'}
+                {formatVND(Math.abs(net))}
               </span>
             </div>
           </div>
-          <div className="flex w-full flex-col items-center justify-between gap-3 px-6 py-3.5 text-xs text-on-surface-variant sm:flex-row">
-            <div>
-              Hiển thị <span className="font-semibold text-on-surface">{from} - {to}</span> trong
-              tổng số <span className="font-semibold text-on-surface">{rows.length}</span> phiếu thu
-              chi
-            </div>
-            <Pagination className="mx-0 w-auto justify-end">
-              <PaginationContent>
-                <PaginationItem>
-                  <PaginationPrevious
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      if (safePage > 1) onPageChange(safePage - 1);
-                    }}
-                    aria-disabled={safePage <= 1}
-                    className={safePage <= 1 ? 'pointer-events-none opacity-40' : ''}
-                    text="Trang trước"
-                  />
-                </PaginationItem>
-                {getPageItems(safePage, totalPages).map((item, idx) =>
-                  item === 'ellipsis' ? (
-                    <PaginationItem key={`e-${idx}`}>
-                      <PaginationEllipsis />
-                    </PaginationItem>
-                  ) : (
-                    <PaginationItem key={item}>
-                      <PaginationLink
-                        href="#"
-                        isActive={item === safePage}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          onPageChange(item);
-                        }}
-                      >
-                        {item}
-                      </PaginationLink>
-                    </PaginationItem>
-                  ),
-                )}
-                <PaginationItem>
-                  <PaginationNext
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      if (safePage < totalPages) onPageChange(safePage + 1);
-                    }}
-                    aria-disabled={safePage >= totalPages}
-                    className={safePage >= totalPages ? 'pointer-events-none opacity-40' : ''}
-                    text="Trang sau"
-                  />
-                </PaginationItem>
-              </PaginationContent>
-            </Pagination>
-          </div>
-        </div>
-      }
-    />
+        }
+        pagination={{
+          page,
+          pageSize: PAGE_SIZE,
+          total,
+          totalPages: data?.total_pages,
+          itemLabel: 'phiếu thu chi',
+          onPageChange: handlePageChange,
+        }}
+      />
+
+      <CashflowApproveDialog
+        voucher={approveTarget}
+        open={Boolean(approveTarget)}
+        isPending={isApproving}
+        error={approveError}
+        onOpenChange={handleApproveOpenChange}
+        onConfirm={handleConfirmApprove}
+      />
+    </>
   );
 }
