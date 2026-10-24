@@ -12,9 +12,9 @@ type MockStaffRepository struct {
 	mock.Mock
 }
 
-func (m *MockStaffRepository) CreateStaff(ctx context.Context, staff *domain.Staff) error {
+func (m *MockStaffRepository) CreateStaff(ctx context.Context, staff *domain.Staff) (string, error) {
 	args := m.Called(ctx, staff)
-	return args.Error(0)
+	return args.String(0), args.Error(1)
 }
 
 func (m *MockStaffRepository) GetStaffByOrgID(ctx context.Context, orgID string, search string, status string, sort string, limit, offset int) ([]*domain.Staff, error) {

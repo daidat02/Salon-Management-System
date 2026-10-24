@@ -1,12 +1,34 @@
 package postgres
 
 const (
+	staffSelectColumns = `
+		id, organization_id, code, full_name, COALESCE(phone, '') AS phone,
+		COALESCE(email, '') AS email, birth_date, COALESCE(gender, '') AS gender,
+		COALESCE(address, '') AS address, position,
+		COALESCE(employment_type, '') AS employment_type, commission_rate,
+		base_salary, COALESCE(bank_name, '') AS bank_name,
+		COALESCE(bank_account_number, '') AS bank_account_number,
+		COALESCE(bank_account_holder, '') AS bank_account_holder,
+		status, COALESCE(hire_date, '0001-01-01') AS hire_date, created_at, updated_at, deleted_at
+	`
+	nextStaffCodeQuery = `
+		SELECT COALESCE(
+			MAX(NULLIF(regexp_replace(code, '[^0-9]', '', 'g'), '')::int),
+			0
+		) + 1
+		FROM staff
+		WHERE organization_id = $1 AND code ~ '^NV[0-9]+$'
+	`
 	createStaffQuery = `
-		INSERT INTO staff (id, organization_id, code, full_name, phone, position, commission_rate, status, hire_date)
-		VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		INSERT INTO staff (
+			id, organization_id, code, full_name, phone, email, birth_date, gender,
+			address, position, employment_type, commission_rate, base_salary,
+			bank_name, bank_account_number, bank_account_holder, status, hire_date
+		)
+		VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
 	`
 	getStaffsByOrgIDQuery = `
-		SELECT *
+		SELECT ` + staffSelectColumns + `
 		FROM staff
 		WHERE organization_id = $1 AND deleted_at IS NULL
 	`
@@ -30,8 +52,11 @@ const (
 		WHERE organization_id = $1 AND deleted_at IS NULL`
 	updateStaffQuery = `
 		UPDATE staff
-		SET code = $3, full_name = $4, phone = $5, position = $6,
-		    commission_rate = $7, status = $8, hire_date = $9
+		SET code = $3, full_name = $4, phone = $5, email = $6, birth_date = $7,
+		    gender = $8, address = $9, position = $10, employment_type = $11,
+		    commission_rate = $12, base_salary = $13, bank_name = $14,
+		    bank_account_number = $15, bank_account_holder = $16, status = $17,
+		    hire_date = $18
 		WHERE id = $1 AND organization_id = $2 AND deleted_at IS NULL
 	`
 	deleteStaffQuery = `

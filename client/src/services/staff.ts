@@ -1,4 +1,4 @@
-import { Staff } from '@/types/staff';
+import { Staff, StaffEmploymentType, StaffGender } from '@/types/staff';
 import { ApiResponse, PaginationResult } from '@/types/response';
 import apiClient from './apiClient';
 
@@ -32,14 +32,23 @@ export const getStaffsByOrgID = async ({
 };
 
 export type CreateStaffPayload = {
-  code: string;
   full_name: string;
   phone: string;
+  email?: string;
+  birth_date?: string | null;
+  gender?: StaffGender | '';
+  address?: string;
   position: string;
+  employment_type?: StaffEmploymentType | '';
   commission_rate: number;
+  base_salary?: number;
+  bank_name?: string;
+  bank_account_number?: string;
+  bank_account_holder?: string;
   status: Staff['status'];
-  hire_date: string;
+  hire_date?: string | null;
 };
+
 
 export const createStaff = async (payload: CreateStaffPayload) => {
   const res = await apiClient.post<ApiResponse<Staff>>('/staff', payload);

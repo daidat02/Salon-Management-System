@@ -353,7 +353,7 @@ INSERT INTO cash_flow_categories (id, organization_id, code, name, kind, categor
 VALUES
   -- Nhóm Doanh thu chính & Doanh thu khác (revenue)
   ('55555555-5555-5555-5555-000000005501', '11111111-1111-1111-1111-111111111111', 'SERVICE_REVENUE', 'Thu dịch vụ chính', 'income', 'revenue', true, 1, true),
-  ('55555555-5555-5555-5555-000000005502', '11111111-1111-1111-1111-111111111102', 'RETAIL_REVENUE', 'Thu bán lẻ sản phẩm', 'income', 'revenue', true, 2, true),
+  ('55555555-5555-5555-5555-000000005502', '11111111-1111-1111-1111-111111111111', 'RETAIL_REVENUE', 'Thu bán lẻ sản phẩm', 'income', 'revenue', true, 2, true),
   ('55555555-5555-5555-5555-000000005510', '11111111-1111-1111-1111-111111111111', 'OTHER_REVENUE', 'Thu nhập khác', 'income', 'revenue', true, 3, true),
 
   -- Nhóm Chi phí vận hành để tính P&L (operating_expense)

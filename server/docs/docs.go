@@ -4609,13 +4609,37 @@ const docTemplate = `{
         "github_com_daidat02_server_internal_domain_staff.CreateStaffRequest": {
             "type": "object",
             "properties": {
-                "code": {
+                "address": {
+                    "type": "string"
+                },
+                "bank_account_holder": {
+                    "type": "string"
+                },
+                "bank_account_number": {
+                    "type": "string"
+                },
+                "bank_name": {
+                    "type": "string"
+                },
+                "base_salary": {
+                    "type": "number"
+                },
+                "birth_date": {
                     "type": "string"
                 },
                 "commission_rate": {
                     "type": "number"
                 },
+                "email": {
+                    "type": "string"
+                },
+                "employment_type": {
+                    "type": "string"
+                },
                 "full_name": {
+                    "type": "string"
+                },
+                "gender": {
                     "type": "string"
                 },
                 "hire_date": {
@@ -4641,13 +4665,40 @@ const docTemplate = `{
         "github_com_daidat02_server_internal_domain_staff.UpdateStaffRequest": {
             "type": "object",
             "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "bank_account_holder": {
+                    "type": "string"
+                },
+                "bank_account_number": {
+                    "type": "string"
+                },
+                "bank_name": {
+                    "type": "string"
+                },
+                "base_salary": {
+                    "type": "number"
+                },
+                "birth_date": {
+                    "type": "string"
+                },
                 "code": {
                     "type": "string"
                 },
                 "commission_rate": {
                     "type": "number"
                 },
+                "email": {
+                    "type": "string"
+                },
+                "employment_type": {
+                    "type": "string"
+                },
                 "full_name": {
+                    "type": "string"
+                },
+                "gender": {
                     "type": "string"
                 },
                 "hire_date": {

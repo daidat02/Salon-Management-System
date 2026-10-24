@@ -45,6 +45,6 @@ export default function useCashFlows({
         pageSize,
       }),
     placeholderData: keepPreviousData,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 1 * 60 * 1000, // 1 minute
   });
 }

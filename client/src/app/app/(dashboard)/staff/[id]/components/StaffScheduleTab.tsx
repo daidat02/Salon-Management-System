@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { DashInput } from '@/components/dashboard/DashInput';
 import { DashSelect } from '@/components/dashboard/DashSelect';
 import { DashDialog } from '@/components/dashboard/DashDialog';
-import { Field } from './StaffFormParts';
+import { Field } from '../../components/StaffFormParts';
 import {
   SHIFT_OPTIONS,
   mockLeaveBalance,

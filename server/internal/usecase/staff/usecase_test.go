@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	domain "github.com/daidat02/server/internal/domain/staff"
 	"github.com/daidat02/server/internal/delivery/http/middlewares"
+	domain "github.com/daidat02/server/internal/domain/staff"
 	"github.com/daidat02/server/pkg/apperror"
 
 	"github.com/stretchr/testify/assert"
@@ -20,16 +20,26 @@ func withOrgCtx(orgID string) context.Context {
 }
 
 // validStaff trả về input đầy đủ, pass hết Validate():
-// Code, FullName, Phone, Position, CommissionRate 0-100, Status active/inactive.
+// FullName, Phone, Position, CommissionRate 0-100, Status active/inactive.
 func validStaff() *domain.Staff {
+	birthDate := time.Date(1998, 3, 14, 0, 0, 0, 0, time.UTC)
 	return &domain.Staff{
-		Code:           "NV001",
-		FullName:       "Nguyễn Văn A",
-		Phone:          "0901234567",
-		Position:       "Thợ cắt tóc",
-		CommissionRate: 10,
-		Status:         "active",
-		HireDate:       time.Date(2024, 1, 15, 0, 0, 0, 0, time.UTC),
+		Code:              "NV001",
+		FullName:          "Nguyễn Văn A",
+		Phone:             "0901234567",
+		Email:             "vana@salon.test",
+		BirthDate:         &birthDate,
+		Gender:            "male",
+		Address:           "45 Nguyễn Trãi, Q.1, TP.HCM",
+		Position:          "Thợ cắt tóc",
+		EmploymentType:    "fulltime",
+		CommissionRate:    10,
+		BaseSalary:        8000000,
+		BankName:          "Vietcombank",
+		BankAccountNumber: "0071008821",
+		BankAccountHolder: "NGUYEN VAN A",
+		Status:            "active",
+		HireDate:          time.Date(2024, 1, 15, 0, 0, 0, 0, time.UTC),
 	}
 }
 
@@ -66,13 +76,9 @@ func TestStaffUsecase_CreateStaff(f *testing.T) {
 			expectedError: false,
 		},
 		{
-			name: "Thất bại - Lỗi từ database (trùng mã nhân viên)",
-			ctx:  withOrgCtx("org-123"),
-			inputStaff: func() *domain.Staff {
-				s := validStaff()
-				s.Code = "NV001"
-				return s
-			}(),
+			name:          "Thất bại - Lỗi từ database",
+			ctx:           withOrgCtx("org-123"),
+			inputStaff:    validStaff(),
 			mockReturnErr: errors.New("database duplicate error"),
 			callRepo:      true,
 			expectedError: true,
@@ -94,19 +100,6 @@ func TestStaffUsecase_CreateStaff(f *testing.T) {
 			ctx:  withOrgCtx(""),
 			inputStaff: func() *domain.Staff {
 				return validStaff()
-			}(),
-			mockReturnErr: nil,
-			callRepo:      false,
-			expectedError: true,
-			expectedCode:  400,
-		},
-		{
-			name: "Thất bại - Validate (thiếu mã nhân viên)",
-			ctx:  withOrgCtx("org-123"),
-			inputStaff: func() *domain.Staff {
-				s := validStaff()
-				s.Code = ""
-				return s
 			}(),
 			mockReturnErr: nil,
 			callRepo:      false,
@@ -178,6 +171,45 @@ func TestStaffUsecase_CreateStaff(f *testing.T) {
 			expectedError: true,
 			expectedCode:  400,
 		},
+		{
+			name: "Thất bại - Validate (lương cơ bản âm)",
+			ctx:  withOrgCtx("org-123"),
+			inputStaff: func() *domain.Staff {
+				s := validStaff()
+				s.BaseSalary = -1
+				return s
+			}(),
+			mockReturnErr: nil,
+			callRepo:      false,
+			expectedError: true,
+			expectedCode:  400,
+		},
+		{
+			name: "Thất bại - Validate (giới tính không hợp lệ)",
+			ctx:  withOrgCtx("org-123"),
+			inputStaff: func() *domain.Staff {
+				s := validStaff()
+				s.Gender = "unknown"
+				return s
+			}(),
+			mockReturnErr: nil,
+			callRepo:      false,
+			expectedError: true,
+			expectedCode:  400,
+		},
+		{
+			name: "Thất bại - Validate (hình thức làm việc không hợp lệ)",
+			ctx:  withOrgCtx("org-123"),
+			inputStaff: func() *domain.Staff {
+				s := validStaff()
+				s.EmploymentType = "unknown"
+				return s
+			}(),
+			mockReturnErr: nil,
+			callRepo:      false,
+			expectedError: true,
+			expectedCode:  400,
+		},
 	}
 
 	// Chạy vòng lặp qua từng kịch bản
@@ -189,7 +221,7 @@ func TestStaffUsecase_CreateStaff(f *testing.T) {
 			// 2. Thiết lập kỳ vọng: dùng mock.Anything cho cả ctx lẫn staff
 			// vì usecase mutate staff.ID/staff.OrganizationID trước khi gọi repo.
 			if tt.callRepo {
-				mockRepo.On("CreateStaff", mock.Anything, mock.Anything).Return(tt.mockReturnErr)
+				mockRepo.On("CreateStaff", mock.Anything, mock.Anything).Return("NV013", tt.mockReturnErr)
 			}
 
 			// 3. Khởi tạo Usecase THẬT với mock repo vừa tạo
@@ -212,11 +244,20 @@ func TestStaffUsecase_CreateStaff(f *testing.T) {
 				assert.NotNil(t, res, "Khi thành công thì phải trả về kết quả")
 				assert.NotEmpty(t, res.ID, "ID phải được sinh ra")
 				assert.Equal(t, "org-123", res.OrganizationID, "OrganizationID phải lấy từ context")
-				assert.Equal(t, tt.inputStaff.Code, res.Code)
+				assert.Equal(t, "NV013", res.Code, "Mã nhân viên phải do server sinh ra")
 				assert.Equal(t, tt.inputStaff.FullName, res.FullName)
 				assert.Equal(t, tt.inputStaff.Phone, res.Phone)
+				assert.Equal(t, tt.inputStaff.Email, res.Email)
+				assert.Equal(t, tt.inputStaff.BirthDate, res.BirthDate)
+				assert.Equal(t, tt.inputStaff.Gender, res.Gender)
+				assert.Equal(t, tt.inputStaff.Address, res.Address)
 				assert.Equal(t, tt.inputStaff.Position, res.Position)
+				assert.Equal(t, tt.inputStaff.EmploymentType, res.EmploymentType)
 				assert.Equal(t, tt.inputStaff.CommissionRate, res.CommissionRate)
+				assert.Equal(t, tt.inputStaff.BaseSalary, res.BaseSalary)
+				assert.Equal(t, tt.inputStaff.BankName, res.BankName)
+				assert.Equal(t, tt.inputStaff.BankAccountNumber, res.BankAccountNumber)
+				assert.Equal(t, tt.inputStaff.BankAccountHolder, res.BankAccountHolder)
 				assert.Equal(t, tt.inputStaff.Status, res.Status)
 				assert.True(t, tt.inputStaff.HireDate.Equal(res.HireDate))
 				mockRepo.AssertExpectations(t)
@@ -493,8 +534,17 @@ func TestStaffUsecase_UpdateStaff(f *testing.T) {
 				assert.Equal(t, tt.inputStaff.Code, res.Code)
 				assert.Equal(t, tt.inputStaff.FullName, res.FullName)
 				assert.Equal(t, tt.inputStaff.Phone, res.Phone)
+				assert.Equal(t, tt.inputStaff.Email, res.Email)
+				assert.Equal(t, tt.inputStaff.BirthDate, res.BirthDate)
+				assert.Equal(t, tt.inputStaff.Gender, res.Gender)
+				assert.Equal(t, tt.inputStaff.Address, res.Address)
 				assert.Equal(t, tt.inputStaff.Position, res.Position)
+				assert.Equal(t, tt.inputStaff.EmploymentType, res.EmploymentType)
 				assert.Equal(t, tt.inputStaff.CommissionRate, res.CommissionRate)
+				assert.Equal(t, tt.inputStaff.BaseSalary, res.BaseSalary)
+				assert.Equal(t, tt.inputStaff.BankName, res.BankName)
+				assert.Equal(t, tt.inputStaff.BankAccountNumber, res.BankAccountNumber)
+				assert.Equal(t, tt.inputStaff.BankAccountHolder, res.BankAccountHolder)
 				assert.Equal(t, tt.inputStaff.Status, res.Status)
 				assert.True(t, tt.inputStaff.HireDate.Equal(res.HireDate))
 				mockRepo.AssertExpectations(t)

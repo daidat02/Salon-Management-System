@@ -20,6 +20,8 @@ export type PageHeadingAction = {
   variant?: PageHeadingActionVariant;
   href?: string;
   onClick?: (e: MouseEvent) => void;
+  disabled?: boolean;
+  title?: string;
 };
 
 export type PageHeadingBackButton = {
@@ -171,6 +173,8 @@ export default function PageHeading({
                 key={action.label}
                 variant={isPrimary ? 'default' : 'outline'}
                 onClick={action.onClick}
+                disabled={action.disabled}
+                title={action.title}
                 className={cn(
                   'h-auto rounded-md px-3.5 py-2 text-xs shadow-sm',
                   isPrimary ? 'font-semibold' : 'bg-surface hover:bg-surface-container',

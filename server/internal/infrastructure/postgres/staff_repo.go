@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	domain "github.com/daidat02/server/internal/domain/staff"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -19,10 +20,40 @@ func NewPostgresStaffRepository(db *pgxpool.Pool) *PostgresStaffRepository {
 	}
 }
 
+// nullableStaffString chuyển chuỗi rỗng thành NULL để qua được các CHECK constraint.
+func nullableStaffString(value string) any {
+	if strings.TrimSpace(value) == "" {
+		return nil
+	}
+	return strings.TrimSpace(value)
+}
 
+// nullableStaffDate chuyển zero time thành NULL cho cột DATE nullable.
+func nullableStaffDate(value time.Time) any {
+	if value.IsZero() {
+		return nil
+	}
+	return value
+}
 
-func (r *PostgresStaffRepository) CreateStaff(ctx context.Context, staff *domain.Staff) error {
-	_ ,err := r.db.Exec(
+func (r *PostgresStaffRepository) CreateStaff(ctx context.Context, staff *domain.Staff) (string, error) {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return "", fmt.Errorf("lỗi khi bắt đầu transaction tạo nhân viên: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", staff.OrganizationID); err != nil {
+		return "", fmt.Errorf("lỗi khi khóa tạo mã nhân viên: %w", err)
+	}
+
+	var nextCode int
+	if err := tx.QueryRow(ctx, nextStaffCodeQuery, staff.OrganizationID).Scan(&nextCode); err != nil {
+		return "", fmt.Errorf("lỗi khi tạo mã nhân viên: %w", err)
+	}
+	staff.Code = fmt.Sprintf("NV%03d", nextCode)
+
+	if _, err := tx.Exec(
 		ctx,
 		createStaffQuery,
 		staff.ID,
@@ -30,115 +61,136 @@ func (r *PostgresStaffRepository) CreateStaff(ctx context.Context, staff *domain
 		staff.Code,
 		staff.FullName,
 		staff.Phone,
+		nullableStaffString(staff.Email),
+		staff.BirthDate,
+		nullableStaffString(staff.Gender),
+		nullableStaffString(staff.Address),
 		staff.Position,
+		nullableStaffString(staff.EmploymentType),
 		staff.CommissionRate,
+		staff.BaseSalary,
+		nullableStaffString(staff.BankName),
+		nullableStaffString(staff.BankAccountNumber),
+		nullableStaffString(staff.BankAccountHolder),
 		staff.Status,
-		staff.HireDate,
-	)
-	if err !=nil{
-		return fmt.Errorf("Lỗi khi tạo nhân viên: %w", err)
+		nullableStaffDate(staff.HireDate),
+	); err != nil {
+		return "", fmt.Errorf("Lỗi khi tạo nhân viên: %w", err)
 	}
 
-	return nil
+	if err := tx.Commit(ctx); err != nil {
+		return "", fmt.Errorf("lỗi khi commit tạo nhân viên: %w", err)
+	}
+
+	return staff.Code, nil
 }
 
 func (r *PostgresStaffRepository) GetStaffByOrgID(
-    ctx context.Context,
-    orgID string,
-    search string,
-    status string,
-    sort string,
-    limit, offset int,
+	ctx context.Context,
+	orgID string,
+	search string,
+	status string,
+	sort string,
+	limit, offset int,
 ) ([]*domain.Staff, error) {
-    // 1. Nối toàn bộ các khối hằng số lại với nhau theo đúng thứ tự $1, $2, $3, $4
-    query := getStaffsByOrgIDQuery +
-        searchStaffsFilter +
-        filterStaffsStatus +
-        sortStaffsFilter
+	// 1. Nối toàn bộ các khối hằng số lại với nhau theo đúng thứ tự $1, $2, $3, $4
+	query := getStaffsByOrgIDQuery +
+		searchStaffsFilter +
+		filterStaffsStatus +
+		sortStaffsFilter
 
-    // 2. Chuẩn bị mảng tham số cố định 4 vị trí đầu tiên ($1, $2, $3, $4)
-    // - $1: orgID
-    // - $2: search (nếu rỗng thì truyền "", SQL nhận diện qua ($2 = '' OR ...))
-    // - $3: status (nếu rỗng thì truyền "", SQL nhận diện qua ($3 = '' OR ...))
-    // - $4: sort   (truyền thẳng chuỗi sort vào, CASE WHEN sẽ tự so khớp)
+	// 2. Chuẩn bị mảng tham số cố định 4 vị trí đầu tiên ($1, $2, $3, $4)
+	// - $1: orgID
+	// - $2: search (nếu rỗng thì truyền "", SQL nhận diện qua ($2 = '' OR ...))
+	// - $3: status (nếu rỗng thì truyền "", SQL nhận diện qua ($3 = '' OR ...))
+	// - $4: sort   (truyền thẳng chuỗi sort vào, CASE WHEN sẽ tự so khớp)
 
-    formattedSearch := ""
-    if strings.TrimSpace(search) != "" {
-        formattedSearch = "%" + strings.TrimSpace(search) + "%"
-    }
+	formattedSearch := ""
+	if strings.TrimSpace(search) != "" {
+		formattedSearch = "%" + strings.TrimSpace(search) + "%"
+	}
 
-    args := []any{
-        orgID,           // $1
-        formattedSearch, // $2
-        status,          // $3
-        sort,            // $4
-    }
+	args := []any{
+		orgID,           // $1
+		formattedSearch, // $2
+		status,          // $3
+		sort,            // $4
+	}
 
-    // 3. Tự động cộng thêm phần Phân trang ở cuối dựa trên số lượng args hiện tại ($5, $6)
-    query += fmt.Sprintf(" LIMIT $%d OFFSET $%d", len(args)+1, len(args)+2)
-    args = append(args, limit, offset)
+	// 3. Tự động cộng thêm phần Phân trang ở cuối dựa trên số lượng args hiện tại ($5, $6)
+	query += fmt.Sprintf(" LIMIT $%d OFFSET $%d", len(args)+1, len(args)+2)
+	args = append(args, limit, offset)
 
-    // 4. Thực thi câu lệnh
-    rows, err := r.db.Query(ctx, query, args...)
-    if err != nil {
-        return nil, fmt.Errorf("lỗi khi truy vấn danh sách nhân viên: %w", err)
-    }
-    
-    // Đảm bảo đóng rows để giải phóng kết nối database
-    defer rows.Close()
+	// 4. Thực thi câu lệnh
+	rows, err := r.db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("lỗi khi truy vấn danh sách nhân viên: %w", err)
+	}
 
-    // 2. Khởi tạo mảng kết quả (non-nil để JSON ra [] thay vì null)
-    staffs := make([]*domain.Staff, 0)
+	// Đảm bảo đóng rows để giải phóng kết nối database
+	defer rows.Close()
 
-    // 3. Vòng lặp duyệt qua TỪNG DÒNG dữ liệu
-    for rows.Next() {
-        // Tạo một object trống để hứng dữ liệu cho dòng hiện tại
-        var s domain.Staff
-        
-        // Scan dữ liệu của dòng đó vào object s
-        err := rows.Scan(
-            &s.ID,
-            &s.OrganizationID,
-            &s.Code,
-            &s.FullName,
-            &s.Phone,
-            &s.Position,
-            &s.CommissionRate,
-            &s.Status,
-            &s.HireDate,
-            &s.CreatedAt,
-            &s.UpdatedAt,
-            &s.DeletedAt,
-        )
-        if err != nil {
-            return nil, fmt.Errorf("lỗi khi đọc dữ liệu dòng nhân viên: %w", err)
-        }
-        
-        // Push object vừa scan được vào mảng kết quả
-        staffs = append(staffs, &s)
-    }
+	// 2. Khởi tạo mảng kết quả (non-nil để JSON ra [] thay vì null)
+	staffs := make([]*domain.Staff, 0)
 
-    // 4. Kiểm tra xem có lỗi ẩn nào xảy ra trong quá trình chạy vòng lặp không
-    if err := rows.Err(); err != nil {
-        return nil, fmt.Errorf("lỗi trong quá trình duyệt danh sách: %w", err)
-    }
+	// 3. Vòng lặp duyệt qua TỪNG DÒNG dữ liệu
+	for rows.Next() {
+		// Tạo một object trống để hứng dữ liệu cho dòng hiện tại
+		var s domain.Staff
 
-    return staffs, nil
+		// Scan dữ liệu của dòng đó vào object s
+		err := rows.Scan(
+			&s.ID,
+			&s.OrganizationID,
+			&s.Code,
+			&s.FullName,
+			&s.Phone,
+			&s.Email,
+			&s.BirthDate,
+			&s.Gender,
+			&s.Address,
+			&s.Position,
+			&s.EmploymentType,
+			&s.CommissionRate,
+			&s.BaseSalary,
+			&s.BankName,
+			&s.BankAccountNumber,
+			&s.BankAccountHolder,
+			&s.Status,
+			&s.HireDate,
+			&s.CreatedAt,
+			&s.UpdatedAt,
+			&s.DeletedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("lỗi khi đọc dữ liệu dòng nhân viên: %w", err)
+		}
+
+		// Push object vừa scan được vào mảng kết quả
+		staffs = append(staffs, &s)
+	}
+
+	// 4. Kiểm tra xem có lỗi ẩn nào xảy ra trong quá trình chạy vòng lặp không
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("lỗi trong quá trình duyệt danh sách: %w", err)
+	}
+
+	return staffs, nil
 }
 
 func (r *PostgresStaffRepository) CountStaffsByOrgID(ctx context.Context, orgID string, search string, status string) (int64, error) {
-    formattedSearch := ""
-    if strings.TrimSpace(search) != "" {
-        formattedSearch = "%" + strings.TrimSpace(search) + "%"
-    }
-    args := []any{orgID, formattedSearch, status}
-    query := countStaffsByOrgIDQuery + searchStaffsFilter + filterStaffsStatus
+	formattedSearch := ""
+	if strings.TrimSpace(search) != "" {
+		formattedSearch = "%" + strings.TrimSpace(search) + "%"
+	}
+	args := []any{orgID, formattedSearch, status}
+	query := countStaffsByOrgIDQuery + searchStaffsFilter + filterStaffsStatus
 
-    var total int64
-    if err := r.db.QueryRow(ctx, query, args...).Scan(&total); err != nil {
-        return 0, fmt.Errorf("lỗi khi đếm danh sách nhân viên: %w", err)
-    }
-    return total, nil
+	var total int64
+	if err := r.db.QueryRow(ctx, query, args...).Scan(&total); err != nil {
+		return 0, fmt.Errorf("lỗi khi đếm danh sách nhân viên: %w", err)
+	}
+	return total, nil
 }
 
 func (r *PostgresStaffRepository) UpdateStaff(ctx context.Context, staff *domain.Staff) error {
@@ -150,10 +202,19 @@ func (r *PostgresStaffRepository) UpdateStaff(ctx context.Context, staff *domain
 		staff.Code,
 		staff.FullName,
 		staff.Phone,
+		nullableStaffString(staff.Email),
+		staff.BirthDate,
+		nullableStaffString(staff.Gender),
+		nullableStaffString(staff.Address),
 		staff.Position,
+		nullableStaffString(staff.EmploymentType),
 		staff.CommissionRate,
+		staff.BaseSalary,
+		nullableStaffString(staff.BankName),
+		nullableStaffString(staff.BankAccountNumber),
+		nullableStaffString(staff.BankAccountHolder),
 		staff.Status,
-		staff.HireDate,
+		nullableStaffDate(staff.HireDate),
 	)
 	if err != nil {
 		return fmt.Errorf("lỗi khi cập nhật nhân viên: %w", err)

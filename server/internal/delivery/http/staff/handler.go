@@ -2,6 +2,8 @@ package staff
 
 import (
 	"strconv"
+	"strings"
+	"time"
 
 	domain "github.com/daidat02/server/internal/domain/staff"
 	uc "github.com/daidat02/server/internal/usecase/staff"
@@ -10,14 +12,39 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type StaffHandler struct{
+type StaffHandler struct {
 	uc *uc.StaffUsecase
 }
 
-func NewStaffHandler(uc *uc.StaffUsecase) *StaffHandler{
+func NewStaffHandler(uc *uc.StaffUsecase) *StaffHandler {
 	return &StaffHandler{
 		uc: uc,
 	}
+}
+
+// parseOptionalDate nhận yyyy-MM-dd hoặc RFC3339; chuỗi rỗng trả về nil.
+func parseOptionalDate(raw *string) (*time.Time, error) {
+	if raw == nil || strings.TrimSpace(*raw) == "" {
+		return nil, nil
+	}
+	value := strings.TrimSpace(*raw)
+	parsed, err := time.Parse("2006-01-02", value)
+	if err != nil {
+		parsed, err = time.Parse(time.RFC3339, value)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &parsed, nil
+}
+
+// parseHireDate nhận yyyy-MM-dd hoặc RFC3339; chuỗi rỗng trả về zero time.
+func parseHireDate(raw *string) (time.Time, error) {
+	parsed, err := parseOptionalDate(raw)
+	if err != nil || parsed == nil {
+		return time.Time{}, err
+	}
+	return *parsed, nil
 }
 
 // CreateStaff godoc
@@ -32,34 +59,54 @@ func NewStaffHandler(uc *uc.StaffUsecase) *StaffHandler{
 // @Failure      401   {object}  response.ErrorResponse     "Thiếu token / token không hợp lệ"
 // @Failure      500   {object}  response.ErrorResponse     "Lỗi server"
 // @Router       /staff [post]
-func (h *StaffHandler) CreateStaff(c *gin.Context){
+func (h *StaffHandler) CreateStaff(c *gin.Context) {
 	var req domain.CreateStaffRequest
 
-	if err:= c.ShouldBindJSON(&req); err!=nil{
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
 		c.Abort()
 		return
 	}
 
-	staff := &domain.Staff{
-		Code: req.Code,
-		FullName: req.FullName,
-		Phone: req.Phone,
-		Position: req.Position,
-		CommissionRate: req.CommissionRate,
-		Status: req.Status,
-		HireDate: req.HireDate,
-	}
-
-	result,err:= h.uc.CreateStaff(c.Request.Context(), staff)
-	if err !=nil{
-		response.Error(c,err)
+	birthDate, err := parseOptionalDate(req.BirthDate)
+	if err != nil {
+		response.Error(c, apperror.New(400, "Ngày sinh không hợp lệ", err))
 		c.Abort()
-		return 
+		return
 	}
-	response.Success(c,200,"Tạo nhân viên thành công",result)
-}
+	hireDate, err := parseHireDate(req.HireDate)
+	if err != nil {
+		response.Error(c, apperror.New(400, "Ngày vào làm không hợp lệ", err))
+		c.Abort()
+		return
+	}
 
+	staff := &domain.Staff{
+		FullName:          req.FullName,
+		Phone:             req.Phone,
+		Email:             req.Email,
+		BirthDate:         birthDate,
+		Gender:            req.Gender,
+		Address:           req.Address,
+		Position:          req.Position,
+		EmploymentType:    req.EmploymentType,
+		CommissionRate:    req.CommissionRate,
+		BaseSalary:        req.BaseSalary,
+		BankName:          req.BankName,
+		BankAccountNumber: req.BankAccountNumber,
+		BankAccountHolder: req.BankAccountHolder,
+		Status:            req.Status,
+		HireDate:          hireDate,
+	}
+
+	result, err := h.uc.CreateStaff(c.Request.Context(), staff)
+	if err != nil {
+		response.Error(c, err)
+		c.Abort()
+		return
+	}
+	response.Success(c, 200, "Tạo nhân viên thành công", result)
+}
 
 // GetStaffByOrgID godoc
 // @Summary      Lấy danh sách nhân viên (phân trang + lọc + sắp xếp)
@@ -76,7 +123,7 @@ func (h *StaffHandler) CreateStaff(c *gin.Context){
 // @Failure      401        {object}  response.ErrorResponse    "Thiếu token / token không hợp lệ"
 // @Failure      500        {object}  response.ErrorResponse    "Lỗi server"
 // @Router       /staff [get]
-func (h *StaffHandler) GetStaffByOrgID(c *gin.Context){
+func (h *StaffHandler) GetStaffByOrgID(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
 	search := c.DefaultQuery("search", "")
@@ -105,7 +152,7 @@ func (h *StaffHandler) GetStaffByOrgID(c *gin.Context){
 // @Failure      401   {object}  response.ErrorResponse     "Thiếu token / token không hợp lệ"
 // @Failure      404   {object}  response.ErrorResponse     "Không tìm thấy nhân viên"
 // @Router       /staff/{id} [put]
-func (h *StaffHandler) UpdateStaff(c *gin.Context){
+func (h *StaffHandler) UpdateStaff(c *gin.Context) {
 	id := c.Param("id")
 
 	var req domain.UpdateStaffRequest
@@ -115,14 +162,36 @@ func (h *StaffHandler) UpdateStaff(c *gin.Context){
 		return
 	}
 
+	birthDate, err := parseOptionalDate(req.BirthDate)
+	if err != nil {
+		response.Error(c, apperror.New(400, "Ngày sinh không hợp lệ", err))
+		c.Abort()
+		return
+	}
+	hireDate, err := parseHireDate(req.HireDate)
+	if err != nil {
+		response.Error(c, apperror.New(400, "Ngày vào làm không hợp lệ", err))
+		c.Abort()
+		return
+	}
+
 	staff := &domain.Staff{
-		Code:           req.Code,
-		FullName:       req.FullName,
-		Phone:          req.Phone,
-		Position:       req.Position,
-		CommissionRate: req.CommissionRate,
-		Status:         req.Status,
-		HireDate:       req.HireDate,
+		Code:              req.Code,
+		FullName:          req.FullName,
+		Phone:             req.Phone,
+		Email:             req.Email,
+		BirthDate:         birthDate,
+		Gender:            req.Gender,
+		Address:           req.Address,
+		Position:          req.Position,
+		EmploymentType:    req.EmploymentType,
+		CommissionRate:    req.CommissionRate,
+		BaseSalary:        req.BaseSalary,
+		BankName:          req.BankName,
+		BankAccountNumber: req.BankAccountNumber,
+		BankAccountHolder: req.BankAccountHolder,
+		Status:            req.Status,
+		HireDate:          hireDate,
 	}
 
 	result, err := h.uc.UpdateStaff(c.Request.Context(), id, staff)
@@ -145,7 +214,7 @@ func (h *StaffHandler) UpdateStaff(c *gin.Context){
 // @Failure      401  {object}  response.ErrorResponse    "Thiếu token / token không hợp lệ"
 // @Failure      404  {object}  response.ErrorResponse    "Không tìm thấy nhân viên"
 // @Router       /staff/{id} [delete]
-func (h *StaffHandler) DeleteStaff(c *gin.Context){
+func (h *StaffHandler) DeleteStaff(c *gin.Context) {
 	id := c.Param("id")
 
 	deletedID, err := h.uc.DeleteStaff(c.Request.Context(), id)

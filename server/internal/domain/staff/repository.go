@@ -12,7 +12,7 @@ var ErrMissingOrganizationID = errors.New("missing organization_id in context")
 var ErrStaffNotFound = errors.New("staff not found")
 
 type StaffRepository interface {
-	CreateStaff(ctx context.Context, staff *Staff) error
+	CreateStaff(ctx context.Context, staff *Staff) (string, error)
 	GetStaffByOrgID(ctx context.Context, orgID string, search string, status string, sort string, limit, offset int) ([]*Staff, error)
 	CountStaffsByOrgID(ctx context.Context, orgID string, search string, status string) (int64, error)
 	UpdateStaff(ctx context.Context, staff *Staff) error
