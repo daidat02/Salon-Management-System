@@ -6,19 +6,82 @@ import { DashDialog, DashDialogFooter } from '@/components/dashboard/DashDialog'
 import { DashInput } from '@/components/dashboard/DashInput';
 import { Button } from '@/components/ui/button';
 import { useCreatePayment } from '@/hooks/use-create-payment';
+import { usePaymentSettings } from '@/hooks/use-settings';
 import { getApiErrorMessage } from '@/services/apiClient';
 import { toast } from '@/components/ui/toast';
 import type { PaymentMethod } from '@/services/order';
+import type { SettingPaymentMethod } from '@/types/setting';
 import { cn } from '@/lib/utils';
 import { type EnrichedRetailLine, type EnrichedServiceLine } from './orderDetailUtils';
 import { formatVND } from '@/lib/format';
 
-const METHODS: { label: string; sub: string; value: PaymentMethod; icon: typeof Banknote }[] = [
-  { label: 'Tiền mặt', sub: 'Thu trực tiếp', value: 'cash', icon: Banknote },
-  { label: 'Chuyển khoản', sub: 'VietQR ngân hàng', value: 'bank_transfer', icon: QrCode },
-  { label: 'Thẻ', sub: 'POS / quẹt thẻ', value: 'card', icon: CreditCard },
-  { label: 'Ví điện tử', sub: 'Cổng online', value: 'gateway', icon: Smartphone },
-];
+const METHOD_META: Record<
+  PaymentMethod,
+  { label: string; sub: string; icon: typeof Banknote }
+> = {
+  cash: { label: 'Tiền mặt', sub: 'Thu trực tiếp', icon: Banknote },
+  bank_transfer: { label: 'Chuyển khoản', sub: 'VietQR ngân hàng', icon: QrCode },
+  card: { label: 'Thẻ', sub: 'POS / quẹt thẻ', icon: CreditCard },
+  gateway: { label: 'Ví điện tử', sub: 'Cổng online', icon: Smartphone },
+};
+
+const CODE_TO_VALUE: Record<string, PaymentMethod> = {
+  CASH: 'cash',
+  BANK_TRANSFER: 'bank_transfer',
+  TRANSFER: 'bank_transfer',
+  BANK: 'bank_transfer',
+  CARD: 'card',
+  POS: 'card',
+  WALLET: 'gateway',
+  E_WALLET: 'gateway',
+  GATEWAY: 'gateway',
+};
+
+type MethodOption = {
+  key: string;
+  value: PaymentMethod;
+  methodPaymentId: string;
+  label: string;
+  sub: string;
+  icon: typeof Banknote;
+};
+
+const FALLBACK_METHODS: MethodOption[] = (
+  [
+    ['CASH', 'Tiền mặt', 'cash'],
+    ['BANK_TRANSFER', 'Chuyển khoản', 'bank_transfer'],
+    ['CARD', 'Thẻ', 'card'],
+    ['GATEWAY', 'Ví điện tử', 'gateway'],
+  ] as const
+).map(([code, label, value]) => ({
+  key: code,
+  value,
+  methodPaymentId: code,
+  label,
+  sub: METHOD_META[value].sub,
+  icon: METHOD_META[value].icon,
+}));
+
+function buildMethodOptions(methods: SettingPaymentMethod[] | undefined): MethodOption[] {
+  const options = (methods ?? [])
+    .filter((method) => method.is_active)
+    .flatMap<MethodOption>((method) => {
+      const value = CODE_TO_VALUE[method.code.toUpperCase()];
+      if (!value) return [];
+      return [
+        {
+          key: method.id,
+          value,
+          methodPaymentId: method.id,
+          label: method.name,
+          sub: METHOD_META[value].sub,
+          icon: METHOD_META[value].icon,
+        },
+      ];
+    });
+
+  return options.length > 0 ? options : FALLBACK_METHODS;
+}
 
 type Props = {
   open: boolean;
@@ -39,18 +102,26 @@ export default function PaymentDialog({
   services,
   retail,
 }: Props) {
-  const [method, setMethod] = React.useState<PaymentMethod>('cash');
+  const { data } = usePaymentSettings();
+  const methodOptions = React.useMemo(
+    () => buildMethodOptions(data?.payment_methods),
+    [data],
+  );
+  const [methodKey, setMethodKey] = React.useState<string>('');
   const [discount, setDiscount] = React.useState(0);
   const [coupon, setCoupon] = React.useState('');
   const [error, setError] = React.useState<string | null>(null);
   const { mutate, isPending } = useCreatePayment(orderId);
+
+  const selectedMethod =
+    methodOptions.find((option) => option.key === methodKey) ?? methodOptions[0];
 
   const clampedDiscount = Math.min(Math.max(0, discount || 0), remaining);
   const collectAmount = Math.max(0, remaining - clampedDiscount);
 
   const handleOpenChange = (v: boolean) => {
     if (!v) {
-      setMethod('cash');
+      setMethodKey('');
       setDiscount(0);
       setCoupon('');
       setError(null);
@@ -59,12 +130,13 @@ export default function PaymentDialog({
   };
 
   const handleSubmit = () => {
-    if (collectAmount <= 0 || isPending) return;
+    if (!selectedMethod || collectAmount <= 0 || isPending) return;
     setError(null);
     mutate(
       {
-        method,
-        provider: method === 'bank_transfer' ? 'vietqr' : null,
+        method: selectedMethod.value,
+        method_payment_id: selectedMethod.methodPaymentId,
+        provider: selectedMethod.value === 'bank_transfer' ? 'vietqr' : null,
         amount: collectAmount,
       },
       {
@@ -188,7 +260,7 @@ export default function PaymentDialog({
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <div className="mb-1 flex items-center gap-1 text-xs font-medium text-on-surface-variant">
+              <div className="mb-1.5 flex items-center gap-1 text-xs font-semibold text-on-surface">
                 <BadgePercent className="h-3.5 w-3.5" />
                 Giảm giá (đ)
               </div>
@@ -203,7 +275,7 @@ export default function PaymentDialog({
               />
             </div>
             <div>
-              <div className="mb-1 flex items-center gap-1 text-xs font-medium text-on-surface-variant">
+              <div className="mb-1.5 flex items-center gap-1 text-xs font-semibold text-on-surface">
                 <Ticket className="h-3.5 w-3.5" />
                 Mã giảm giá
               </div>
@@ -216,18 +288,18 @@ export default function PaymentDialog({
             </div>
           </div>
           <div>
-            <div className="mb-1.5 text-xs font-medium text-on-surface-variant">
+            <div className="mb-1.5 text-xs font-semibold text-on-surface">
               Phương thức thanh toán
             </div>
             <div className="grid grid-cols-2 gap-2">
-              {METHODS.map((m) => {
+              {methodOptions.map((m) => {
                 const Icon = m.icon;
-                const active = method === m.value;
+                const active = selectedMethod?.key === m.key;
                 return (
                   <button
-                    key={m.value}
+                    key={m.key}
                     type="button"
-                    onClick={() => setMethod(m.value)}
+                    onClick={() => setMethodKey(m.key)}
                     className={cn(
                       'flex items-center gap-2.5 rounded-lg border p-2.5 text-left transition-all',
                       active

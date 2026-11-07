@@ -18,13 +18,18 @@ export const API_ENDPOINTS = {
 
   PRODUCTS: {
     GET_ALL: `${API_BASE}/products`,
+    GET_BY_ID: (id: string) => `${API_BASE}/products/${id}`,
     CREATE: `${API_BASE}/products`,
+    UPDATE: (id: string) => `${API_BASE}/products/${id}`,
     GET_STATS: `${API_BASE}/products/stats`,
   },
 
   SERVICES: {
     GET_ALL: `${API_BASE}/services`,
+    GET_STATS: `${API_BASE}/services/stats`,
+    GET_DETAIL: (id: string) => `${API_BASE}/services/${id}/details`,
     CREATE: `${API_BASE}/services`,
+    UPDATE: (id: string) => `${API_BASE}/services/${id}`,
   },
 
   CATEGORIES: {
@@ -38,6 +43,7 @@ export const API_ENDPOINTS = {
     GET_DOCUMENTS: `${API_BASE}/inventory/`,
     CREATE_DOCUMENT: `${API_BASE}/inventory/`,
     GET_DOCUMENT_DETAIL: (documentId: string) => `${API_BASE}/inventory/${documentId}`,
+    GET_STATS: `${API_BASE}/inventory/stats`,
     GET_TRANSACTIONS: `${API_BASE}/inventory/transactions`,
     GET_TRANSACTION_DETAIL: (transactionId: string) =>
       `${API_BASE}/inventory/transactions/${transactionId}`,
@@ -45,7 +51,20 @@ export const API_ENDPOINTS = {
 
   APPOINTMENTS: {
     GET_APPOINTMENTS: `${API_BASE}/appointments`,
+    GET_WEEKLY_SCHEDULE: `${API_BASE}/appointments/weekly`,
     GET_APPOINTMENT_DETAIL: (id: string) => `${API_BASE}/appointments/${id}`,
+    UPDATE_APPOINTMENT: (id: string) => `${API_BASE}/appointments/${id}`,
+  },
+
+  SETTINGS: {
+    GET_GENERAL: `${API_BASE}/settings/general`,
+    UPDATE_GENERAL: `${API_BASE}/settings/general`,
+    GET_BOOKING: `${API_BASE}/settings/booking`,
+    UPDATE_BOOKING: `${API_BASE}/settings/booking`,
+    GET_PAYMENT: `${API_BASE}/settings/payment`,
+    UPDATE_PAYMENT: `${API_BASE}/settings/payment`,
+    GET_NOTIFICATIONS: `${API_BASE}/settings/notifications`,
+    UPDATE_NOTIFICATIONS: `${API_BASE}/settings/notifications`,
   },
 
   CASHFLOWS: {

@@ -331,6 +331,88 @@ func TestAppointmentUseCase_CreateAppointment(t *testing.T) {
 		assertFlatAppError(t, err, 500)
 		catalog.AssertExpectations(t)
 	})
+
+	t.Run("Thành công - Khách no_show đủ ngưỡng phải cọc theo % tổng tiền", func(t *testing.T) {
+		repo := new(MockAppointmentRepository)
+		finder := new(MockCustomerFinder)
+		catalog := catalogOK()
+		settingsRepo := new(MockSettingsRepository)
+		finder.On("FindCustomerByPhone", mock.Anything, "org-123", "0912345678").
+			Return(existingCustomer(), nil).Once()
+		settings := domain.DefaultAppointmentSettings("org-123")
+		settings.NoShowThreshold = 2
+		settings.DepositPercent = 30
+		settingsRepo.On("GetAppointmentSettings", mock.Anything, "org-123").
+			Return(settings, nil).Once()
+		settingsRepo.On("CountCustomerNoShows", mock.Anything, "org-123", "cus-1", mock.Anything).
+			Return(2, nil).Once()
+		repo.On("CreateAppointment", mock.Anything, mock.MatchedBy(func(a *domain.Appointment) bool {
+			return a.RequiredDepositAmount == 195000 && a.DepositStatus == "pending"
+		}), mock.Anything).Return(nil).Once()
+
+		uc := NewAppointmentUseCase(repo, finder, catalog, settingsRepo)
+		res, err := uc.CreateAppointment(withOrgCtx("org-123"), validRequest())
+
+		assert.NoError(t, err)
+		assert.Equal(t, 195000.0, res.RequiredDepositAmount, "30% của 650000")
+		assert.Equal(t, "pending", res.DepositStatus)
+		repo.AssertExpectations(t)
+		settingsRepo.AssertExpectations(t)
+	})
+
+	t.Run("Thành công - Cọc theo % nhưng không vượt mức tối đa", func(t *testing.T) {
+		repo := new(MockAppointmentRepository)
+		finder := new(MockCustomerFinder)
+		catalog := catalogOK()
+		settingsRepo := new(MockSettingsRepository)
+		finder.On("FindCustomerByPhone", mock.Anything, "org-123", "0912345678").
+			Return(existingCustomer(), nil).Once()
+		settings := domain.DefaultAppointmentSettings("org-123")
+		settings.NoShowThreshold = 2
+		settings.DepositPercent = 30
+		settings.DepositMaxAmount = 100000
+		settingsRepo.On("GetAppointmentSettings", mock.Anything, "org-123").
+			Return(settings, nil).Once()
+		settingsRepo.On("CountCustomerNoShows", mock.Anything, "org-123", "cus-1", mock.Anything).
+			Return(2, nil).Once()
+		repo.On("CreateAppointment", mock.Anything, mock.MatchedBy(func(a *domain.Appointment) bool {
+			return a.RequiredDepositAmount == 100000 && a.DepositStatus == "pending"
+		}), mock.Anything).Return(nil).Once()
+
+		uc := NewAppointmentUseCase(repo, finder, catalog, settingsRepo)
+		res, err := uc.CreateAppointment(withOrgCtx("org-123"), validRequest())
+
+		assert.NoError(t, err)
+		assert.Equal(t, 100000.0, res.RequiredDepositAmount, "30% của 650000 bị cap bởi 100000")
+		assert.Equal(t, "pending", res.DepositStatus)
+		repo.AssertExpectations(t)
+		settingsRepo.AssertExpectations(t)
+	})
+
+	t.Run("Thành công - Chưa đủ ngưỡng no_show thì không cần cọc", func(t *testing.T) {
+		repo := new(MockAppointmentRepository)
+		finder := new(MockCustomerFinder)
+		catalog := catalogOK()
+		settingsRepo := new(MockSettingsRepository)
+		finder.On("FindCustomerByPhone", mock.Anything, "org-123", "0912345678").
+			Return(existingCustomer(), nil).Once()
+		settings := domain.DefaultAppointmentSettings("org-123")
+		settings.NoShowThreshold = 2
+		settingsRepo.On("GetAppointmentSettings", mock.Anything, "org-123").
+			Return(settings, nil).Once()
+		settingsRepo.On("CountCustomerNoShows", mock.Anything, "org-123", "cus-1", mock.Anything).
+			Return(1, nil).Once()
+		repo.On("CreateAppointment", mock.Anything, mock.Anything, mock.Anything).
+			Return(nil).Once()
+
+		uc := NewAppointmentUseCase(repo, finder, catalog, settingsRepo)
+		res, err := uc.CreateAppointment(withOrgCtx("org-123"), validRequest())
+
+		assert.NoError(t, err)
+		assert.Equal(t, 0.0, res.RequiredDepositAmount)
+		assert.Equal(t, "none", res.DepositStatus)
+		settingsRepo.AssertExpectations(t)
+	})
 }
 
 func validAppointment(status string) *domain.Appointment {
@@ -342,24 +424,112 @@ func validAppointment(status string) *domain.Appointment {
 	}
 }
 
+func validAppointmentResponse(status string) *domain.AppointmentResponse {
+	return &domain.AppointmentResponse{
+		ID: "appt-1", OrganizationID: "org-123", Code: "APT-CLIENT-1",
+		CustomerID: "cus-1", CustomerName: "Nguyễn Thị C", CustomerPhone: "0912345678",
+		StartTime: "2026-10-01T14:00:00+07:00", EndTime: "2026-10-01T15:00:00+07:00",
+		Status: status, Source: "online", TotalAmount: 650000,
+	}
+}
+
 func newUC(repo *MockAppointmentRepository) (*AppointmentUseCase, *MockCustomerFinder, *MockCatalogChecker) {
 	finder := new(MockCustomerFinder)
 	catalog := new(MockCatalogChecker)
 	return NewAppointmentUseCase(repo, finder, catalog), finder, catalog
 }
 
+func TestAppointmentUseCase_UpdateAppointment(t *testing.T) {
+	t.Run("Thành công - Ghi đè field, giữ code, total do server tính", func(t *testing.T) {
+		repo := new(MockAppointmentRepository)
+		finder := new(MockCustomerFinder)
+		catalog := catalogOK()
+		repo.On("CheckExitAppointmentByID", mock.Anything, "org-123", "appt-1").
+			Return(validAppointment("confirmed"), nil).Once()
+		finder.On("FindCustomerByPhone", mock.Anything, "org-123", "0912345678").
+			Return(existingCustomer(), nil).Once()
+		repo.On("UpdateAppointment", mock.Anything, mock.Anything, mock.Anything).
+			Return(nil).Once()
+
+		uc := NewAppointmentUseCase(repo, finder, catalog)
+		req := validRequest()
+		req.Code = "APT-CLIENT-IGNORED"
+		req.TotalAmount = 1
+		res, err := uc.UpdateAppointment(withOrgCtx("org-123"), "appt-1", req)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, res)
+		assert.Equal(t, "appt-1", res.ID)
+		assert.Equal(t, "APT-CLIENT-1", res.Code, "Code phải giữ nguyên, không nhận từ client")
+		assert.Equal(t, "cus-1", res.CustomerID)
+		assert.Equal(t, 650000.0, res.TotalAmount, "Total phải do server tính từ items")
+		repo.AssertExpectations(t)
+		finder.AssertExpectations(t)
+		catalog.AssertExpectations(t)
+	})
+
+	t.Run("Thành công - Đổi SĐT sang khách mới", func(t *testing.T) {
+		repo := new(MockAppointmentRepository)
+		finder := new(MockCustomerFinder)
+		catalog := catalogOK()
+		repo.On("CheckExitAppointmentByID", mock.Anything, "org-123", "appt-1").
+			Return(validAppointment("confirmed"), nil).Once()
+		finder.On("FindCustomerByPhone", mock.Anything, "org-123", "0987654321").
+			Return(nil, nil).Once()
+		finder.On("CreateCustomer", mock.Anything, mock.Anything).
+			Return(nil).Once()
+		repo.On("UpdateAppointment", mock.Anything, mock.Anything, mock.Anything).
+			Return(nil).Once()
+
+		uc := NewAppointmentUseCase(repo, finder, catalog)
+		req := validRequest()
+		req.CustomerPhone = "0987654321"
+		res, err := uc.UpdateAppointment(withOrgCtx("org-123"), "appt-1", req)
+
+		assert.NoError(t, err)
+		assert.NotEmpty(t, res.CustomerID)
+		assert.NotEqual(t, "cus-1", res.CustomerID)
+		finder.AssertExpectations(t)
+	})
+
+	t.Run("Thất bại - Không tìm thấy lịch hẹn", func(t *testing.T) {
+		repo := new(MockAppointmentRepository)
+		repo.On("CheckExitAppointmentByID", mock.Anything, "org-123", "missing").
+			Return(nil, domain.ErrAppointmentNotFound).Once()
+		uc, _, _ := newUC(repo)
+
+		res, err := uc.UpdateAppointment(withOrgCtx("org-123"), "missing", validRequest())
+
+		assert.Error(t, err)
+		assert.Nil(t, res)
+		assertFlatAppError(t, err, 404)
+		repo.AssertNotCalled(t, "UpdateAppointment", mock.Anything, mock.Anything, mock.Anything)
+	})
+
+	t.Run("Thất bại - Thiếu id", func(t *testing.T) {
+		repo := new(MockAppointmentRepository)
+		uc, _, _ := newUC(repo)
+
+		res, err := uc.UpdateAppointment(withOrgCtx("org-123"), "  ", validRequest())
+
+		assert.Error(t, err)
+		assert.Nil(t, res)
+		assertFlatAppError(t, err, 400)
+	})
+}
+
 func TestAppointmentUseCase_GetAppointments(t *testing.T) {
-	list := []*domain.Appointment{validAppointment("confirmed"), validAppointment("pending")}
+	list := []*domain.AppointmentResponse{validAppointmentResponse("confirmed"), validAppointmentResponse("pending")}
 
 	t.Run("Thành công - List phân trang kèm total", func(t *testing.T) {
 		repo := new(MockAppointmentRepository)
-		repo.On("GetAppointmentsByOrgID", mock.Anything, "org-123", "", "", "", 20, 0).
+		repo.On("GetAppointmentsByOrgID", mock.Anything, "org-123", "", "", "", "", 20, 0).
 			Return(list, nil).Once()
-		repo.On("CountAppointmentsByOrgID", mock.Anything, "org-123", "", "", "").
+		repo.On("CountAppointmentsByOrgID", mock.Anything, "org-123", "", "", "", "").
 			Return(int64(2), nil).Once()
 		uc, _, _ := newUC(repo)
 
-		res, err := uc.GetAppointments(withOrgCtx("org-123"), 1, 20, "", "", "")
+		res, err := uc.GetAppointments(withOrgCtx("org-123"), 1, 20, "", "", "", "")
 
 		assert.NoError(t, err)
 		assert.NotNil(t, res.Data)
@@ -372,19 +542,19 @@ func TestAppointmentUseCase_GetAppointments(t *testing.T) {
 		repo := new(MockAppointmentRepository)
 		uc, _, _ := newUC(repo)
 
-		res, err := uc.GetAppointments(withOrgCtx("org-123"), 1, 20, "unknown", "", "")
+		res, err := uc.GetAppointments(withOrgCtx("org-123"), 1, 20, "unknown", "", "", "")
 
 		assert.Error(t, err)
 		assert.Nil(t, res)
 		assertFlatAppError(t, err, 400)
-		repo.AssertNotCalled(t, "GetAppointmentsByOrgID", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+		repo.AssertNotCalled(t, "GetAppointmentsByOrgID", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	})
 
 	t.Run("Thất bại - Khoảng thời gian lọc sai format", func(t *testing.T) {
 		repo := new(MockAppointmentRepository)
 		uc, _, _ := newUC(repo)
 
-		res, err := uc.GetAppointments(withOrgCtx("org-123"), 1, 20, "", "not-a-date", "")
+		res, err := uc.GetAppointments(withOrgCtx("org-123"), 1, 20, "", "not-a-date", "", "")
 
 		assert.Error(t, err)
 		assert.Nil(t, res)
@@ -393,11 +563,11 @@ func TestAppointmentUseCase_GetAppointments(t *testing.T) {
 
 	t.Run("Thất bại - Lỗi DB khi list", func(t *testing.T) {
 		repo := new(MockAppointmentRepository)
-		repo.On("GetAppointmentsByOrgID", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		repo.On("GetAppointmentsByOrgID", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(nil, errors.New("db error")).Once()
 		uc, _, _ := newUC(repo)
 
-		res, err := uc.GetAppointments(withOrgCtx("org-123"), 1, 20, "", "", "")
+		res, err := uc.GetAppointments(withOrgCtx("org-123"), 1, 20, "", "", "", "")
 
 		assert.Error(t, err)
 		assert.Nil(t, res)
@@ -406,13 +576,13 @@ func TestAppointmentUseCase_GetAppointments(t *testing.T) {
 
 	t.Run("Thất bại - Lỗi DB khi count", func(t *testing.T) {
 		repo := new(MockAppointmentRepository)
-		repo.On("GetAppointmentsByOrgID", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		repo.On("GetAppointmentsByOrgID", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(list, nil).Once()
-		repo.On("CountAppointmentsByOrgID", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		repo.On("CountAppointmentsByOrgID", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(int64(0), errors.New("db error")).Once()
 		uc, _, _ := newUC(repo)
 
-		res, err := uc.GetAppointments(withOrgCtx("org-123"), 1, 20, "", "", "")
+		res, err := uc.GetAppointments(withOrgCtx("org-123"), 1, 20, "", "", "", "")
 
 		assert.Error(t, err)
 		assert.Nil(t, res)
@@ -423,7 +593,7 @@ func TestAppointmentUseCase_GetAppointments(t *testing.T) {
 		repo := new(MockAppointmentRepository)
 		uc, _, _ := newUC(repo)
 
-		res, err := uc.GetAppointments(context.Background(), 1, 20, "", "", "")
+		res, err := uc.GetAppointments(context.Background(), 1, 20, "", "", "", "")
 
 		assert.Error(t, err)
 		assert.Nil(t, res)
@@ -431,15 +601,84 @@ func TestAppointmentUseCase_GetAppointments(t *testing.T) {
 	})
 }
 
+func TestAppointmentUseCase_GetWeeklySchedule(t *testing.T) {
+	thursday := validAppointmentResponse("confirmed")
+	friday := validAppointmentResponse("pending")
+	friday.ID = "appt-2"
+	friday.StartTime = "2026-10-02T09:00:00+07:00"
+	outOfWeek := validAppointmentResponse("confirmed")
+	outOfWeek.ID = "appt-3"
+	outOfWeek.StartTime = "2026-10-06T09:00:00+07:00"
+
+	t.Run("Thành công - Tách 7 ngày, chỉ nhận lịch trong tuần", func(t *testing.T) {
+		repo := new(MockAppointmentRepository)
+		repo.On("GetAppointmentsByDateRange", mock.Anything, "org-123",
+			"2026-09-28T00:00:00+07:00", "2026-10-05T00:00:00+07:00").
+			Return([]*domain.AppointmentResponse{thursday, friday, outOfWeek}, nil).Once()
+		uc, _, _ := newUC(repo)
+
+		res, err := uc.GetWeeklySchedule(withOrgCtx("org-123"), "2026-10-01T00:00:00+07:00")
+
+		assert.NoError(t, err)
+		assert.NotNil(t, res)
+		assert.Equal(t, "2026-09-28", res.WeekStart)
+		assert.Equal(t, "2026-10-04", res.WeekEnd)
+		assert.Equal(t, 2, res.Total)
+		assert.Len(t, res.Days, 7)
+		assert.Equal(t, "Thứ 2", res.Days[0].Weekday)
+		assert.Equal(t, "2026-10-01", res.Days[3].Date)
+		assert.Equal(t, 1, res.Days[3].Total)
+		assert.Equal(t, 1, res.Days[4].Total)
+		assert.Empty(t, res.Days[0].Appointments)
+		repo.AssertExpectations(t)
+	})
+
+	t.Run("Thất bại - week_start sai format", func(t *testing.T) {
+		repo := new(MockAppointmentRepository)
+		uc, _, _ := newUC(repo)
+
+		res, err := uc.GetWeeklySchedule(withOrgCtx("org-123"), "not-a-date")
+
+		assert.Error(t, err)
+		assert.Nil(t, res)
+		assertFlatAppError(t, err, 400)
+		repo.AssertNotCalled(t, "GetAppointmentsByDateRange", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	})
+
+	t.Run("Thất bại - Thiếu organization_id", func(t *testing.T) {
+		repo := new(MockAppointmentRepository)
+		uc, _, _ := newUC(repo)
+
+		res, err := uc.GetWeeklySchedule(context.Background(), "")
+
+		assert.Error(t, err)
+		assert.Nil(t, res)
+		assertFlatAppError(t, err, 400)
+	})
+
+	t.Run("Thất bại - Lỗi DB", func(t *testing.T) {
+		repo := new(MockAppointmentRepository)
+		repo.On("GetAppointmentsByDateRange", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			Return(nil, errors.New("db error")).Once()
+		uc, _, _ := newUC(repo)
+
+		res, err := uc.GetWeeklySchedule(withOrgCtx("org-123"), "")
+
+		assert.Error(t, err)
+		assert.Nil(t, res)
+		assertFlatAppError(t, err, 500)
+	})
+}
+
 func TestAppointmentUseCase_GetAppointmentDetail(t *testing.T) {
-	items := []*domain.AppointmentItem{
+	items := []*domain.AppointmentItemResponse{
 		{ID: "item-1", OrganizationID: "org-123", AppointmentID: "appt-1", ItemType: "service", Quantity: 1, UnitPrice: 500000, LineTotal: 500000},
 	}
 
 	t.Run("Thành công - Chi tiết kèm items", func(t *testing.T) {
 		repo := new(MockAppointmentRepository)
 		repo.On("GetAppointmentByID", mock.Anything, "org-123", "appt-1").
-			Return(validAppointment("confirmed"), nil).Once()
+			Return(validAppointmentResponse("confirmed"), nil).Once()
 		repo.On("GetAppointmentItems", mock.Anything, "org-123", "appt-1").
 			Return(items, nil).Once()
 		uc, _, _ := newUC(repo)
@@ -469,7 +708,7 @@ func TestAppointmentUseCase_GetAppointmentDetail(t *testing.T) {
 	t.Run("Thất bại - Lỗi DB khi lấy items", func(t *testing.T) {
 		repo := new(MockAppointmentRepository)
 		repo.On("GetAppointmentByID", mock.Anything, "org-123", "appt-1").
-			Return(validAppointment("confirmed"), nil).Once()
+			Return(validAppointmentResponse("confirmed"), nil).Once()
 		repo.On("GetAppointmentItems", mock.Anything, "org-123", "appt-1").
 			Return(nil, errors.New("db error")).Once()
 		uc, _, _ := newUC(repo)
@@ -498,7 +737,7 @@ func TestAppointmentUseCase_RescheduleAppointment(t *testing.T) {
 
 	t.Run("Thành công - Đổi lịch pending", func(t *testing.T) {
 		repo := new(MockAppointmentRepository)
-		repo.On("GetAppointmentByID", mock.Anything, "org-123", "appt-1").
+		repo.On("CheckExitAppointmentByID", mock.Anything, "org-123", "appt-1").
 			Return(validAppointment("pending"), nil).Once()
 		repo.On("UpdateAppointmentTimes", mock.Anything, "org-123", "appt-1", newStart, newEnd).
 			Return(nil).Once()
@@ -514,7 +753,7 @@ func TestAppointmentUseCase_RescheduleAppointment(t *testing.T) {
 
 	t.Run("Thất bại - Lịch completed không được đổi", func(t *testing.T) {
 		repo := new(MockAppointmentRepository)
-		repo.On("GetAppointmentByID", mock.Anything, "org-123", "appt-1").
+		repo.On("CheckExitAppointmentByID", mock.Anything, "org-123", "appt-1").
 			Return(validAppointment("completed"), nil).Once()
 		uc, _, _ := newUC(repo)
 
@@ -539,7 +778,7 @@ func TestAppointmentUseCase_RescheduleAppointment(t *testing.T) {
 
 	t.Run("Thất bại - Không tìm thấy lịch hẹn", func(t *testing.T) {
 		repo := new(MockAppointmentRepository)
-		repo.On("GetAppointmentByID", mock.Anything, "org-123", "missing").
+		repo.On("CheckExitAppointmentByID", mock.Anything, "org-123", "missing").
 			Return(nil, domain.ErrAppointmentNotFound).Once()
 		uc, _, _ := newUC(repo)
 
@@ -554,7 +793,7 @@ func TestAppointmentUseCase_RescheduleAppointment(t *testing.T) {
 func TestAppointmentUseCase_CancelAppointment(t *testing.T) {
 	t.Run("Thành công - Hủy lịch confirmed kèm lý do", func(t *testing.T) {
 		repo := new(MockAppointmentRepository)
-		repo.On("GetAppointmentByID", mock.Anything, "org-123", "appt-1").
+		repo.On("CheckExitAppointmentByID", mock.Anything, "org-123", "appt-1").
 			Return(validAppointment("confirmed"), nil).Once()
 		repo.On("UpdateAppointmentStatus", mock.Anything, "org-123", "appt-1", "cancelled", "Khách bận").
 			Return(nil).Once()
@@ -570,7 +809,7 @@ func TestAppointmentUseCase_CancelAppointment(t *testing.T) {
 
 	t.Run("Thất bại - Lịch completed không được hủy", func(t *testing.T) {
 		repo := new(MockAppointmentRepository)
-		repo.On("GetAppointmentByID", mock.Anything, "org-123", "appt-1").
+		repo.On("CheckExitAppointmentByID", mock.Anything, "org-123", "appt-1").
 			Return(validAppointment("completed"), nil).Once()
 		uc, _, _ := newUC(repo)
 
@@ -583,7 +822,7 @@ func TestAppointmentUseCase_CancelAppointment(t *testing.T) {
 
 	t.Run("Thất bại - Không tìm thấy lịch hẹn", func(t *testing.T) {
 		repo := new(MockAppointmentRepository)
-		repo.On("GetAppointmentByID", mock.Anything, "org-123", "missing").
+		repo.On("CheckExitAppointmentByID", mock.Anything, "org-123", "missing").
 			Return(nil, domain.ErrAppointmentNotFound).Once()
 		uc, _, _ := newUC(repo)
 
@@ -598,7 +837,7 @@ func TestAppointmentUseCase_CancelAppointment(t *testing.T) {
 func TestAppointmentUseCase_UpdateAppointmentStatus(t *testing.T) {
 	t.Run("Thành công - confirmed sang checked_in", func(t *testing.T) {
 		repo := new(MockAppointmentRepository)
-		repo.On("GetAppointmentByID", mock.Anything, "org-123", "appt-1").
+		repo.On("CheckExitAppointmentByID", mock.Anything, "org-123", "appt-1").
 			Return(validAppointment("confirmed"), nil).Once()
 		repo.On("UpdateAppointmentStatus", mock.Anything, "org-123", "appt-1", "checked_in", "").
 			Return(nil).Once()
@@ -613,7 +852,7 @@ func TestAppointmentUseCase_UpdateAppointmentStatus(t *testing.T) {
 
 	t.Run("Thất bại - Nhảy cóc pending sang completed", func(t *testing.T) {
 		repo := new(MockAppointmentRepository)
-		repo.On("GetAppointmentByID", mock.Anything, "org-123", "appt-1").
+		repo.On("CheckExitAppointmentByID", mock.Anything, "org-123", "appt-1").
 			Return(validAppointment("pending"), nil).Once()
 		uc, _, _ := newUC(repo)
 
@@ -634,12 +873,12 @@ func TestAppointmentUseCase_UpdateAppointmentStatus(t *testing.T) {
 		assert.Error(t, err)
 		assert.Nil(t, res)
 		assertFlatAppError(t, err, 400)
-		repo.AssertNotCalled(t, "GetAppointmentByID", mock.Anything, mock.Anything, mock.Anything)
+		repo.AssertNotCalled(t, "CheckExitAppointmentByID", mock.Anything, mock.Anything, mock.Anything)
 	})
 
 	t.Run("Thất bại - Lịch cancelled là trạng thái cuối", func(t *testing.T) {
 		repo := new(MockAppointmentRepository)
-		repo.On("GetAppointmentByID", mock.Anything, "org-123", "appt-1").
+		repo.On("CheckExitAppointmentByID", mock.Anything, "org-123", "appt-1").
 			Return(validAppointment("cancelled"), nil).Once()
 		uc, _, _ := newUC(repo)
 
@@ -654,7 +893,7 @@ func TestAppointmentUseCase_UpdateAppointmentStatus(t *testing.T) {
 func TestAppointmentUseCase_DeleteAppointment(t *testing.T) {
 	t.Run("Thành công - Xóa lịch pending", func(t *testing.T) {
 		repo := new(MockAppointmentRepository)
-		repo.On("GetAppointmentByID", mock.Anything, "org-123", "appt-1").
+		repo.On("CheckExitAppointmentByID", mock.Anything, "org-123", "appt-1").
 			Return(validAppointment("pending"), nil).Once()
 		repo.On("DeleteAppointment", mock.Anything, "org-123", "appt-1").
 			Return(nil).Once()
@@ -669,7 +908,7 @@ func TestAppointmentUseCase_DeleteAppointment(t *testing.T) {
 
 	t.Run("Thất bại - Lịch confirmed còn giá trị, phải hủy thay vì xóa", func(t *testing.T) {
 		repo := new(MockAppointmentRepository)
-		repo.On("GetAppointmentByID", mock.Anything, "org-123", "appt-1").
+		repo.On("CheckExitAppointmentByID", mock.Anything, "org-123", "appt-1").
 			Return(validAppointment("confirmed"), nil).Once()
 		uc, _, _ := newUC(repo)
 
@@ -683,7 +922,7 @@ func TestAppointmentUseCase_DeleteAppointment(t *testing.T) {
 
 	t.Run("Thất bại - Không tìm thấy lịch hẹn", func(t *testing.T) {
 		repo := new(MockAppointmentRepository)
-		repo.On("GetAppointmentByID", mock.Anything, "org-123", "missing").
+		repo.On("CheckExitAppointmentByID", mock.Anything, "org-123", "missing").
 			Return(nil, domain.ErrAppointmentNotFound).Once()
 		uc, _, _ := newUC(repo)
 

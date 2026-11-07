@@ -13,14 +13,15 @@ import (
 	customerhttp "github.com/daidat02/server/internal/delivery/http/customer"
 	inventoryhttp "github.com/daidat02/server/internal/delivery/http/inventory"
 	orderhttp "github.com/daidat02/server/internal/delivery/http/order"
+	organizationhttp "github.com/daidat02/server/internal/delivery/http/organization"
 	producthttp "github.com/daidat02/server/internal/delivery/http/product"
 	servicehttp "github.com/daidat02/server/internal/delivery/http/service"
+	settinghttp "github.com/daidat02/server/internal/delivery/http/setting"
 	staffhttp "github.com/daidat02/server/internal/delivery/http/staff"
 	userhttp "github.com/daidat02/server/internal/delivery/http/user"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
-
 
 func NewRouter(cfg *config.Config, dbPool *pgxpool.Pool) *gin.Engine {
 	// Tạo một router mới sử dụng Gin
@@ -31,14 +32,14 @@ func NewRouter(cfg *config.Config, dbPool *pgxpool.Pool) *gin.Engine {
 	// Cấu hình CORS để cho phép các yêu cầu từ các nguồn được chỉ định
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     allowedOrigins,
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE","PATCH" },
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "PATCH"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
 	}))
-	
-	r.GET("/health", func (c *gin.Context)  {
-		c.JSON(200, gin.H{"status": "ok",})	
+
+	r.GET("/health", func(c *gin.Context) {
+		c.JSON(200, gin.H{"status": "ok"})
 	})
 
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
@@ -54,11 +55,17 @@ func NewRouter(cfg *config.Config, dbPool *pgxpool.Pool) *gin.Engine {
 	customerDeps := customerhttp.NewDependencies(dbPool)
 	customerhttp.RegisterCustomerRoutes(r, customerDeps.Handler, basePath)
 
+	organizationDeps := organizationhttp.NewDependencies(dbPool)
+	organizationhttp.RegisterOrganizationRoutes(r, organizationDeps.Handler, basePath)
+
 	categoryDeps := categoryhttp.NewDependencies(dbPool)
 	categoryhttp.RegisterCategoryRoutes(r, categoryDeps.Handler, basePath)
 
 	serviceDeps := servicehttp.NewDependencies(dbPool)
 	servicehttp.RegisterServiceRoutes(r, serviceDeps.Handler, basePath)
+
+	settingDeps := settinghttp.NewDependencies(dbPool)
+	settinghttp.RegisterSettingRoutes(r, settingDeps.Handler, basePath)
 
 	productDeps := producthttp.NewDependencies(dbPool)
 	producthttp.RegisterProductRoutes(r, productDeps.Handler, basePath)

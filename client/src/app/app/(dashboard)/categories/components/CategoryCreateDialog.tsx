@@ -103,13 +103,13 @@ export function CategoryCreateDialog({ open, onOpenChange, initial, onSuccess }:
         )}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <Label className="block font-semibold text-slate-700 mb-1">
+            <Label className="mb-1.5 block min-w-0 text-xs font-semibold text-on-surface">
               Tên danh mục <span className="text-error">*</span>
             </Label>
             <DashInput name="name" defaultValue={initial?.name ?? ''} placeholder="VD: Cắt tóc" required />
           </div>
           <div>
-            <Label className="block font-semibold text-slate-700 mb-1">Phân nhóm</Label>
+            <Label className="mb-1.5 block min-w-0 text-xs font-semibold text-on-surface">Phân nhóm</Label>
             <DashSelect
               value={type}
               onValueChange={(v) => setType(v as 'service' | 'product')}
@@ -122,7 +122,7 @@ export function CategoryCreateDialog({ open, onOpenChange, initial, onSuccess }:
           </div>
         </div>
         <div>
-          <Label className="block font-semibold text-slate-700 mb-1">Mô tả</Label>
+          <Label className="mb-1.5 block min-w-0 text-xs font-semibold text-on-surface">Mô tả</Label>
           <Textarea
             name="description"
             defaultValue={initial?.description ?? ''}
@@ -133,7 +133,7 @@ export function CategoryCreateDialog({ open, onOpenChange, initial, onSuccess }:
         </div>
         <div className="flex items-center justify-between rounded-lg border border-outline bg-surface-container-low px-3 py-2">
           <div>
-            <p className="text-xs font-semibold text-slate-700">Đang hoạt động</p>
+            <p className="text-xs font-semibold text-on-surface">Đang hoạt động</p>
             <p className="text-[11px] text-on-surface-variant">Tắt để tạm ẩn khỏi POS</p>
           </div>
           <Switch checked={isActive} onCheckedChange={setIsActive} />

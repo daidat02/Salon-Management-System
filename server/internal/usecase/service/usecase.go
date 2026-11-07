@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
-	"github.com/daidat02/server/internal/usecase/shared"
 	domain "github.com/daidat02/server/internal/domain/service"
+	"github.com/daidat02/server/internal/usecase/shared"
 	"github.com/daidat02/server/pkg/apperror"
 	"github.com/daidat02/server/pkg/pagination"
 	"github.com/daidat02/server/pkg/utils"
+	"github.com/google/uuid"
 )
 
 type ServiceUsecase struct {
@@ -26,17 +28,20 @@ func NewServiceUsecase(repo domain.ServiceRepository) *ServiceUsecase {
 
 func toResponse(s *domain.Service) *domain.ServiceResponse {
 	return &domain.ServiceResponse{
-		ID:              s.ID,
-		OrganizationID:  s.OrganizationID,
-		CategoryID:      s.CategoryID,
-		Name:            s.Name,
-		Description:     s.Description,
-		DurationMinutes: s.DurationMinutes,
-		BufferMinutes:   s.BufferMinutes,
-		Price:           s.Price,
-		IsActive:        s.IsActive,
-		CreatedAt:       s.CreatedAt,
-		UpdatedAt:       s.UpdatedAt,
+		ID:               s.ID,
+		OrganizationID:   s.OrganizationID,
+		CategoryID:       s.CategoryID,
+		CategoryName:     s.CategoryName,
+		Name:             s.Name,
+		Description:      s.Description,
+		DurationMinutes:  s.DurationMinutes,
+		BufferMinutes:    s.BufferMinutes,
+		Price:            s.Price,
+		IsActive:         s.IsActive,
+		SoldThisMonth:    s.SoldThisMonth,
+		RevenueThisMonth: s.RevenueThisMonth,
+		CreatedAt:        s.CreatedAt,
+		UpdatedAt:        s.UpdatedAt,
 	}
 }
 
@@ -150,15 +155,22 @@ func (u *ServiceUsecase) checkCategoryInOrg(ctx context.Context, orgID string, c
 	return nil
 }
 
-func (u *ServiceUsecase) GetServicesByOrgID(ctx context.Context, search string, status string, sort string, page, pageSize int) (*pagination.Result[*domain.ServiceResponse], error) {
+func (u *ServiceUsecase) GetServicesByOrgID(ctx context.Context, search string, status string, categoryID string, sort string, page, pageSize int) (*pagination.Result[*domain.ServiceResponse], error) {
 	orgID, err := shared.RequireOrgID(ctx)
 	if err != nil {
 		return nil, err
 	}
 
+	categoryID = strings.TrimSpace(categoryID)
+	if categoryID != "" {
+		if _, err := uuid.Parse(categoryID); err != nil {
+			return nil, apperror.New(400, "category_id không hợp lệ", err)
+		}
+	}
+
 	params := pagination.Normalize(page, pageSize)
 
-	services, err := u.repo.GetServicesByOrgID(ctx, orgID, search, status, sort, params.PageSize, params.Offset())
+	services, err := u.repo.GetServicesByOrgID(ctx, orgID, search, status, categoryID, sort, params.PageSize, params.Offset())
 	if err != nil {
 		return nil, apperror.New(500, "Lỗi khi lấy danh sách dịch vụ", err)
 	}
@@ -168,12 +180,58 @@ func (u *ServiceUsecase) GetServicesByOrgID(ctx context.Context, search string, 
 		servicesResponse = append(servicesResponse, toResponse(service))
 	}
 
-	total, err := u.repo.CountServicesByOrgID(ctx, orgID, search, status)
+	total, err := u.repo.CountServicesByOrgID(ctx, orgID, search, status, categoryID)
 	if err != nil {
 		return nil, apperror.New(500, "Lỗi khi đếm danh sách dịch vụ", err)
 	}
 
 	return pagination.NewResult(servicesResponse, params, total), nil
+}
+
+// GetServiceStats thống kê tổng quan dịch vụ của salon.
+func (u *ServiceUsecase) GetServiceStats(ctx context.Context) (*domain.ServiceStatsResponse, error) {
+	orgID, err := shared.RequireOrgID(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	stats, err := u.repo.GetServiceStats(ctx, orgID)
+	if err != nil {
+		log.Println("Error getting service stats:", err)
+		return nil, apperror.New(500, "Lỗi khi lấy thống kê dịch vụ", err)
+	}
+	return stats, nil
+}
+
+const serviceRevenueMonths = 6
+
+// buildServiceRevenueLastMonths điền đủ các tháng còn thiếu và trả về doanh
+// số/doanh thu tháng hiện tại.
+func buildServiceRevenueLastMonths(sales []domain.ServiceMonthlySales, months int) ([]domain.ServiceMonthlyRevenueResponse, float64, float64) {
+	byMonth := make(map[string]domain.ServiceMonthlySales, len(sales))
+	for _, s := range sales {
+		byMonth[s.MonthStart.UTC().Format("2006-01")] = s
+	}
+
+	now := time.Now().UTC()
+	currentMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
+	result := make([]domain.ServiceMonthlyRevenueResponse, 0, months)
+	var soldThisMonth, revenueThisMonth float64
+
+	for i := months - 1; i >= 0; i-- {
+		month := currentMonth.AddDate(0, -i, 0)
+		sale := byMonth[month.Format("2006-01")]
+		result = append(result, domain.ServiceMonthlyRevenueResponse{
+			Month:   fmt.Sprintf("T%d", int(month.Month())),
+			Revenue: sale.Revenue,
+		})
+		if i == 0 {
+			soldThisMonth = sale.Quantity
+			revenueThisMonth = sale.Revenue
+		}
+	}
+
+	return result, soldThisMonth, revenueThisMonth
 }
 
 func (u *ServiceUsecase) UpdateService(ctx context.Context, id string, service *domain.Service) (*domain.ServiceResponse, error) {
@@ -227,14 +285,13 @@ func (u *ServiceUsecase) DeleteService(ctx context.Context, id string) (string, 
 	return id, nil
 }
 
-
-
-func (u *ServiceUsecase) GetServiceDetails(ctx context.Context, serviceID string) (*domain.ServiceResponse, []*domain.ServiceMaterial, error) {
-	orgID,err := shared.RequireOrgID(ctx)
+func (u *ServiceUsecase) GetServiceDetails(ctx context.Context, serviceID string) (*domain.ServiceDetailResponse, []*domain.ServiceMaterial, error) {
+	orgID, err := shared.RequireOrgID(ctx)
 	if err != nil {
 		return nil, nil, err
 	}
-	service, materials, err := u.repo.GetServiceDetails(ctx,orgID,serviceID)
+
+	service, materials, err := u.repo.GetServiceDetails(ctx, orgID, serviceID)
 	if err != nil {
 		if errors.Is(err, domain.ErrServiceNotFound) {
 			return nil, nil, apperror.New(404, "Không tìm thấy dịch vụ", err)
@@ -242,5 +299,21 @@ func (u *ServiceUsecase) GetServiceDetails(ctx context.Context, serviceID string
 		return nil, nil, apperror.New(500, "Lỗi khi lấy thông tin dịch vụ và nguyên vật liệu", err)
 	}
 
-	return service, materials, nil
+	sales, err := u.repo.GetServiceSalesLastMonths(ctx, orgID, serviceID, serviceRevenueMonths)
+	if err != nil {
+		return nil, nil, apperror.New(500, "Lỗi khi lấy doanh số dịch vụ", err)
+	}
+	bookingStats, err := u.repo.GetServiceBookingStats(ctx, orgID, serviceID)
+	if err != nil {
+		return nil, nil, apperror.New(500, "Lỗi khi lấy thống kê lịch hẹn dịch vụ", err)
+	}
+
+	detail := &domain.ServiceDetailResponse{
+		ServiceResponse:       *service,
+		BookingsThisMonth:     bookingStats.BookingsThisMonth,
+		CompletedThisMonth:    bookingStats.CompletedThisMonth,
+		MaterialCostThisMonth: bookingStats.MaterialCostThisMonth,
+	}
+	detail.RevenueLast6Months, detail.SoldThisMonth, detail.RevenueThisMonth = buildServiceRevenueLastMonths(sales, serviceRevenueMonths)
+	return detail, materials, nil
 }

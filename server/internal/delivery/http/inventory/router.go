@@ -13,6 +13,7 @@ func RegisterInventoryRoutes(r *gin.Engine, h *InventoryHandler, basePath string
 		group.GET("/", h.GetDocumentsByOrgID)
 		group.GET("/transactions", h.GetTransactionsByOrgID)
 		group.GET("/low-stock", h.GetLowStockProducts)
+		group.GET("/stats", h.GetInventoryStats)
 		group.GET("/:document_id", h.GetDocumentByID)
 		group.GET("/transactions/:product_id", h.GetTransactionsByProductID)
 	}

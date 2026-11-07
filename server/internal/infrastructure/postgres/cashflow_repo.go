@@ -125,14 +125,16 @@ func (r *CashFlowRepository) CreateCashFlow(ctx context.Context, voucher *domain
 // Hard-coded system codes cho hook chốt đơn.
 const (
 	hookCashFundCode        = "CASH"
+
 	hookRevenueCategoryCode = "SALON_REVENUE"
+	hookPayrollExpenseCategoryCode = "SALARY_EXPENSE"
 )
 
 // insertOrderIncomeVoucherTx sinh phiếu thu tiền mặt khi chốt đơn, chạy
 // trong tx của CompleteOrderWithSlip nên nguyên tử với chốt đơn.
 // Idempotent theo order_id: đơn đã có phiếu thì bỏ qua (chốt lại an toàn).
 // Đơn 0đ caller tự bỏ qua trước (không có dòng tiền thật).
-func insertOrderIncomeVoucherTx(ctx context.Context, tx pgx.Tx, orgID, orderID, orderCode string, orderTotal float64) error {
+func insertOrderIncomeVoucherTx(ctx context.Context, tx pgx.Tx, orgID, orderID, orderCode string, orderTotal float64, fundID string) error {
 	var existingID string
 	err := tx.QueryRow(ctx, findCashFlowIDByOrderQuery, orgID, orderID).Scan(&existingID)
 	if err != nil && err != pgx.ErrNoRows {
@@ -141,15 +143,7 @@ func insertOrderIncomeVoucherTx(ctx context.Context, tx pgx.Tx, orgID, orderID, 
 	if err == nil {
 		return nil
 	}
-
-	var fundID string
-	if err := tx.QueryRow(ctx, findActiveFundIDByCodeQuery, orgID, hookCashFundCode).Scan(&fundID); err != nil {
-		if err == pgx.ErrNoRows {
-			return fmt.Errorf("quỹ tiền mặt (CASH) chưa được khởi tạo")
-		}
-		return fmt.Errorf("lỗi khi tìm quỹ tiền mặt: %w", err)
-	}
-
+	
 	// Danh mục doanh thu thiếu (seed lỗi) thì phiếu vẫn sinh với category NULL
 	// để không chặn chốt đơn — đối soát danh mục bổ sung sau.
 	var categoryID *string
@@ -184,6 +178,55 @@ func insertOrderIncomeVoucherTx(ctx context.Context, tx pgx.Tx, orgID, orderID, 
 		}
 	}
 }
+
+
+func insertPayrollExpenseVoucherTx(ctx context.Context, tx pgx.Tx, orgID, staffID, staffName string, total float64) (ID *string , error error) {
+
+	var fundID string
+	if err := tx.QueryRow(ctx, findActiveFundIDByCodeQuery, orgID, hookCashFundCode).Scan(&fundID); err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, fmt.Errorf("quỹ tiền mặt (CASH) chưa được khởi tạo")
+		}
+		return nil, fmt.Errorf("lỗi khi tìm quỹ tiền mặt: %w", err)
+	}
+
+	// Danh mục doanh thu thiếu (seed lỗi) thì phiếu vẫn sinh với category NULL
+	// để không chặn chốt đơn — đối soát danh mục bổ sung sau.
+	var categoryID *string
+	var resolvedCategory string
+	if err := tx.QueryRow(ctx, findActiveCategoryIDByCodeQuery, orgID, hookPayrollExpenseCategoryCode, domain.KindExpense).Scan(&resolvedCategory); err == nil {
+		categoryID = &resolvedCategory
+	} else if err != pgx.ErrNoRows {
+		return nil,  fmt.Errorf("lỗi khi tìm danh mục chi phí lương: %w", err)
+	}
+
+	now := time.Now()
+	desc := "Chi tiền lương nhân viên - " + staffName + " - " + now.Format("01/2006")
+	voucher := &domain.CashFlow{
+		ID:             utils.NewID(),
+		OrganizationID: orgID,
+		Kind:           domain.KindExpense,
+		CategoryID:     categoryID,
+		FundID:         fundID,
+		Amount:         total,
+		Description:    &desc,
+		OccurredAt:     &now,
+		Status:         domain.VoucherStatusPending,
+		StaffID:        &staffID,
+	}
+	// Trùng mã phiếu (23505) thì sinh lại tối đa 3 lần như phiếu bán hàng.
+	for attempts := 0; ; attempts++ {
+		voucher.Code = utils.GenerateCashFlowCode(domain.KindExpense)
+		if err := createCashFlowTx(ctx, tx, voucher); err == nil {
+			return &voucher.ID, nil
+		} else if !isUniqueViolation(err) || attempts >= 2 {
+			return nil,  fmt.Errorf("lỗi khi sinh phiếu chi của đơn hàng: %w", err)
+		}
+	}
+}
+
+
+
 
 type FilterCashFlow struct {
 	Search string

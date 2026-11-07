@@ -17,17 +17,41 @@ func (m *MockServiceRepository) CreateService(ctx context.Context, service *doma
 	return args.Error(0)
 }
 
-func (m *MockServiceRepository) GetServicesByOrgID(ctx context.Context, orgID string, search string, status string, sort string, limit, offset int) ([]*domain.Service, error) {
-	args := m.Called(ctx, orgID, search, status, sort, limit, offset)
+func (m *MockServiceRepository) GetServicesByOrgID(ctx context.Context, orgID string, search string, status string, categoryID string, sort string, limit, offset int) ([]*domain.Service, error) {
+	args := m.Called(ctx, orgID, search, status, categoryID, sort, limit, offset)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
 	return args.Get(0).([]*domain.Service), args.Error(1)
 }
 
-func (m *MockServiceRepository) CountServicesByOrgID(ctx context.Context, orgID string, search string, status string) (int64, error) {
-	args := m.Called(ctx, orgID, search, status)
+func (m *MockServiceRepository) CountServicesByOrgID(ctx context.Context, orgID string, search string, status string, categoryID string) (int64, error) {
+	args := m.Called(ctx, orgID, search, status, categoryID)
 	return args.Get(0).(int64), args.Error(1)
+}
+
+func (m *MockServiceRepository) GetServiceStats(ctx context.Context, orgID string) (*domain.ServiceStatsResponse, error) {
+	args := m.Called(ctx, orgID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*domain.ServiceStatsResponse), args.Error(1)
+}
+
+func (m *MockServiceRepository) GetServiceSalesLastMonths(ctx context.Context, orgID, serviceID string, months int) ([]domain.ServiceMonthlySales, error) {
+	args := m.Called(ctx, orgID, serviceID, months)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]domain.ServiceMonthlySales), args.Error(1)
+}
+
+func (m *MockServiceRepository) GetServiceBookingStats(ctx context.Context, orgID, serviceID string) (*domain.ServiceBookingStats, error) {
+	args := m.Called(ctx, orgID, serviceID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*domain.ServiceBookingStats), args.Error(1)
 }
 
 func (m *MockServiceRepository) UpdateService(ctx context.Context, service *domain.Service) error {
@@ -68,7 +92,6 @@ func (m *MockServiceRepository) ServicesExistInOrg(ctx context.Context, orgID st
 	}
 	return args.Get(0).([]string), args.Error(1)
 }
-
 
 func (m *MockServiceRepository) GetServiceDetails(ctx context.Context, orgID, serviceID string) (*domain.ServiceResponse, []*domain.ServiceMaterial, error) {
 	args := m.Called(ctx, orgID, serviceID)

@@ -24,3 +24,22 @@ export function formatShortDateTime(value: string): string {
   const mo = String(d.getMonth() + 1).padStart(2, '0');
   return `${hh}:${mm} ${dd}/${mo}`;
 }
+
+/**
+ * Chuyển Date object thành chuỗi 'YYYY-MM-DD' theo đúng ngày hiển thị địa phương (múi giờ VN)
+ * Tránh việc .toISOString() bị trôi lùi 1 ngày do lệch múi giờ UTC.
+ */
+export const formatLocalDate = (date: Date): string => {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(date);
+  // 'en-CA' tự động trả về định dạng chuẩn YYYY-MM-DD
+};
+
+/**
+ * Đọc chuỗi 'YYYY-MM-DD' từ URL ngược lại thành Date object chuẩn Local Time
+ */
+export const parseLocalDate = (dateStr: string | null): Date | undefined => {
+  if (!dateStr) return undefined;
+  // Ghép 'T00:00:00' để JS parse theo giờ địa phương, không bị nhảy sang UTC
+  const date = new Date(`${dateStr}T00:00:00`);
+  return isNaN(date.getTime()) ? undefined : date;
+};

@@ -1,10 +1,13 @@
 'use client';
 
 import * as React from 'react';
+import { format } from 'date-fns';
 import { DashDialog, DashDialogFooter } from '@/components/dashboard/DashDialog';
+import { DashDatePicker } from '@/components/dashboard/DashDatePicker';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { DashInput } from '@/components/dashboard/DashInput';
+import { DashOptionPills } from '@/components/dashboard/DashOptionPills';
 import { DashSelect } from '@/components/dashboard/DashSelect';
 import { useCreateCustomer } from '@/hooks/use-create-customer';
 import { useUpdateCustomer } from '@/hooks/use-update-customer';
@@ -30,14 +33,12 @@ type Props = {
   initialData?: CustomerFormInitialData | null;
 };
 
-/** Lấy YYYY-MM-DD từ chuỗi ISO để điền input date. */
-function toDateInput(value?: string | null): string {
-  if (!value) return '';
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return value.slice(0, 10);
-  const mo = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return `${d.getFullYear()}-${mo}-${dd}`;
+/** Chuyển chuỗi ISO/YYYY-MM-DD sang Date để hiển thị trên date picker. */
+function toDateValue(value?: string | null): Date | undefined {
+  if (!value) return undefined;
+  const [year, month, day] = value.slice(0, 10).split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+  return Number.isNaN(date.getTime()) ? undefined : date;
 }
 
 export function CustomerForm({ open, onOpenChange, onSuccess, mode = 'create', initialData }: Props) {
@@ -45,6 +46,7 @@ export function CustomerForm({ open, onOpenChange, onSuccess, mode = 'create', i
   const searchParams = useSearchParams();
   const isEdit = mode === 'edit';
   const [gender, setGender] = React.useState('female');
+  const [birthDate, setBirthDate] = React.useState<Date | undefined>(undefined);
   const [error, setError] = React.useState<string | null>(null);
   const { mutate: createMutate, isPending: isCreating } = useCreateCustomer();
   const { mutate: updateMutate, isPending: isUpdating } = useUpdateCustomer();
@@ -54,8 +56,9 @@ export function CustomerForm({ open, onOpenChange, onSuccess, mode = 'create', i
     if (open) {
       setError(null);
       setGender(initialData?.gender || 'female');
+      setBirthDate(toDateValue(initialData?.birth_date));
     }
-  }, [open, initialData?.gender, initialData?.id]);
+  }, [open, initialData?.gender, initialData?.id, initialData?.birth_date]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,7 +69,7 @@ export function CustomerForm({ open, onOpenChange, onSuccess, mode = 'create', i
       full_name: data.full_name?.trim(),
       phone: data.phone?.trim().replace(/\s+/g, ''),
       gender,
-      birth_date: data.birth_date || null,
+      birth_date: birthDate ? format(birthDate, 'yyyy-MM-dd') : null,
       note: data.note?.trim() || '',
     } as const;
     if (!payload.full_name || !payload.phone) {
@@ -88,6 +91,7 @@ export function CustomerForm({ open, onOpenChange, onSuccess, mode = 'create', i
       onOpenChange(false);
       form.reset();
       setGender('female');
+      setBirthDate(undefined);
     };
     const failed = (verb: string) => (err: unknown) => {
       const msg = getApiErrorMessage(err);
@@ -147,7 +151,7 @@ export function CustomerForm({ open, onOpenChange, onSuccess, mode = 'create', i
         )}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <Label className="block font-semibold text-slate-700 mb-1">
+            <Label className="mb-1.5 block min-w-0 text-xs font-semibold text-on-surface">
               Họ và tên <span className="text-error">*</span>
             </Label>
             <DashInput
@@ -158,7 +162,7 @@ export function CustomerForm({ open, onOpenChange, onSuccess, mode = 'create', i
             />
           </div>
           <div>
-            <Label className="block font-semibold text-slate-700 mb-1">
+            <Label className="mb-1.5 block min-w-0 text-xs font-semibold text-on-surface">
               Số điện thoại <span className="text-error">*</span>
             </Label>
             <div className="relative">
@@ -175,58 +179,31 @@ export function CustomerForm({ open, onOpenChange, onSuccess, mode = 'create', i
             </div>
           </div>
           <div>
-            <Label className="block font-semibold text-slate-700 mb-1">Email</Label>
+            <Label className="mb-1.5 block min-w-0 text-xs font-semibold text-on-surface">Email</Label>
             <DashInput name="email" type="email" placeholder="khachhang@example.com" />
           </div>
           <div>
-            <Label className="block font-semibold text-slate-700 mb-1">Ngày sinh</Label>
-            <DashInput
-              name="birth_date"
-              type="date"
-              className="text-slate-600"
-              defaultValue={toDateInput(initialData?.birth_date)}
+            <Label className="mb-1.5 block min-w-0 text-xs font-semibold text-on-surface">Ngày sinh</Label>
+            <DashDatePicker
+              value={birthDate}
+              onValueChange={setBirthDate}
+              placeholder="Chọn ngày sinh"
             />
           </div>
           <div>
-            <Label className="block font-semibold text-slate-700 mb-2">Giới tính</Label>
-            <div className="flex h-9 items-center gap-4">
-              <label className="flex items-center gap-1.5 cursor-pointer">
-                <input
-                  type="radio"
-                  name="gender"
-                  value="female"
-                  checked={gender === 'female'}
-                  onChange={() => setGender('female')}
-                  className="text-primary focus:ring-primary"
-                />
-                <span>Nữ</span>
-              </label>
-              <label className="flex items-center gap-1.5 cursor-pointer">
-                <input
-                  type="radio"
-                  name="gender"
-                  value="male"
-                  checked={gender === 'male'}
-                  onChange={() => setGender('male')}
-                  className="text-primary focus:ring-primary"
-                />
-                <span>Nam</span>
-              </label>
-              <label className="flex items-center gap-1.5 cursor-pointer">
-                <input
-                  type="radio"
-                  name="gender"
-                  value="other"
-                  checked={gender === 'other'}
-                  onChange={() => setGender('other')}
-                  className="text-primary focus:ring-primary"
-                />
-                <span>Khác</span>
-              </label>
-            </div>
+            <Label className="mb-1.5 block min-w-0 text-xs font-semibold text-on-surface">Giới tính</Label>
+            <DashOptionPills
+              value={gender}
+              onChange={setGender}
+              options={[
+                { label: 'Nữ', value: 'female' },
+                { label: 'Nam', value: 'male' },
+                { label: 'Khác', value: 'other' },
+              ]}
+            />
           </div>
           <div>
-            <Label className="block font-semibold text-slate-700 mb-1">Nhóm / Phân hạng</Label>
+            <Label className="mb-1.5 block min-w-0 text-xs font-semibold text-on-surface">Nhóm / Phân hạng</Label>
             <DashSelect
               placeholder="Chọn nhóm"
               defaultValue="new"
@@ -240,11 +217,11 @@ export function CustomerForm({ open, onOpenChange, onSuccess, mode = 'create', i
           </div>
         </div>
         <div>
-          <Label className="block font-semibold text-slate-700 mb-1">Địa chỉ liên hệ</Label>
+          <Label className="mb-1.5 block min-w-0 text-xs font-semibold text-on-surface">Địa chỉ liên hệ</Label>
           <DashInput name="address" placeholder="Số nhà, đường, quận/huyện, tỉnh/thành phố" />
         </div>
         <div>
-          <Label className="block font-semibold text-slate-700 mb-1">
+          <Label className="mb-1.5 block min-w-0 text-xs font-semibold text-on-surface">
             Ghi chú sở thích & Lưu ý dịch vụ
           </Label>
           <Textarea

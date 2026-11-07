@@ -1,4 +1,4 @@
-import { Service } from '@/types/service';
+import { Service, ServiceDetailResult, ServiceStats } from '@/types/service';
 import { ApiResponse, PaginationResult } from '@/types/response';
 import apiClient from './apiClient';
 import { API_ENDPOINTS } from '@/constants';
@@ -9,12 +9,14 @@ export const getServicesByOrgID = async ({
   page,
   pageSize,
   status,
+  categoryId,
   sort,
 }: {
   search?: string;
   page: number;
   pageSize: number;
   status?: string;
+  categoryId?: string;
   sort?: string;
 }) => {
   const res = await apiClient.get<ApiResponse<PaginationResult<Service>>>(
@@ -25,11 +27,26 @@ export const getServicesByOrgID = async ({
         page: page,
         page_size: pageSize,
         status: status,
+        category_id: categoryId,
         sort: sort,
       },
     },
   );
 
+  return res.data.data;
+};
+
+/** Thống kê tổng quan dịch vụ của salon. */
+export const getServiceStats = async () => {
+  const res = await apiClient.get<ApiResponse<ServiceStats>>(SERVICES_ENDPOINT.GET_STATS);
+  return res.data.data;
+};
+
+/** Chi tiết dịch vụ kèm thống kê tháng và định mức vật tư. */
+export const getServiceDetail = async (id: string) => {
+  const res = await apiClient.get<ApiResponse<ServiceDetailResult>>(
+    SERVICES_ENDPOINT.GET_DETAIL(id),
+  );
   return res.data.data;
 };
 
@@ -45,5 +62,12 @@ export type CreateServicePayload = {
 
 export const createService = async (payload: CreateServicePayload) => {
   const res = await apiClient.post<ApiResponse<Service>>(SERVICES_ENDPOINT.CREATE, payload);
+  return res.data.data;
+};
+
+export type UpdateServicePayload = CreateServicePayload;
+
+export const updateService = async (id: string, payload: UpdateServicePayload) => {
+  const res = await apiClient.put<ApiResponse<Service>>(SERVICES_ENDPOINT.UPDATE(id), payload);
   return res.data.data;
 };

@@ -2,6 +2,7 @@ export interface Product {
   id: string;
   organization_id: string;
   category_id: string;
+  category_name?: string | null;
   sku: string;
   name: string;
   unit: string;
@@ -14,8 +15,21 @@ export interface Product {
   stock_quantity: number;
   min_stock: number;
   is_active: boolean;
+  /** Chỉ có trong response GET /products (doanh thu tháng hiện tại). */
+  revenue_this_month?: number;
   created_at: string;
   updated_at: string;
+}
+
+export interface ProductMonthlyRevenue {
+  /** Nhãn tháng dạng T1..T12. */
+  month: string;
+  revenue: number;
+}
+
+export interface ProductDetail extends Product {
+  sold_this_month: number;
+  revenue_last_6_months: ProductMonthlyRevenue[];
 }
 
 export interface ProductStats {

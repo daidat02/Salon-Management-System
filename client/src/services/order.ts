@@ -192,6 +192,7 @@ export type PaymentMethod = 'cash' | 'bank_transfer' | 'card' | 'gateway';
 
 export type CreatePaymentPayload = {
   method: PaymentMethod;
+  method_payment_id?: string | null;
   provider?: string | null;
   provider_txn_id?: string | null;
   amount: number;
@@ -266,6 +267,7 @@ export const createPayment = async (orderId: string, payload: CreatePaymentPaylo
     ORDERS_ENDPOINT.CREATE_PAYMENT(orderId),
     {
       method: payload.method,
+      method_payment_id: payload.method_payment_id ?? null,
       provider: payload.provider ?? null,
       provider_txn_id: payload.provider_txn_id ?? null,
       amount: payload.amount,

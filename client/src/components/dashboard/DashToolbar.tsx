@@ -12,6 +12,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from 'cn';
+import type { DateRange } from 'react-day-picker';
+import { DashDatePicker } from '@/components/dashboard/DashDatePicker';
+import { DashDateRangePicker } from '@/components/dashboard/DashDateRangePicker';
 
 export type ToolbarFilterOption = string | { label: string; value: string };
 
@@ -24,10 +27,29 @@ export type ToolbarFilter = {
   widthClass?: string;
 };
 
+type ToolbarDateFilterBase = {
+  placeholder?: string;
+  widthClass?: string;
+};
+
+/** `range: false` (mặc định) = chọn 1 ngày; `range: true` = chọn khoảng ngày. */
+export type ToolbarDateFilter =
+  | (ToolbarDateFilterBase & {
+      range?: false;
+      value?: Date;
+      onValueChange?: (date: Date | undefined) => void;
+    })
+  | (ToolbarDateFilterBase & {
+      range: true;
+      value?: DateRange;
+      onValueChange?: (range: DateRange | undefined) => void;
+    });
+
 type DashToolbarProps = {
   searchPlaceholder?: string;
   searchValue?: string;
   onSearchChange?: (value: string) => void;
+  dateFilter?: ToolbarDateFilter;
   filters?: ToolbarFilter[];
   onRefresh?: () => void;
   onReset?: () => void;
@@ -42,6 +64,7 @@ export default function DashToolbar({
   searchPlaceholder = 'Tìm kiếm...',
   searchValue,
   onSearchChange,
+  dateFilter,
   filters = [],
   onRefresh,
   onReset,
@@ -49,6 +72,13 @@ export default function DashToolbar({
 }: DashToolbarProps) {
   const [internalSearch, setInternalSearch] = React.useState(searchValue ?? '');
   const [prevSearchValue, setPrevSearchValue] = React.useState(searchValue);
+  const singleDateFilter = dateFilter?.range === true ? undefined : dateFilter;
+  const rangeDateFilter = dateFilter?.range === true ? dateFilter : undefined;
+  const [internalDate, setInternalDate] = React.useState<Date | undefined>(singleDateFilter?.value);
+  const [internalRange, setInternalRange] = React.useState<DateRange | undefined>(
+    rangeDateFilter?.value,
+  );
+  const [refreshSpinKey, setRefreshSpinKey] = React.useState(0);
 
   if (searchValue !== prevSearchValue) {
     setPrevSearchValue(searchValue);
@@ -58,6 +88,27 @@ export default function DashToolbar({
   const handleSearch = (v: string) => {
     if (searchValue === undefined) setInternalSearch(v);
     onSearchChange?.(v);
+  };
+
+  const isDateControlled = singleDateFilter?.onValueChange !== undefined;
+  const dateValue = isDateControlled ? singleDateFilter?.value : internalDate;
+
+  const handleDateChange = (date: Date | undefined) => {
+    if (!isDateControlled) setInternalDate(date);
+    singleDateFilter?.onValueChange?.(date);
+  };
+
+  const isRangeControlled = rangeDateFilter?.onValueChange !== undefined;
+  const rangeValue = isRangeControlled ? rangeDateFilter?.value : internalRange;
+
+  const handleRangeChange = (range: DateRange | undefined) => {
+    if (!isRangeControlled) setInternalRange(range);
+    rangeDateFilter?.onValueChange?.(range);
+  };
+
+  const handleRefresh = () => {
+    setRefreshSpinKey((key) => key + 1);
+    onRefresh?.();
   };
 
   return (
@@ -80,6 +131,28 @@ export default function DashToolbar({
             className="bg-surface-container border-outline placeholder:text-on-surface-variant focus-visible:border-primary focus-visible:ring-primary/30 h-8 w-full rounded-md border py-2 pr-3 pl-8 text-xs placeholder:text-xs focus-visible:ring-1"
           />
         </div>
+
+        {/* Date filter - ngay sau search */}
+        {dateFilter && (
+          <div className={cn('w-full', dateFilter.widthClass ?? 'sm:w-44')}>
+            {rangeDateFilter ? (
+              <DashDateRangePicker
+                value={rangeValue}
+                onValueChange={handleRangeChange}
+                placeholder={rangeDateFilter.placeholder ?? 'Tất cả ngày'}
+                className="w-full"
+                triggerClassName="bg-surface-container border-outline h-8 w-full rounded-md px-3 py-2 text-xs shadow-none"
+              />
+            ) : (
+              <DashDatePicker
+                value={dateValue}
+                onValueChange={handleDateChange}
+                placeholder={dateFilter.placeholder ?? 'Tất cả ngày'}
+                triggerClassName="bg-surface-container border-outline h-8 rounded-md px-3 py-2 text-xs"
+              />
+            )}
+          </div>
+        )}
 
         {/* Filters - hiển thị label, value dùng để lưu */}
         {filters.map((filter) => {
@@ -122,11 +195,19 @@ export default function DashToolbar({
         <Button
           variant="outline"
           size="icon-sm"
-          onClick={onRefresh}
+          onClick={handleRefresh}
           title="Làm mới dữ liệu"
           className="border-outline text-on-surface-variant hover:text-primary hover:bg-surface-container rounded-md border"
         >
-          <RefreshCw className="h-4.5 w-4.5" />
+          <RefreshCw
+            key={refreshSpinKey}
+            className={cn('h-4.5 w-4.5', refreshSpinKey > 0 && 'animate-spin')}
+            style={
+              refreshSpinKey > 0
+                ? { animationDuration: '0.6s', animationIterationCount: 1 }
+                : undefined
+            }
+          />
         </Button>
         <Button
           variant="outline"

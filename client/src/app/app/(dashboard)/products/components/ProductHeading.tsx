@@ -3,7 +3,7 @@
 import PageHeading from '@/components/dashboard/PageHeading';
 import { FileDown, Plus } from 'lucide-react';
 import { useState } from 'react';
-import { ProductCreateDialog } from './ProductCreateDialog';
+import { ProductFormDialog } from './ProductFormDialog';
 
 const ProductHeading = () => {
   const [open, setOpen] = useState(false);
@@ -23,7 +23,7 @@ const ProductHeading = () => {
           { label: 'Thêm sản phẩm', icon: Plus, variant: 'primary', onClick: () => setOpen(true) },
         ]}
       />
-      <ProductCreateDialog open={open} onOpenChange={setOpen} />
+      <ProductFormDialog open={open} onOpenChange={setOpen} />
     </>
   );
 };

@@ -107,6 +107,43 @@ func TestInventoryUsecase_GetLowStockProducts(t *testing.T) {
 	})
 }
 
+func TestInventoryUsecase_GetInventoryStats(t *testing.T) {
+	stats := &domain.InventoryStatsResponse{
+		TotalSKUs:            86,
+		RetailSKUs:           58,
+		MaterialSKUs:         28,
+		LowStockSKUs:         7,
+		InventoryValue:       124500000,
+		ImportCostMonth:      32800000,
+		ImportDocumentsMonth: 6,
+	}
+
+	t.Run("Thành công - Thống kê kho", func(t *testing.T) {
+		mockRepo := new(MockInventoryRepository)
+		mockRepo.On("GetInventoryStats", mock.Anything, "org-123").Return(stats, nil)
+
+		uc := NewInventoryUsecase(mockRepo, productsOK())
+		res, err := uc.GetInventoryStats(withOrgCtx("org-123"))
+
+		assert.NoError(t, err)
+		assert.Equal(t, stats, res)
+		mockRepo.AssertExpectations(t)
+	})
+
+	t.Run("Thất bại - Lỗi DB", func(t *testing.T) {
+		mockRepo := new(MockInventoryRepository)
+		mockRepo.On("GetInventoryStats", mock.Anything, "org-123").
+			Return(nil, errors.New("db failed"))
+
+		uc := NewInventoryUsecase(mockRepo, productsOK())
+		res, err := uc.GetInventoryStats(withOrgCtx("org-123"))
+
+		assert.Error(t, err)
+		assert.Nil(t, res)
+		assertFlatAppError(t, err, 500)
+	})
+}
+
 func TestInventoryUsecase_GetTransactionsByProductID(t *testing.T) {
 	txs := []*domain.InventoryTransactionResponse{
 		{ID: "tx-1", OrganizationID: "org-123", ProductID: "prod-1", Type: domain.TypeImport, Quantity: 10, DocumentCode: strPtr("NK-001")},

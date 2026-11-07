@@ -1,6 +1,7 @@
 import {
   InventoryDocument,
   InventoryDocumentDetail,
+  InventoryStats,
   InventoryTransaction,
 } from '@/types/inventory';
 import { ApiResponse, PaginationResult } from '@/types/response';
@@ -70,6 +71,12 @@ export const getInventoryDocument = async (id: string) => {
   const res = await apiClient.get<ApiResponse<InventoryDocumentDetail>>(
     `${INVENTORY_ENDPOINT.GET_DOCUMENT_DETAIL(id)}`,
   );
+  return res.data.data;
+};
+
+/** Thống kê tổng quan trang kho hàng. */
+export const getInventoryStats = async () => {
+  const res = await apiClient.get<ApiResponse<InventoryStats>>(INVENTORY_ENDPOINT.GET_STATS);
   return res.data.data;
 };
 

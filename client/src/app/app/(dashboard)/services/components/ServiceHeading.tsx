@@ -3,7 +3,7 @@
 import PageHeading from '@/components/dashboard/PageHeading';
 import { FileDown, Plus } from 'lucide-react';
 import { useState } from 'react';
-import { ServiceCreateDialog } from './ServiceCreateDialog';
+import { ServiceFormDialog } from './ServiceFormDialog';
 
 const ServiceHeading = () => {
   const [open, setOpen] = useState(false);
@@ -22,7 +22,7 @@ const ServiceHeading = () => {
           { label: 'Thêm dịch vụ', icon: Plus, variant: 'primary', onClick: () => setOpen(true) },
         ]}
       />
-      <ServiceCreateDialog open={open} onOpenChange={setOpen} />
+      <ServiceFormDialog open={open} onOpenChange={setOpen} />
     </>
   );
 };

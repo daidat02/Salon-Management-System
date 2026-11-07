@@ -1,5 +1,6 @@
 'use client';
 import DashToolbar from '@/components/dashboard/DashToolbar';
+import useCategory from '@/hooks/use-category';
 import React, { useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
@@ -9,12 +10,18 @@ const ServiceToolbar = () => {
   const search = searchParams.get('search') || '';
   const status = searchParams.get('status') || '';
   const sort = searchParams.get('sort') || '';
-  const category = searchParams.get('category') || '';
+  const categoryId = searchParams.get('category_id') || '';
   const [inputValue, setInputValue] = React.useState(search);
-
-  useEffect(() => {
+  const [lastSearch, setLastSearch] = React.useState(search);
+  if (search !== lastSearch) {
+    setLastSearch(search);
     setInputValue(search);
-  }, [search]);
+  }
+
+  const { data: categoryData } = useCategory({ page: 1, pageSize: 100 });
+  const categoryOptions = (categoryData?.data ?? [])
+    .filter((c) => c.is_active && c.type === 'service')
+    .map((c) => ({ value: c.id, label: c.name }));
 
   useEffect(() => {
     if (inputValue === search) return;
@@ -43,12 +50,12 @@ const ServiceToolbar = () => {
       onSearchChange={(v) => setInputValue(v)}
       filters={[
         {
-          id: 'category',
+          id: 'category_id',
           placeholder: 'Tất cả danh mục',
-          value: category || undefined,
+          value: categoryId || undefined,
           widthClass: 'sm:w-44',
-          options: ['Tất cả danh mục', 'Cắt tóc', 'Nhuộm', 'Uốn & Duỗi', 'Gội đầu & Chăm sóc', 'Combo'],
-          onValueChange: (value) => handleFilterChange('category', value, 'Tất cả danh mục'),
+          options: [{ value: '', label: 'Tất cả danh mục' }, ...categoryOptions],
+          onValueChange: (value) => handleFilterChange('category_id', value, 'Tất cả danh mục'),
         },
         {
           id: 'status',

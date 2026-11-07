@@ -28,10 +28,11 @@ export default function InventoryHistoryTable() {
 
   const page = pageFromUrl || 1;
   const [inputValue, setInputValue] = React.useState(search);
-
-  React.useEffect(() => {
+  const [lastSearch, setLastSearch] = React.useState(search);
+  if (search !== lastSearch) {
+    setLastSearch(search);
     setInputValue(search);
-  }, [search]);
+  }
 
   // Debounce search -> URL (giống ProductToolbar).
   React.useEffect(() => {
@@ -113,6 +114,11 @@ export default function InventoryHistoryTable() {
         searchPlaceholder="Tìm theo mã phiếu, NCC, đơn hàng..."
         searchValue={inputValue}
         onSearchChange={setInputValue}
+        dateFilter={{
+          range: true,
+          placeholder: 'Từ ngày - Đến ngày',
+          widthClass: 'sm:w-[13.5rem]',
+        }}
         filters={[
           {
             id: 'hfilter',

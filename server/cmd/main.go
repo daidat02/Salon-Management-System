@@ -34,7 +34,7 @@ func main() {
 	// Kết nối cơ sở dữ liệu PostgreSQL
 	dsn := cfg.Database.DB_url
 	dbPool := database.NewPostgresDatabase(dsn)
-
+	defer dbPool.Close()
 	utils.InitJWT(cfg.JWT.Secret, cfg.JWT.AccessTokenExpire, cfg.JWT.RefreshTokenExpire)
 
 	// Khởi tạo router và đăng ký các route

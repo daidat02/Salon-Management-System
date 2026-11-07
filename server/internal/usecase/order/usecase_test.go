@@ -9,14 +9,17 @@ import (
 	"github.com/daidat02/server/internal/delivery/http/middlewares"
 	customerdomain "github.com/daidat02/server/internal/domain/customer"
 	domain "github.com/daidat02/server/internal/domain/order"
+	settingDomain "github.com/daidat02/server/internal/domain/setting"
 	"github.com/daidat02/server/pkg/apperror"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
 func withOrgCtx(orgID string) context.Context {
-	return context.WithValue(context.Background(), middlewares.OrgIdKey, orgID)
+	ctx := context.WithValue(context.Background(), middlewares.OrgIdKey, orgID)
+	return context.WithValue(ctx, middlewares.UserIdKey, "user-123")
 }
 
 func strP(s string) *string { return &s }
@@ -37,6 +40,13 @@ func productsWithPricing() *MockProductStore {
 	p.On("GetProductUnits", mock.Anything, "org-123", mock.Anything).
 		Return(map[string]domain.ProductUnit{"prod-1": {Unit: "chai"}}, nil)
 	return p
+}
+
+func settingOK() *MockSettingStore {
+	s := new(MockSettingStore)
+	s.On("GetPaymentMethodByID", mock.Anything, "org-123", mock.Anything).
+		Return(&settingDomain.PaymentMethod{ID: "pm-1", FundID: "fund-1", Code: "cash", Name: "Tiền mặt"}, nil)
+	return s
 }
 
 func stubProductStore() *MockProductStore {
@@ -80,7 +90,7 @@ func TestOrderUsecase_CreateOrder(t *testing.T) {
 		repo.On("CreateOrder", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(nil)
 
-		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.CreateOrder(withOrgCtx("org-123"), validProductOrderReq())
 
 		assert.NoError(t, err)
@@ -93,7 +103,7 @@ func TestOrderUsecase_CreateOrder(t *testing.T) {
 	})
 
 	t.Run("Thất bại - Thiếu organization_id", func(t *testing.T) {
-		uc := NewOrderUsecase(new(MockOrderRepository), catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(new(MockOrderRepository), catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.CreateOrder(context.Background(), validProductOrderReq())
 
 		assert.Error(t, err)
@@ -102,7 +112,7 @@ func TestOrderUsecase_CreateOrder(t *testing.T) {
 	})
 
 	t.Run("Thất bại - Đơn rỗng", func(t *testing.T) {
-		uc := NewOrderUsecase(new(MockOrderRepository), catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(new(MockOrderRepository), catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.CreateOrder(withOrgCtx("org-123"), &domain.CreateOrderRequest{})
 
 		assert.Error(t, err)
@@ -113,7 +123,7 @@ func TestOrderUsecase_CreateOrder(t *testing.T) {
 	t.Run("Thất bại - Giảm giá vượt tổng", func(t *testing.T) {
 		repo := new(MockOrderRepository)
 
-		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		req := validProductOrderReq()
 		req.DiscountAmount = 999999999
 		res, err := uc.CreateOrder(withOrgCtx("org-123"), req)
@@ -128,7 +138,7 @@ func TestOrderUsecase_CreateOrder(t *testing.T) {
 		repo.On("CreateOrder", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(domain.ErrInsufficientStock)
 
-		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.CreateOrder(withOrgCtx("org-123"), validProductOrderReq())
 
 		assert.Error(t, err)
@@ -141,7 +151,7 @@ func TestOrderUsecase_CreateOrder(t *testing.T) {
 		catalog.On("ProductsExistInOrg", mock.Anything, "org-123", mock.Anything).
 			Return([]string{"prod-x"}, nil)
 
-		uc := NewOrderUsecase(new(MockOrderRepository), catalog, new(MockProductStore), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(new(MockOrderRepository), catalog, new(MockProductStore), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		req := &domain.CreateOrderRequest{
 			Items: []domain.OrderItemInput{
 				{ItemType: domain.ItemTypeProduct, ProductID: strP("prod-x"), Quantity: 1},
@@ -177,7 +187,7 @@ func TestOrderUsecase_CreateOrder(t *testing.T) {
 				"prod-nhuom": {Unit: "tuýp", NetUnit: strP("ml"), NetAmount: f64P(60)},
 			}, nil)
 
-		uc := NewOrderUsecase(repo, catalogOK(), products, services, new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), products, services, new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		req := &domain.CreateOrderRequest{
 			Items: []domain.OrderItemInput{
 				{ItemType: domain.ItemTypeService, ServiceID: strP("svc-1"), Quantity: 1},
@@ -217,7 +227,7 @@ func TestOrderUsecase_CreateOrder(t *testing.T) {
 				"prod-nhuom": {Unit: "tuýp", NetUnit: strP("ml"), NetAmount: f64P(60)},
 			}, nil)
 
-		uc := NewOrderUsecase(repo, catalogOK(), products, services, new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), products, services, new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		req := &domain.CreateOrderRequest{
 			Items: []domain.OrderItemInput{
 				{ItemType: domain.ItemTypeService, ServiceID: strP("svc-1"), Quantity: 1},
@@ -235,12 +245,122 @@ func TestOrderUsecase_CreateOrder(t *testing.T) {
 	})
 }
 
+func TestOrderUsecase_CreateOrder_FromAppointment(t *testing.T) {
+	newAppointmentUC := func(repo *MockOrderRepository, appts *MockAppointmentStore) *OrderUsecase {
+		return NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), appts, new(MockStaffStore), new(MockSettingStore))
+	}
+	appointmentReq := func() *domain.CreateOrderRequest {
+		req := validProductOrderReq()
+		req.AppointmentID = strP("appt-1")
+		return req
+	}
+
+	t.Run("Thành công - Tạo đơn và đưa lịch sang in_progress", func(t *testing.T) {
+		repo := new(MockOrderRepository)
+		appts := new(MockAppointmentStore)
+		appts.On("AppointmentExistsInOrg", mock.Anything, "org-123", "appt-1").Return(true, nil).Once()
+		appts.On("GetAppointmentStatus", mock.Anything, "org-123", "appt-1").Return("pending", nil).Once()
+		repo.On("FindActiveOrderByAppointment", mock.Anything, "org-123", "appt-1").Return(nil, nil).Once()
+		repo.On("CreateOrder", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+		appts.On("UpdateAppointmentStatus", mock.Anything, "org-123", "appt-1", "in_progress", "").Return(nil).Once()
+
+		res, err := newAppointmentUC(repo, appts).CreateOrder(withOrgCtx("org-123"), appointmentReq())
+
+		assert.NoError(t, err)
+		assert.NotNil(t, res)
+		appts.AssertExpectations(t)
+		repo.AssertExpectations(t)
+	})
+
+	t.Run("Thành công - Lịch đã in_progress thì không cập nhật lại", func(t *testing.T) {
+		repo := new(MockOrderRepository)
+		appts := new(MockAppointmentStore)
+		appts.On("AppointmentExistsInOrg", mock.Anything, "org-123", "appt-1").Return(true, nil).Once()
+		appts.On("GetAppointmentStatus", mock.Anything, "org-123", "appt-1").Return("in_progress", nil).Once()
+		repo.On("FindActiveOrderByAppointment", mock.Anything, "org-123", "appt-1").Return(nil, nil).Once()
+		repo.On("CreateOrder", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+
+		res, err := newAppointmentUC(repo, appts).CreateOrder(withOrgCtx("org-123"), appointmentReq())
+
+		assert.NoError(t, err)
+		assert.NotNil(t, res)
+		appts.AssertNotCalled(t, "UpdateAppointmentStatus", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	})
+
+	t.Run("Thất bại - Lịch completed/cancelled/no_show", func(t *testing.T) {
+		for _, status := range []string{"completed", "cancelled", "no_show"} {
+			t.Run(status, func(t *testing.T) {
+				repo := new(MockOrderRepository)
+				appts := new(MockAppointmentStore)
+				appts.On("AppointmentExistsInOrg", mock.Anything, "org-123", "appt-1").Return(true, nil).Once()
+				appts.On("GetAppointmentStatus", mock.Anything, "org-123", "appt-1").Return(status, nil).Once()
+
+				res, err := newAppointmentUC(repo, appts).CreateOrder(withOrgCtx("org-123"), appointmentReq())
+
+				assert.Error(t, err)
+				assert.Nil(t, res)
+				assertFlatAppError(t, err, 400)
+				repo.AssertNotCalled(t, "CreateOrder", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+			})
+		}
+	})
+
+	t.Run("Thất bại - Lịch đã có đơn còn hiệu lực", func(t *testing.T) {
+		repo := new(MockOrderRepository)
+		appts := new(MockAppointmentStore)
+		appts.On("AppointmentExistsInOrg", mock.Anything, "org-123", "appt-1").Return(true, nil).Once()
+		appts.On("GetAppointmentStatus", mock.Anything, "org-123", "appt-1").Return("confirmed", nil).Once()
+		repo.On("FindActiveOrderByAppointment", mock.Anything, "org-123", "appt-1").
+			Return(&domain.Order{ID: "ord-old", Code: "ORD-OLD", Status: domain.StatusPending}, nil).Once()
+
+		res, err := newAppointmentUC(repo, appts).CreateOrder(withOrgCtx("org-123"), appointmentReq())
+
+		assert.Error(t, err)
+		assert.Nil(t, res)
+		assertFlatAppError(t, err, 400)
+		assert.Contains(t, err.Error(), "ORD-OLD")
+		repo.AssertNotCalled(t, "CreateOrder", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	})
+
+	t.Run("Thành công - Lỗi cập nhật trạng thái lịch chỉ log, đơn vẫn tạo", func(t *testing.T) {
+		repo := new(MockOrderRepository)
+		appts := new(MockAppointmentStore)
+		appts.On("AppointmentExistsInOrg", mock.Anything, "org-123", "appt-1").Return(true, nil).Once()
+		appts.On("GetAppointmentStatus", mock.Anything, "org-123", "appt-1").Return("checked_in", nil).Once()
+		repo.On("FindActiveOrderByAppointment", mock.Anything, "org-123", "appt-1").Return(nil, nil).Once()
+		repo.On("CreateOrder", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+		appts.On("UpdateAppointmentStatus", mock.Anything, "org-123", "appt-1", "in_progress", "").
+			Return(errors.New("db error")).Once()
+
+		res, err := newAppointmentUC(repo, appts).CreateOrder(withOrgCtx("org-123"), appointmentReq())
+
+		assert.NoError(t, err)
+		assert.NotNil(t, res)
+	})
+
+	t.Run("Thất bại - Race: partial unique index báo trùng", func(t *testing.T) {
+		repo := new(MockOrderRepository)
+		appts := new(MockAppointmentStore)
+		appts.On("AppointmentExistsInOrg", mock.Anything, "org-123", "appt-1").Return(true, nil).Once()
+		appts.On("GetAppointmentStatus", mock.Anything, "org-123", "appt-1").Return("pending", nil).Once()
+		repo.On("FindActiveOrderByAppointment", mock.Anything, "org-123", "appt-1").Return(nil, nil).Once()
+		repo.On("CreateOrder", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			Return(&pgconn.PgError{Code: "23505", ConstraintName: "uq_orders_appointment_active"}).Once()
+
+		res, err := newAppointmentUC(repo, appts).CreateOrder(withOrgCtx("org-123"), appointmentReq())
+
+		assert.Error(t, err)
+		assert.Nil(t, res)
+		assertFlatAppError(t, err, 400)
+	})
+}
+
 func TestOrderUsecase_UpdateOrderCustomer(t *testing.T) {
 	editableOrder := &domain.Order{ID: "ord-1", OrganizationID: "org-123", Code: "ORD-1", Status: domain.StatusPending, TotalAmount: 300000}
 	lockedOrder := &domain.Order{ID: "ord-2", OrganizationID: "org-123", Code: "ORD-2", Status: domain.StatusCompleted, TotalAmount: 300000}
 
 	newUC := func(repo *MockOrderRepository, customers *MockCustomerStore) *OrderUsecase {
-		return NewOrderUsecase(repo, catalogOK(), new(MockProductStore), new(MockServiceStore), customers, new(MockAppointmentStore), new(MockStaffStore))
+		return NewOrderUsecase(repo, catalogOK(), new(MockProductStore), new(MockServiceStore), customers, new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 	}
 
 	t.Run("Thành công - Gán khách có sẵn", func(t *testing.T) {
@@ -318,7 +438,7 @@ func TestOrderUsecase_CancelRefund(t *testing.T) {
 		repo.On("ApplyCancel", mock.Anything, "org-123", "ord-1", domain.StatusCancelled, mock.Anything, mock.Anything).
 			Return(nil)
 
-		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.CancelOrder(withOrgCtx("org-123"), "ord-1")
 
 		assert.NoError(t, err)
@@ -336,7 +456,7 @@ func TestOrderUsecase_CancelRefund(t *testing.T) {
 		repo.On("ApplyCancel", mock.Anything, "org-123", "ord-2", domain.StatusCancelled, mock.Anything, mock.Anything).
 			Return(nil)
 
-		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.CancelOrder(withOrgCtx("org-123"), "ord-2")
 
 		assert.NoError(t, err)
@@ -348,7 +468,7 @@ func TestOrderUsecase_CancelRefund(t *testing.T) {
 		repo := new(MockOrderRepository)
 		repo.On("GetOrderByID", mock.Anything, "org-123", "ord-4").Return(completedOrder, nil)
 
-		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.CancelOrder(withOrgCtx("org-123"), "ord-4")
 
 		assert.Error(t, err)
@@ -360,7 +480,7 @@ func TestOrderUsecase_CancelRefund(t *testing.T) {
 		repo := new(MockOrderRepository)
 		repo.On("GetOrderByID", mock.Anything, "org-123", "ord-2").Return(confirmOrder, nil)
 
-		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.RefundOrder(withOrgCtx("org-123"), "ord-2")
 
 		assert.Error(t, err)
@@ -378,7 +498,7 @@ func TestOrderUsecase_CancelRefund(t *testing.T) {
 		repo.On("ApplyCancel", mock.Anything, "org-123", "ord-4", domain.StatusRefunded, mock.Anything, mock.Anything).
 			Return(nil)
 
-		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.RefundOrder(withOrgCtx("org-123"), "ord-4")
 
 		assert.NoError(t, err)
@@ -391,80 +511,8 @@ func TestOrderUsecase_CancelRefund(t *testing.T) {
 		repo.On("GetOrderByID", mock.Anything, "org-123", "missing").
 			Return(nil, domain.ErrOrderNotFound)
 
-		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.CancelOrder(withOrgCtx("org-123"), "missing")
-
-		assert.Error(t, err)
-		assert.Nil(t, res)
-		assertFlatAppError(t, err, 404)
-	})
-}
-
-func TestOrderUsecase_Complete(t *testing.T) {
-	pendingOrder := &domain.Order{ID: "ord-1", OrganizationID: "org-123", Code: "ORD-1", Status: domain.StatusPending, TotalAmount: 300000}
-	completedOrder := &domain.Order{ID: "ord-4", OrganizationID: "org-123", Code: "ORD-4", Status: domain.StatusCompleted, TotalAmount: 300000}
-
-	t.Run("Thành công - Chốt đơn chờ xử lý, sinh phiếu bán hàng", func(t *testing.T) {
-		repo := new(MockOrderRepository)
-		repo.On("GetOrderByID", mock.Anything, "org-123", "ord-1").Return(pendingOrder, nil)
-		repo.On("GetOrderItems", mock.Anything, "org-123", "ord-1").
-			Return([]*domain.OrderItem{
-				{ID: "it-1", OrganizationID: "org-123", OrderID: "ord-1", ItemType: domain.ItemTypeProduct, ProductID: strP("prod-1"), Quantity: 2, UnitPrice: 150000, LineTotal: 300000},
-			}, nil)
-		repo.On("GetOrderMaterials", mock.Anything, "ord-1").
-			Return([]*domain.OrderItemMaterial{
-				{ID: "m-1", OrderItemID: "it-1", ProductID: "prod-2", Quantity: 1, UnitCostAtTime: 20000},
-			}, nil)
-		repo.On("CompleteOrderWithSlip", mock.Anything, "org-123", "ord-1", mock.Anything).
-			Return(domain.SaleSlipResult{DocumentID: "doc-1", DocumentCode: "XK-ORD-1"}, nil)
-
-		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
-		res, err := uc.CompleteOrder(withOrgCtx("org-123"), "ord-1")
-
-		assert.NoError(t, err)
-		assert.NotNil(t, res)
-		assert.Equal(t, domain.StatusCompleted, res.Order.Status)
-		assert.Equal(t, "XK-ORD-1", res.DocumentCode)
-		repo.AssertExpectations(t)
-	})
-
-	t.Run("Thất bại - Chốt đơn đã chốt rồi", func(t *testing.T) {
-		repo := new(MockOrderRepository)
-		repo.On("GetOrderByID", mock.Anything, "org-123", "ord-4").Return(completedOrder, nil)
-
-		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
-		res, err := uc.CompleteOrder(withOrgCtx("org-123"), "ord-4")
-
-		assert.Error(t, err)
-		assert.Nil(t, res)
-		assertFlatAppError(t, err, 400)
-	})
-
-	t.Run("Thất bại - Tồn kho không đủ lúc chốt", func(t *testing.T) {
-		repo := new(MockOrderRepository)
-		repo.On("GetOrderByID", mock.Anything, "org-123", "ord-1").Return(pendingOrder, nil)
-		repo.On("GetOrderItems", mock.Anything, "org-123", "ord-1").
-			Return([]*domain.OrderItem{}, nil)
-		repo.On("GetOrderMaterials", mock.Anything, "ord-1").
-			Return([]*domain.OrderItemMaterial{}, nil)
-		repo.On("CompleteOrderWithSlip", mock.Anything, "org-123", "ord-1", mock.Anything).
-			Return(domain.SaleSlipResult{}, domain.ErrInsufficientStock)
-
-		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
-		res, err := uc.CompleteOrder(withOrgCtx("org-123"), "ord-1")
-
-		assert.Error(t, err)
-		assert.Nil(t, res)
-		assertFlatAppError(t, err, 400)
-	})
-
-	t.Run("Thất bại - Không tìm thấy đơn", func(t *testing.T) {
-		repo := new(MockOrderRepository)
-		repo.On("GetOrderByID", mock.Anything, "org-123", "missing").
-			Return(nil, domain.ErrOrderNotFound)
-
-		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
-		res, err := uc.CompleteOrder(withOrgCtx("org-123"), "missing")
 
 		assert.Error(t, err)
 		assert.Nil(t, res)
@@ -486,10 +534,10 @@ func TestOrderUsecase_CreatePayment(t *testing.T) {
 			}, nil)
 		repo.On("GetOrderMaterials", mock.Anything, "ord-1").
 			Return([]*domain.OrderItemMaterial{}, nil)
-		repo.On("CompleteOrderWithSlip", mock.Anything, "org-123", "ord-1", mock.Anything).
+		repo.On("CompleteOrderWithSlip", mock.Anything, "org-123", "ord-1", mock.Anything, mock.Anything, mock.Anything).
 			Return(domain.SaleSlipResult{DocumentID: "doc-1", DocumentCode: "XK-ORD-1"}, nil)
 
-		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), settingOK())
 		res, err := uc.CreatePayment(withOrgCtx("org-123"), "ord-1", &domain.CreatePaymentRequest{
 			Method: domain.PaymentMethodCash, Amount: 300000,
 		})
@@ -505,14 +553,14 @@ func TestOrderUsecase_CreatePayment(t *testing.T) {
 		repo.On("CreatePayment", mock.Anything, mock.Anything).Return(nil)
 		repo.On("GetTotalPaidByOrder", mock.Anything, "org-123", "ord-1").Return(float64(100000), nil)
 
-		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), settingOK())
 		res, err := uc.CreatePayment(withOrgCtx("org-123"), "ord-1", &domain.CreatePaymentRequest{
 			Method: domain.PaymentMethodCash, Amount: 100000,
 		})
 
 		assert.NoError(t, err)
 		assert.NotNil(t, res)
-		repo.AssertNotCalled(t, "CompleteOrderWithSlip", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+		repo.AssertNotCalled(t, "CompleteOrderWithSlip", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 		repo.AssertExpectations(t)
 	})
 
@@ -524,7 +572,7 @@ func TestOrderUsecase_CreatePayment(t *testing.T) {
 		repo.On("GetOrderByID", mock.Anything, "org-123", "ord-1").Return(pendingOrder, nil)
 		repo.On("FindPaymentByProviderTxn", mock.Anything, "vnpay", "txn-1").Return(existing, nil)
 
-		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), settingOK())
 		res, err := uc.CreatePayment(withOrgCtx("org-123"), "ord-1", &domain.CreatePaymentRequest{
 			Method: domain.PaymentMethodGateway, Provider: strP("vnpay"), ProviderTxnID: strP("txn-1"), Amount: 300000,
 		})
@@ -539,7 +587,7 @@ func TestOrderUsecase_CreatePayment(t *testing.T) {
 		repo := new(MockOrderRepository)
 		repo.On("GetOrderByID", mock.Anything, "org-123", "ord-3").Return(cancelled, nil)
 
-		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), settingOK())
 		res, err := uc.CreatePayment(withOrgCtx("org-123"), "ord-3", &domain.CreatePaymentRequest{
 			Method: domain.PaymentMethodCash, Amount: 100000,
 		})
@@ -562,7 +610,7 @@ func TestOrderUsecase_GetOrders(t *testing.T) {
 		repo.On("CountOrdersByOrgID", mock.Anything, "org-123", "").
 			Return(int64(1), nil)
 
-		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.GetOrdersByOrgID(withOrgCtx("org-123"), 1, 20, "")
 
 		assert.NoError(t, err)
@@ -578,7 +626,7 @@ func TestOrderUsecase_GetOrders(t *testing.T) {
 		repo.On("CountOrdersByOrgID", mock.Anything, "org-123", "").
 			Return(int64(0), errors.New("db count failed"))
 
-		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.GetOrdersByOrgID(withOrgCtx("org-123"), 1, 20, "")
 
 		assert.Error(t, err)
@@ -599,7 +647,7 @@ func TestOrderUsecase_GetPosItemsByOrgID(t *testing.T) {
 		repo.On("GetPosItemsByOrgID", mock.Anything, "org-123", 20, "", "", "", "", "").
 			Return(items, nil)
 
-		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.GetPosItemsByOrgID(withOrgCtx("org-123"), 20, "", "", "", "", "")
 
 		assert.NoError(t, err)
@@ -615,7 +663,7 @@ func TestOrderUsecase_GetPosItemsByOrgID(t *testing.T) {
 		repo.On("GetPosItemsByOrgID", mock.Anything, "org-123", 20, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(items, nil)
 
-		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.GetPosItemsByOrgID(withOrgCtx("org-123"), 0, "", "", "", "", "")
 
 		assert.NoError(t, err)
@@ -628,7 +676,7 @@ func TestOrderUsecase_GetPosItemsByOrgID(t *testing.T) {
 		repo.On("GetPosItemsByOrgID", mock.Anything, "org-123", 100, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(items, nil)
 
-		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.GetPosItemsByOrgID(withOrgCtx("org-123"), 999, "", "", "", "", "")
 
 		assert.NoError(t, err)
@@ -637,7 +685,7 @@ func TestOrderUsecase_GetPosItemsByOrgID(t *testing.T) {
 	})
 
 	t.Run("Thất bại - Thiếu organization_id", func(t *testing.T) {
-		uc := NewOrderUsecase(new(MockOrderRepository), catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(new(MockOrderRepository), catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.GetPosItemsByOrgID(context.Background(), 20, "", "", "", "", "")
 
 		assert.Error(t, err)
@@ -650,7 +698,7 @@ func TestOrderUsecase_GetPosItemsByOrgID(t *testing.T) {
 		repo.On("GetPosItemsByOrgID", mock.Anything, "org-123", 20, "", "", "", "", "").
 			Return(nil, errors.New("db query failed"))
 
-		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.GetPosItemsByOrgID(withOrgCtx("org-123"), 20, "", "", "", "", "")
 
 		assert.Error(t, err)
@@ -687,7 +735,7 @@ func TestOrderUsecase_ReplaceStaffOrderItems(t *testing.T) {
 			Return([]*domain.OrderItemMaterial{}, nil)
 		repo.On("ReplaceStaffOrderItems", mock.Anything, "org-123", "item-1", mock.Anything).Return(nil)
 
-		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), staff)
+		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), staff, new(MockSettingStore))
 		res, err := uc.ReplaceStaffOrderItems(withOrgCtx("org-123"), "item-1", validStaffInputs())
 
 		assert.NoError(t, err)
@@ -717,7 +765,7 @@ func TestOrderUsecase_ReplaceStaffOrderItems(t *testing.T) {
 			Return([]*domain.OrderItemMaterial{}, nil)
 		repo.On("ReplaceStaffOrderItems", mock.Anything, "org-123", "item-1", mock.Anything).Return(nil)
 
-		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), staff)
+		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), staff, new(MockSettingStore))
 		inputs := []*domain.StaffOrderItemInput{
 			{StaffID: "staff-1", Type: strP(domain.StaffTypeFixed), SharePct: f64P(0), CommissionAmount: f64P(50000)},
 		}
@@ -735,7 +783,7 @@ func TestOrderUsecase_ReplaceStaffOrderItems(t *testing.T) {
 		inputs := validStaffInputs()
 		inputs[0].Type = strP("boss")
 
-		uc := NewOrderUsecase(new(MockOrderRepository), catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(new(MockOrderRepository), catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.ReplaceStaffOrderItems(withOrgCtx("org-123"), "item-1", inputs)
 
 		assert.Error(t, err)
@@ -744,7 +792,7 @@ func TestOrderUsecase_ReplaceStaffOrderItems(t *testing.T) {
 	})
 
 	t.Run("Thất bại - Thiếu organization_id", func(t *testing.T) {
-		uc := NewOrderUsecase(new(MockOrderRepository), catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(new(MockOrderRepository), catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.ReplaceStaffOrderItems(context.Background(), "item-1", validStaffInputs())
 
 		assert.Error(t, err)
@@ -763,7 +811,7 @@ func TestOrderUsecase_ReplaceStaffOrderItems(t *testing.T) {
 			Return([]*domain.OrderItemMaterial{}, nil)
 		repo.On("ReplaceStaffOrderItems", mock.Anything, "org-123", "item-1", mock.Anything).Return(nil)
 
-		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.ReplaceStaffOrderItems(withOrgCtx("org-123"), "item-1", nil)
 
 		assert.NoError(t, err)
@@ -776,7 +824,7 @@ func TestOrderUsecase_ReplaceStaffOrderItems(t *testing.T) {
 		inputs := validStaffInputs()
 		inputs[1].SharePct = f64P(20)
 
-		uc := NewOrderUsecase(new(MockOrderRepository), catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(new(MockOrderRepository), catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.ReplaceStaffOrderItems(withOrgCtx("org-123"), "item-1", inputs)
 
 		assert.Error(t, err)
@@ -788,7 +836,7 @@ func TestOrderUsecase_ReplaceStaffOrderItems(t *testing.T) {
 		inputs := validStaffInputs()
 		inputs[1].StaffID = "staff-1"
 
-		uc := NewOrderUsecase(new(MockOrderRepository), catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(new(MockOrderRepository), catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.ReplaceStaffOrderItems(withOrgCtx("org-123"), "item-1", inputs)
 
 		assert.Error(t, err)
@@ -800,7 +848,7 @@ func TestOrderUsecase_ReplaceStaffOrderItems(t *testing.T) {
 		inputs := validStaffInputs()
 		inputs[0].CommissionAmount = f64P(-1000)
 
-		uc := NewOrderUsecase(new(MockOrderRepository), catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(new(MockOrderRepository), catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.ReplaceStaffOrderItems(withOrgCtx("org-123"), "item-1", inputs)
 
 		assert.Error(t, err)
@@ -813,7 +861,7 @@ func TestOrderUsecase_ReplaceStaffOrderItems(t *testing.T) {
 		repo.On("MapItemOrders", mock.Anything, "org-123", []string{"item-x"}).
 			Return(map[string]string{}, nil)
 
-		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.ReplaceStaffOrderItems(withOrgCtx("org-123"), "item-x", validStaffInputs())
 
 		assert.Error(t, err)
@@ -830,7 +878,7 @@ func TestOrderUsecase_ReplaceStaffOrderItems(t *testing.T) {
 		staff.On("StaffsExistInOrg", mock.Anything, "org-123", []string{"staff-1", "staff-2"}).
 			Return([]string{"staff-2"}, nil)
 
-		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), staff)
+		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), staff, new(MockSettingStore))
 		res, err := uc.ReplaceStaffOrderItems(withOrgCtx("org-123"), "item-1", validStaffInputs())
 
 		assert.Error(t, err)
@@ -858,7 +906,7 @@ func TestOrderUsecase_ReplaceStaffOrderItems(t *testing.T) {
 			map[string]domain.ProductUnit{"prod-net": {Unit: "chai", NetUnit: strP("ml"), NetAmount: f64P(1000)}}, nil)
 		repo.On("ReplaceStaffOrderItems", mock.Anything, "org-123", "item-1", mock.Anything).Return(nil)
 
-		uc := NewOrderUsecase(repo, catalogOK(), products, new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), staff)
+		uc := NewOrderUsecase(repo, catalogOK(), products, new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), staff, new(MockSettingStore))
 		inputs := []*domain.StaffOrderItemInput{
 			{StaffID: "staff-1", Type: strP(domain.StaffTypeProfit), SharePct: f64P(100)},
 		}
@@ -902,7 +950,7 @@ func TestOrderUsecase_GetOrderDetail_Commissions(t *testing.T) {
 	repo.On("GetOrderPayments", mock.Anything, "org-123", "ord-1").
 		Return([]*domain.Payment{}, nil)
 
-	uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+	uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 	res, err := uc.GetOrderDetail(withOrgCtx("org-123"), "ord-1")
 
 	assert.NoError(t, err)
@@ -923,7 +971,7 @@ func TestOrderUsecase_CreateOrder_CustomerStore(t *testing.T) {
 			Return(nil)
 		customers.On("CustomerExistsInOrg", mock.Anything, "org-123", "cus-1").Return(true, nil)
 
-		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), customers, new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), customers, new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		req := validProductOrderReq()
 		req.CustomerID = strP("cus-1")
 		res, err := uc.CreateOrder(withOrgCtx("org-123"), req)
@@ -941,7 +989,7 @@ func TestOrderUsecase_CreateOrder_CustomerStore(t *testing.T) {
 		customers := new(MockCustomerStore)
 		customers.On("CustomerExistsInOrg", mock.Anything, "org-123", "cus-x").Return(false, nil)
 
-		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), customers, new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), customers, new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		req := validProductOrderReq()
 		req.CustomerID = strP("cus-x")
 		res, err := uc.CreateOrder(withOrgCtx("org-123"), req)
@@ -957,7 +1005,7 @@ func TestOrderUsecase_CreateOrder_CustomerStore(t *testing.T) {
 		appointments := new(MockAppointmentStore)
 		appointments.On("AppointmentExistsInOrg", mock.Anything, "org-123", "appt-x").Return(false, nil)
 
-		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), appointments, new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), appointments, new(MockStaffStore), new(MockSettingStore))
 		req := validProductOrderReq()
 		req.AppointmentID = strP("appt-x")
 		res, err := uc.CreateOrder(withOrgCtx("org-123"), req)
@@ -978,7 +1026,7 @@ func TestOrderUsecase_CreateOrder_CustomerStore(t *testing.T) {
 		customers.On("CreateCustomer", mock.Anything, mock.Anything).Return(nil)
 		customers.On("CustomerExistsInOrg", mock.Anything, "org-123", mock.Anything).Return(true, nil)
 
-		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), customers, new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), customers, new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		req := validProductOrderReq()
 		req.NewCustomer = &domain.NewCustomerInput{FullName: "Khách Mới", Phone: "0912345678"}
 		res, err := uc.CreateOrder(withOrgCtx("org-123"), req)
@@ -1001,7 +1049,7 @@ func TestOrderUsecase_CreateOrder_CustomerStore(t *testing.T) {
 			Return(&customerdomain.Customer{ID: "cus-old", FullName: "Khách Cũ"}, nil)
 		customers.On("CustomerExistsInOrg", mock.Anything, "org-123", "cus-old").Return(true, nil)
 
-		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), customers, new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), customers, new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		req := validProductOrderReq()
 		req.NewCustomer = &domain.NewCustomerInput{FullName: "Khách Mới", Phone: "0912345678"}
 		res, err := uc.CreateOrder(withOrgCtx("org-123"), req)
@@ -1046,7 +1094,7 @@ func TestOrderUsecase_ReplaceOrderMaterials(t *testing.T) {
 
 	t.Run("Thành công - thay toàn bộ vật tư", func(t *testing.T) {
 		repo, catalog, products := setupOK()
-		uc := NewOrderUsecase(repo, catalog, products, new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalog, products, new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.ReplaceOrderMaterials(withOrgCtx("org-123"), validInputs())
 
 		assert.NoError(t, err)
@@ -1062,7 +1110,7 @@ func TestOrderUsecase_ReplaceOrderMaterials(t *testing.T) {
 	t.Run("Thành công - mảng rỗng thì không làm gì", func(t *testing.T) {
 		repo := new(MockOrderRepository)
 
-		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.ReplaceOrderMaterials(withOrgCtx("org-123"), []*domain.OrderMaterialInput{})
 
 		assert.NoError(t, err)
@@ -1071,7 +1119,7 @@ func TestOrderUsecase_ReplaceOrderMaterials(t *testing.T) {
 	})
 
 	t.Run("Thất bại - Thiếu organization_id", func(t *testing.T) {
-		uc := NewOrderUsecase(new(MockOrderRepository), catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(new(MockOrderRepository), catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.ReplaceOrderMaterials(context.Background(), validInputs())
 
 		assert.Error(t, err)
@@ -1080,7 +1128,7 @@ func TestOrderUsecase_ReplaceOrderMaterials(t *testing.T) {
 	})
 
 	t.Run("Thất bại - Dòng vật tư thiếu order_item_id", func(t *testing.T) {
-		uc := NewOrderUsecase(new(MockOrderRepository), catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(new(MockOrderRepository), catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		inputs := []*domain.OrderMaterialInput{
 			{ProductID: "prod-1", Quantity: 1},
 		}
@@ -1096,7 +1144,7 @@ func TestOrderUsecase_ReplaceOrderMaterials(t *testing.T) {
 		repo.On("MapItemOrders", mock.Anything, "org-123", []string{"item-x"}).
 			Return(map[string]string{}, nil)
 
-		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		inputs := []*domain.OrderMaterialInput{
 			{OrderItemID: "item-x", ProductID: "prod-1", Quantity: 1},
 		}
@@ -1127,7 +1175,7 @@ func TestOrderUsecase_ReplaceOrderMaterials(t *testing.T) {
 				"prod-2": {SellPrice: 60000, CostPrice: 40000},
 			}, nil)
 
-		uc := NewOrderUsecase(repo, catalog, products, new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalog, products, new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.ReplaceOrderMaterials(withOrgCtx("org-123"), validInputs())
 
 		assert.Error(t, err)
@@ -1147,7 +1195,7 @@ func TestOrderUsecase_ReplaceOrderMaterials(t *testing.T) {
 			Return(fmt.Errorf("đơn hàng ord-1: %w", domain.ErrOrderNotEditable))
 		products := stubProductStore()
 
-		uc := NewOrderUsecase(repo, catalog, products, new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalog, products, new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.ReplaceOrderMaterials(withOrgCtx("org-123"), validInputs())
 
 		assert.Error(t, err)
@@ -1167,7 +1215,7 @@ func TestOrderUsecase_ReplaceOrderMaterials(t *testing.T) {
 			Return(fmt.Errorf("sản phẩm prod-1: %w", domain.ErrInsufficientStock))
 		products := stubProductStore()
 
-		uc := NewOrderUsecase(repo, catalog, products, new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalog, products, new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.ReplaceOrderMaterials(withOrgCtx("org-123"), validInputs())
 
 		assert.Error(t, err)
@@ -1179,7 +1227,7 @@ func TestOrderUsecase_ReplaceOrderMaterials(t *testing.T) {
 	t.Run("Thất bại - Số lượng không hợp lệ", func(t *testing.T) {
 		repo := new(MockOrderRepository)
 
-		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		inputs := []*domain.OrderMaterialInput{
 			{OrderItemID: "item-1", ProductID: "prod-1", Quantity: 0},
 		}
@@ -1211,7 +1259,7 @@ func TestOrderUsecase_ReplaceOrderMaterials(t *testing.T) {
 			}, nil)
 		repo.On("ReplaceOrderMaterials", mock.Anything, "org-123", mock.Anything, mock.Anything).Return(nil)
 
-		uc := NewOrderUsecase(repo, catalog, products, new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalog, products, new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		inputs := []*domain.OrderMaterialInput{
 			{OrderItemID: "item-1", ProductID: "prod-1", Quantity: 2},
 			{OrderItemID: "item-9", ProductID: "prod-9", Quantity: 1},
@@ -1245,7 +1293,7 @@ func TestOrderUsecase_CreateOrder_Units(t *testing.T) {
 		products.On("GetProductPricing", mock.Anything, "org-123", mock.Anything).Return(netPricing, nil)
 		products.On("GetProductUnits", mock.Anything, "org-123", mock.Anything).Return(netUnits, nil)
 
-		uc := NewOrderUsecase(repo, catalogOK(), products, new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), products, new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		req := &domain.CreateOrderRequest{
 			Items: []domain.OrderItemInput{
 				{ItemType: domain.ItemTypeProduct, ProductID: strP("prod-net"), Quantity: 2, Unit: strP("chai")},
@@ -1280,7 +1328,7 @@ func TestOrderUsecase_CreateOrder_Units(t *testing.T) {
 		products.On("GetProductPricing", mock.Anything, "org-123", mock.Anything).Return(netPricing, nil)
 		products.On("GetProductUnits", mock.Anything, "org-123", mock.Anything).Return(netUnits, nil)
 
-		uc := NewOrderUsecase(repo, catalogOK(), products, new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), products, new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		req := &domain.CreateOrderRequest{
 			Items: []domain.OrderItemInput{
 				{ItemType: domain.ItemTypeProduct, ProductID: strP("prod-net"), Quantity: 500, Unit: strP("ml")},
@@ -1307,7 +1355,7 @@ func TestOrderUsecase_CreateOrder_Units(t *testing.T) {
 		products.On("GetProductPricing", mock.Anything, "org-123", mock.Anything).Return(netPricing, nil)
 		products.On("GetProductUnits", mock.Anything, "org-123", mock.Anything).Return(netUnits, nil)
 
-		uc := NewOrderUsecase(repo, catalogOK(), products, new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), products, new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		req := &domain.CreateOrderRequest{
 			Items: []domain.OrderItemInput{
 				{ItemType: domain.ItemTypeProduct, ProductID: strP("prod-net"), Quantity: 1, Unit: strP("thùng")},
@@ -1335,7 +1383,7 @@ func TestOrderUsecase_CreateOrder_Units(t *testing.T) {
 			Return([]string{}, nil)
 		repo.On("ReplaceOrderMaterials", mock.Anything, "org-123", mock.Anything, mock.Anything).Return(nil)
 
-		uc := NewOrderUsecase(repo, catalog, products, new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalog, products, new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		inputs := []*domain.OrderMaterialInput{
 			{OrderItemID: "item-1", ProductID: "prod-net", Quantity: 1500, Unit: strP("ml")},
 		}
@@ -1381,7 +1429,7 @@ func TestOrderUsecase_UpdateOrderItemQty(t *testing.T) {
 				gotTotal = args.Get(7).(float64)
 			}).Return(nil)
 
-		uc := NewOrderUsecase(repo, catalogOK(), products, new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), products, new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.UpdateOrderItemQty(withOrgCtx("org-123"), "ord-1", "it-1", &domain.UpdateOrderItemQtyRequest{Quantity: 1000, Unit: strP("ml")})
 
 		assert.NoError(t, err)
@@ -1416,7 +1464,7 @@ func TestOrderUsecase_UpdateOrderItemQty(t *testing.T) {
 				gotDeltas = args.Get(5).([]domain.StockDeduction)
 			}).Return(nil)
 
-		uc := NewOrderUsecase(repo, catalogOK(), new(MockProductStore), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), new(MockProductStore), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.UpdateOrderItemQty(withOrgCtx("org-123"), "ord-1", "it-9", &domain.UpdateOrderItemQtyRequest{Quantity: 2})
 
 		assert.NoError(t, err)
@@ -1432,7 +1480,7 @@ func TestOrderUsecase_UpdateOrderItemQty(t *testing.T) {
 		repo := new(MockOrderRepository)
 		repo.On("GetOrderByID", mock.Anything, "org-123", "ord-9").Return(deliveryOrder, nil)
 
-		uc := NewOrderUsecase(repo, catalogOK(), new(MockProductStore), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), new(MockProductStore), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.UpdateOrderItemQty(withOrgCtx("org-123"), "ord-9", "it-1", &domain.UpdateOrderItemQtyRequest{Quantity: 1})
 
 		assert.Error(t, err)
@@ -1446,7 +1494,7 @@ func TestOrderUsecase_UpdateOrderItemQty(t *testing.T) {
 		repo.On("GetOrderItems", mock.Anything, "org-123", "ord-1").Return([]*domain.OrderItem{}, nil)
 		repo.On("GetOrderMaterials", mock.Anything, "ord-1").Return([]*domain.OrderItemMaterial{}, nil)
 
-		uc := NewOrderUsecase(repo, catalogOK(), new(MockProductStore), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), new(MockProductStore), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.UpdateOrderItemQty(withOrgCtx("org-123"), "ord-1", "missing", &domain.UpdateOrderItemQtyRequest{Quantity: 1})
 
 		assert.Error(t, err)
@@ -1458,7 +1506,7 @@ func TestOrderUsecase_UpdateOrderItemQty(t *testing.T) {
 		repo := new(MockOrderRepository)
 		repo.On("GetOrderByID", mock.Anything, "org-123", "ord-1").Return(pendingOrder, nil)
 
-		uc := NewOrderUsecase(repo, catalogOK(), new(MockProductStore), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), new(MockProductStore), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.UpdateOrderItemQty(withOrgCtx("org-123"), "ord-1", "it-1", &domain.UpdateOrderItemQtyRequest{Quantity: 0})
 
 		assert.Error(t, err)
@@ -1474,7 +1522,7 @@ func TestOrderUsecase_UpdateOrderItemQty(t *testing.T) {
 		repo.On("GetOrderMaterials", mock.Anything, "ord-1").Return([]*domain.OrderItemMaterial{}, nil)
 		products.On("GetProductUnits", mock.Anything, "org-123", []string{"prod-net"}).Return(netUnits, nil)
 
-		uc := NewOrderUsecase(repo, catalogOK(), products, new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), products, new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.UpdateOrderItemQty(withOrgCtx("org-123"), "ord-1", "it-1", &domain.UpdateOrderItemQtyRequest{Quantity: 1, Unit: strP("thùng")})
 
 		assert.Error(t, err)
@@ -1491,7 +1539,7 @@ func TestOrderUsecase_UpdateOrderItemQty(t *testing.T) {
 		repo.On("GetOrderMaterials", mock.Anything, "ord-1").Return([]*domain.OrderItemMaterial{}, nil)
 		products.On("GetProductUnits", mock.Anything, "org-123", []string{"prod-net"}).Return(netUnits, nil)
 
-		uc := NewOrderUsecase(repo, catalogOK(), products, new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), products, new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.UpdateOrderItemQty(withOrgCtx("org-123"), "ord-1", "it-1", &domain.UpdateOrderItemQtyRequest{Quantity: 1, Unit: strP("chai")})
 
 		assert.Error(t, err)
@@ -1508,7 +1556,7 @@ func TestOrderUsecase_UpdateOrderItemQty(t *testing.T) {
 		products.On("GetProductUnits", mock.Anything, "org-123", []string{"prod-net"}).Return(netUnits, nil)
 		repo.On("GetTotalPaidByOrder", mock.Anything, "org-123", "ord-1").Return(500000.0, nil)
 
-		uc := NewOrderUsecase(repo, catalogOK(), products, new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), products, new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.UpdateOrderItemQty(withOrgCtx("org-123"), "ord-1", "it-1", &domain.UpdateOrderItemQtyRequest{Quantity: 1, Unit: strP("chai")})
 
 		assert.Error(t, err)
@@ -1527,7 +1575,7 @@ func TestOrderUsecase_UpdateOrderItemQty(t *testing.T) {
 		repo.On("ApplyItemQtyUpdate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(domain.ErrInsufficientStock)
 
-		uc := NewOrderUsecase(repo, catalogOK(), products, new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), products, new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.UpdateOrderItemQty(withOrgCtx("org-123"), "ord-1", "it-1", &domain.UpdateOrderItemQtyRequest{Quantity: 5, Unit: strP("chai")})
 
 		assert.Error(t, err)
@@ -1546,7 +1594,7 @@ func TestOrderUsecase_UpdateOrderItemQty(t *testing.T) {
 		repo.On("ApplyItemQtyUpdate", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(domain.ErrOrderNotEditable)
 
-		uc := NewOrderUsecase(repo, catalogOK(), products, new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), products, new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.UpdateOrderItemQty(withOrgCtx("org-123"), "ord-1", "it-1", &domain.UpdateOrderItemQtyRequest{Quantity: 5, Unit: strP("chai")})
 
 		assert.Error(t, err)
@@ -1574,7 +1622,7 @@ func TestOrderUsecase_AddOrderItems(t *testing.T) {
 				gotTotal = args.Get(7).(float64)
 			}).Return(nil)
 
-		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.AddOrderItems(withOrgCtx("org-123"), "ord-1", []domain.OrderItemInput{
 			{ItemType: domain.ItemTypeProduct, ProductID: strP("prod-1"), Quantity: 1},
 		})
@@ -1613,7 +1661,7 @@ func TestOrderUsecase_AddOrderItems(t *testing.T) {
 				gotMats = args.Get(4).([]*domain.OrderItemMaterial)
 			}).Return(nil)
 
-		uc := NewOrderUsecase(repo, catalogOK(), products, services, new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), products, services, new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.AddOrderItems(withOrgCtx("org-123"), "ord-1", []domain.OrderItemInput{
 			{ItemType: domain.ItemTypeService, ServiceID: strP("svc-1"), Quantity: 1},
 		})
@@ -1627,7 +1675,7 @@ func TestOrderUsecase_AddOrderItems(t *testing.T) {
 	})
 
 	t.Run("Thất bại - danh sách rỗng", func(t *testing.T) {
-		uc := NewOrderUsecase(new(MockOrderRepository), catalogOK(), new(MockProductStore), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(new(MockOrderRepository), catalogOK(), new(MockProductStore), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.AddOrderItems(withOrgCtx("org-123"), "ord-1", []domain.OrderItemInput{})
 
 		assert.Error(t, err)
@@ -1639,7 +1687,7 @@ func TestOrderUsecase_AddOrderItems(t *testing.T) {
 		repo := new(MockOrderRepository)
 		repo.On("GetOrderByID", mock.Anything, "org-123", "ord-9").Return(deliveryOrder, nil)
 
-		uc := NewOrderUsecase(repo, catalogOK(), new(MockProductStore), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), new(MockProductStore), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.AddOrderItems(withOrgCtx("org-123"), "ord-9", []domain.OrderItemInput{
 			{ItemType: domain.ItemTypeProduct, ProductID: strP("prod-1"), Quantity: 1},
 		})
@@ -1656,7 +1704,7 @@ func TestOrderUsecase_AddOrderItems(t *testing.T) {
 		repo.On("AddOrderItems", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(domain.ErrInsufficientStock)
 
-		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.AddOrderItems(withOrgCtx("org-123"), "ord-1", []domain.OrderItemInput{
 			{ItemType: domain.ItemTypeProduct, ProductID: strP("prod-1"), Quantity: 99},
 		})
@@ -1673,7 +1721,7 @@ func TestOrderUsecase_AddOrderItems(t *testing.T) {
 		repo.On("AddOrderItems", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(domain.ErrOrderNotEditable)
 
-		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.AddOrderItems(withOrgCtx("org-123"), "ord-1", []domain.OrderItemInput{
 			{ItemType: domain.ItemTypeProduct, ProductID: strP("prod-1"), Quantity: 1},
 		})
@@ -1714,7 +1762,7 @@ func TestOrderUsecase_DeleteOrderItem(t *testing.T) {
 				gotTotal = args.Get(6).(float64)
 			}).Return(nil)
 
-		uc := NewOrderUsecase(repo, catalogOK(), products, new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), products, new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.DeleteOrderItem(withOrgCtx("org-123"), "ord-1", "it-1")
 
 		assert.NoError(t, err)
@@ -1741,7 +1789,7 @@ func TestOrderUsecase_DeleteOrderItem(t *testing.T) {
 				gotReleases = args.Get(4).([]domain.StockDeduction)
 			}).Return(nil)
 
-		uc := NewOrderUsecase(repo, catalogOK(), new(MockProductStore), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), new(MockProductStore), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.DeleteOrderItem(withOrgCtx("org-123"), "ord-1", "it-2")
 
 		assert.NoError(t, err)
@@ -1760,7 +1808,7 @@ func TestOrderUsecase_DeleteOrderItem(t *testing.T) {
 		}, nil)
 		repo.On("GetOrderMaterials", mock.Anything, "ord-1").Return([]*domain.OrderItemMaterial{}, nil)
 
-		uc := NewOrderUsecase(repo, catalogOK(), new(MockProductStore), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), new(MockProductStore), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.DeleteOrderItem(withOrgCtx("org-123"), "ord-1", "it-1")
 
 		assert.Error(t, err)
@@ -1772,7 +1820,7 @@ func TestOrderUsecase_DeleteOrderItem(t *testing.T) {
 		repo := new(MockOrderRepository)
 		repo.On("GetOrderByID", mock.Anything, "org-123", "ord-9").Return(deliveryOrder, nil)
 
-		uc := NewOrderUsecase(repo, catalogOK(), new(MockProductStore), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), new(MockProductStore), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.DeleteOrderItem(withOrgCtx("org-123"), "ord-9", "it-1")
 
 		assert.Error(t, err)
@@ -1786,7 +1834,7 @@ func TestOrderUsecase_DeleteOrderItem(t *testing.T) {
 		repo.On("GetOrderItems", mock.Anything, "org-123", "ord-1").Return(twoLines(), nil)
 		repo.On("GetOrderMaterials", mock.Anything, "ord-1").Return([]*domain.OrderItemMaterial{}, nil)
 
-		uc := NewOrderUsecase(repo, catalogOK(), new(MockProductStore), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), new(MockProductStore), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.DeleteOrderItem(withOrgCtx("org-123"), "ord-1", "missing")
 
 		assert.Error(t, err)
@@ -1803,7 +1851,7 @@ func TestOrderUsecase_DeleteOrderItem(t *testing.T) {
 		repo.On("GetOrderMaterials", mock.Anything, "ord-1").Return([]*domain.OrderItemMaterial{}, nil)
 		products.On("GetProductUnits", mock.Anything, "org-123", []string{"prod-net"}).Return(netUnits, nil)
 
-		uc := NewOrderUsecase(repo, catalogOK(), products, new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), products, new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.DeleteOrderItem(withOrgCtx("org-123"), "ord-1", "it-1")
 
 		assert.Error(t, err)
@@ -1820,7 +1868,7 @@ func TestOrderUsecase_DeleteOrderItem(t *testing.T) {
 		products.On("GetProductUnits", mock.Anything, "org-123", []string{"prod-net"}).Return(netUnits, nil)
 		repo.On("GetTotalPaidByOrder", mock.Anything, "org-123", "ord-1").Return(400000.0, nil)
 
-		uc := NewOrderUsecase(repo, catalogOK(), products, new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), products, new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.DeleteOrderItem(withOrgCtx("org-123"), "ord-1", "it-1")
 
 		assert.Error(t, err)
@@ -1839,7 +1887,7 @@ func TestOrderUsecase_DeleteOrderItem(t *testing.T) {
 		repo.On("ApplyDeleteItem", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(domain.ErrOrderNotEditable)
 
-		uc := NewOrderUsecase(repo, catalogOK(), products, new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), products, new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.DeleteOrderItem(withOrgCtx("org-123"), "ord-1", "it-1")
 
 		assert.Error(t, err)
@@ -1858,7 +1906,7 @@ func TestOrderUsecase_GetOrderStats(t *testing.T) {
 			CancelRefundToday: 2, CancelRefundMonth: 3, MonthTotal: 96,
 		}, nil)
 
-		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.GetOrderStats(withOrgCtx("org-123"))
 
 		assert.NoError(t, err)
@@ -1877,7 +1925,7 @@ func TestOrderUsecase_GetOrderStats(t *testing.T) {
 			TodayRevenue: 100000, YesterdayRevenue: 0, CancelRefundMonth: 0, MonthTotal: 0,
 		}, nil)
 
-		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.GetOrderStats(withOrgCtx("org-123"))
 
 		assert.NoError(t, err)
@@ -1886,7 +1934,7 @@ func TestOrderUsecase_GetOrderStats(t *testing.T) {
 	})
 
 	t.Run("Thất bại - Thiếu organization_id", func(t *testing.T) {
-		uc := NewOrderUsecase(new(MockOrderRepository), catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(new(MockOrderRepository), catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.GetOrderStats(context.Background())
 
 		assert.Error(t, err)
@@ -1898,7 +1946,7 @@ func TestOrderUsecase_GetOrderStats(t *testing.T) {
 		repo := new(MockOrderRepository)
 		repo.On("GetOrderStats", mock.Anything, "org-123").Return(nil, errors.New("db query failed"))
 
-		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore))
+		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
 		res, err := uc.GetOrderStats(withOrgCtx("org-123"))
 
 		assert.Error(t, err)

@@ -1,6 +1,8 @@
 'use client';
 
 import * as React from 'react';
+import { format } from 'date-fns';
+import { DashDatePicker } from '@/components/dashboard/DashDatePicker';
 import { DashInput } from '@/components/dashboard/DashInput';
 import { DashOptionPills } from '@/components/dashboard/DashOptionPills';
 import { DashSelect } from '@/components/dashboard/DashSelect';
@@ -77,6 +79,14 @@ export const emptyStaffFormValues: StaffFormValues = {
 function toNumber(value: string): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+/** Chuyển YYYY-MM-DD sang Date để hiển thị trên date picker. */
+function toDateValue(value: string): Date | undefined {
+  if (!value) return undefined;
+  const [year, month, day] = value.slice(0, 10).split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+  return Number.isNaN(date.getTime()) ? undefined : date;
 }
 
 export function validateStaffForm(values: StaffFormValues): string | null {
@@ -194,11 +204,13 @@ export function StaffForm({
             />
           </Field>
           <Field label="Ngày sinh">
-            <DashInput
-              name="birth_date"
-              type="date"
-              value={value.birth_date}
-              onChange={(e) => setField('birth_date', e.target.value)}
+            <DashDatePicker
+              value={toDateValue(value.birth_date)}
+              onValueChange={(date) =>
+                setField('birth_date', date ? format(date, 'yyyy-MM-dd') : '')
+              }
+              placeholder="Chọn ngày sinh"
+              disableFuture
             />
           </Field>
           <Field label="Giới tính">
@@ -245,11 +257,12 @@ export function StaffForm({
             </Field>
           )}
           <Field label="Ngày bắt đầu làm việc">
-            <DashInput
-              name="hire_date"
-              type="date"
-              value={value.hire_date}
-              onChange={(e) => setField('hire_date', e.target.value)}
+            <DashDatePicker
+              value={toDateValue(value.hire_date)}
+              onValueChange={(date) =>
+                setField('hire_date', date ? format(date, 'yyyy-MM-dd') : '')
+              }
+              placeholder="Chọn ngày bắt đầu"
             />
           </Field>
           <Field label="Hình thức làm việc">

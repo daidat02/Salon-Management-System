@@ -15,15 +15,16 @@ export default function ServicesTable() {
   const searchParams = useSearchParams()
   const search = searchParams.get("search") || ""
   const status = searchParams.get("status") || ""
+  const categoryId = searchParams.get("category_id") || ""
   const sort = searchParams.get("sort") || ""
   const pageFromUrl = parseInt(searchParams.get("page") || "1", 10) || 1
   const page = pageFromUrl || 1
   const pageSize = 20
 
-  const { data, isLoading, isError, error } = useService({ page, pageSize, search, status, sort })
+  const { data, isLoading, isError, error } = useService({ page, pageSize, search, status, categoryId, sort })
 
   const services = (data?.data || []).filter((r): r is NonNullable<typeof r> => r !== null && r !== undefined)
-  const total = (data as any)?.total || 0
+  const total = data?.total || 0
 
   const [drawerOpen, setDrawerOpen] = React.useState(false)
   const [selected, setSelected] = React.useState<Service | null>(null)

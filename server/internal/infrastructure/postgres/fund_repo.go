@@ -7,6 +7,8 @@ import (
 	"fmt"
 
 	domain "github.com/daidat02/server/internal/domain/cashflow"
+	"github.com/daidat02/server/pkg/utils"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
@@ -24,6 +26,50 @@ func NewPostgresFundRepository(db *pgxpool.Pool) *PostgresFundRepository {
 		db: db,
 		qx: sqlx.NewDb(stdlib.OpenDBFromPool(db), "pgx"),
 	}
+}
+
+type DefaultFund struct {
+	Code         string
+	Name         string
+	FundType     string // 'cash' | 'bank' | 'e_wallet'
+	IsDefault    bool
+	IsActive     bool
+	IsConfigured bool
+}
+
+func InsertDefaultFundsAndMethods(ctx context.Context, tx pgx.Tx, orgID string) error {
+	// 1. Khởi tạo 2 Quỹ tiền mặc định (Tiền mặt & Ngân hàng). Idempotent.
+	queryFunds := `
+		INSERT INTO funds (id, organization_id, code, name, fund_type, is_active, is_default, is_configured)
+		VALUES
+			($1, $3, 'CASH', 'Quỹ Tiền Mặt', 'cash', true, true, true),
+			($2, $3, 'BANK', 'Tài khoản Ngân Hàng', 'bank', true, false, true)
+		ON CONFLICT (organization_id, code) DO NOTHING;
+	`
+	if _, err := tx.Exec(ctx, queryFunds, utils.NewID(), utils.NewID(), orgID); err != nil {
+		return err
+	}
+
+	// Lấy lại id quỹ (có thể đã tồn tại từ lần chạy trước).
+	var cashFundID, bankFundID string
+	if err := tx.QueryRow(ctx, `
+		SELECT
+			(SELECT id FROM funds WHERE organization_id = $1 AND code = 'CASH'),
+			(SELECT id FROM funds WHERE organization_id = $1 AND code = 'BANK')
+	`, orgID).Scan(&cashFundID, &bankFundID); err != nil {
+		return err
+	}
+
+	// 2. Khởi tạo 2 Phương thức thanh toán hiển thị POS trỏ vào 2 Quỹ trên.
+	queryMethods := `
+		INSERT INTO payment_methods (id, organization_id, fund_id, code, name, is_system, sort_order, is_active)
+		VALUES
+			($1, $5, $3, 'CASH', 'Tiền mặt', true, 1, true),
+			($2, $5, $4, 'BANK_TRANSFER', 'Chuyển khoản / VietQR', true, 2, true)
+		ON CONFLICT (organization_id, code) DO NOTHING;
+	`
+	_, err := tx.Exec(ctx, queryMethods, utils.NewID(), utils.NewID(), cashFundID, bankFundID, orgID)
+	return err
 }
 
 func (r *PostgresFundRepository) CreateFund(ctx context.Context, fund *domain.Fund) error {

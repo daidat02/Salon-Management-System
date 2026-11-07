@@ -23,6 +23,11 @@ CREATE TABLE organizations (
     address VARCHAR(255),
     timezone VARCHAR(50) NOT NULL DEFAULT 'Asia/Ho_Chi_Minh',
     status VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'suspended', 'closed')),
+    email VARCHAR(150),
+    website VARCHAR(255),
+    tax_code VARCHAR(20),
+    slogan VARCHAR(255),
+    logo_url VARCHAR(500),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -531,6 +536,7 @@ CREATE TABLE cash_flows (
     status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'cancelled')),
     order_id UUID REFERENCES orders(id) ON DELETE SET NULL,
     inventory_document_id UUID REFERENCES inventory_documents(id) ON DELETE SET NULL,
+    staff_id UUID REFERENCES staff(id) ON DELETE SET NULL,
     created_by UUID REFERENCES users(id) ON DELETE SET NULL,
     approved_by UUID REFERENCES users(id) ON DELETE SET NULL,
     approved_at TIMESTAMPTZ,
@@ -573,6 +579,233 @@ CREATE TRIGGER trg_payrolls_updated_at
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- ==========================================
+-- 21. STAFF_SALARY_ADJUSTMENTS (Thưởng/phạt, phụ cấp/khấu trừ)
+-- payroll_id null khi draft; gán khi chốt lương để khóa.
+-- ==========================================
+CREATE TABLE staff_salary_adjustments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    staff_id UUID NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+    payroll_id UUID REFERENCES payrolls(id) ON DELETE SET NULL,
+    adjustment_type VARCHAR(20) NOT NULL CHECK (adjustment_type IN ('ALLOWANCE', 'DEDUCTION')),
+    amount BIGINT NOT NULL DEFAULT 0,
+    reason VARCHAR(255) NOT NULL,
+    effective_date DATE NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TRIGGER trg_staff_salary_adjustments_updated_at
+    BEFORE UPDATE ON staff_salary_adjustments
+    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- ==========================================
+-- 22. ATTENDANCES (Điểm danh / nghỉ phép)
+-- ==========================================
+CREATE TABLE attendances (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    staff_id UUID NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+    payroll_id UUID REFERENCES payrolls(id) ON DELETE SET NULL,
+    target_date DATE NOT NULL,
+    status VARCHAR(20) NOT NULL CHECK (status IN ('PRESENT', 'LEAVE_EXCUSED', 'LEAVE_UNEXCUSED', 'LATE')),
+    note TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (staff_id, target_date)
+);
+CREATE TRIGGER trg_attendances_updated_at
+    BEFORE UPDATE ON attendances
+    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- ==========================================
+-- 23. STAFF_LEAVES (Đơn nghỉ phép / đi trễ)
+-- ==========================================
+CREATE TABLE staff_leaves (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    staff_id UUID NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+    leave_type VARCHAR(20) NOT NULL CHECK (leave_type IN ('ANNUAL', 'EXCUSED', 'LATE')),
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    note TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT staff_leaves_date_range_check CHECK (end_date >= start_date)
+);
+CREATE TRIGGER trg_staff_leaves_updated_at
+    BEFORE UPDATE ON staff_leaves
+    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- ==========================================
+-- 24. BUSINESS_HOURS (1 dòng/org; giờ làm việc 7 ngày lưu trong JSONB)
+-- days là array đúng 7 phần tử, weekday 1=T2 .. 7=CN:
+-- {weekday, is_open, open_time, close_time, break_start, break_end, note}
+-- Dùng giờ tường của salon (không timezone). Validate chi tiết ở usecase.
+-- ==========================================
+CREATE TABLE business_hours (
+    organization_id UUID PRIMARY KEY REFERENCES organizations(id) ON DELETE CASCADE,
+    days JSONB NOT NULL DEFAULT '[
+        {"weekday": 1, "is_open": true, "open_time": "08:30", "close_time": "20:30", "break_start": "12:30", "break_end": "13:30", "note": "Lịch thông thường"},
+        {"weekday": 2, "is_open": true, "open_time": "08:30", "close_time": "20:30", "break_start": "12:30", "break_end": "13:30", "note": "Lịch thông thường"},
+        {"weekday": 3, "is_open": true, "open_time": "08:30", "close_time": "20:30", "break_start": "12:30", "break_end": "13:30", "note": "Lịch thông thường"},
+        {"weekday": 4, "is_open": true, "open_time": "08:30", "close_time": "20:30", "break_start": "12:30", "break_end": "13:30", "note": "Lịch thông thường"},
+        {"weekday": 5, "is_open": true, "open_time": "08:30", "close_time": "21:00", "break_start": "12:30", "break_end": "13:30", "note": "Khung giờ cao điểm tối"},
+        {"weekday": 6, "is_open": true, "open_time": "08:00", "close_time": "21:30", "break_start": null, "break_end": null, "note": "Ngày đông khách - tăng ca"},
+        {"weekday": 7, "is_open": true, "open_time": "08:00", "close_time": "21:30", "break_start": null, "break_end": null, "note": "Ngày đông khách - tăng ca"}
+    ]'::jsonb,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT business_hours_days_is_array
+        CHECK (jsonb_typeof(days) = 'array' AND jsonb_array_length(days) = 7)
+);
+CREATE TRIGGER trg_business_hours_updated_at
+    BEFORE UPDATE ON business_hours
+    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- ==========================================
+-- 25. ORGANIZATION_NOTIFICATION_SETTINGS (1 dòng/org)
+-- daily_report_time hiểu theo organizations.timezone.
+-- ==========================================
+CREATE TABLE organization_notification_settings (
+    organization_id UUID PRIMARY KEY REFERENCES organizations(id) ON DELETE CASCADE,
+    appointment_reminder BOOLEAN NOT NULL DEFAULT true,
+    new_booking_alert BOOLEAN NOT NULL DEFAULT true,
+    low_stock_alert BOOLEAN NOT NULL DEFAULT true,
+    daily_revenue_report BOOLEAN NOT NULL DEFAULT true,
+    birthday_voucher BOOLEAN NOT NULL DEFAULT true,
+    reminder_hours_before SMALLINT NOT NULL DEFAULT 2
+        CHECK (reminder_hours_before BETWEEN 0 AND 168),
+    low_stock_threshold INTEGER NOT NULL DEFAULT 5
+        CHECK (low_stock_threshold >= 0),
+    daily_report_time TIME NOT NULL DEFAULT '22:00',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TRIGGER trg_organization_notification_settings_updated_at
+    BEFORE UPDATE ON organization_notification_settings
+    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- ==========================================
+-- 26. APPOINTMENT_SETTINGS (Cấu hình đặt lịch + quy tắc cọc theo no-show)
+-- 1 dòng / organization. Khách có >= no_show_threshold lần no_show trong
+-- no_show_lookback_days ngày gần nhất thì lần đặt kế tiếp phải cọc.
+-- ==========================================
+CREATE TABLE appointment_settings (
+    organization_id UUID PRIMARY KEY REFERENCES organizations(id) ON DELETE CASCADE,
+
+    -- Quy tắc đặt lịch
+    allow_online_booking BOOLEAN NOT NULL DEFAULT true,
+    auto_confirm BOOLEAN NOT NULL DEFAULT false,
+    slot_step_minutes SMALLINT NOT NULL DEFAULT 30
+        CHECK (slot_step_minutes IN (15, 30, 45, 60)),
+    max_per_slot SMALLINT NOT NULL DEFAULT 2
+        CHECK (max_per_slot >= 1),
+    min_lead_minutes INTEGER NOT NULL DEFAULT 60
+        CHECK (min_lead_minutes >= 0),
+    max_advance_days INTEGER NOT NULL DEFAULT 30
+        CHECK (max_advance_days >= 1),
+
+    -- Hủy & đổi lịch
+    allow_cancel BOOLEAN NOT NULL DEFAULT true,
+    cancel_before_hours SMALLINT NOT NULL DEFAULT 4
+        CHECK (cancel_before_hours >= 0),
+    max_cancellations_per_month SMALLINT NOT NULL DEFAULT 3
+        CHECK (max_cancellations_per_month >= 0),
+    allow_reschedule BOOLEAN NOT NULL DEFAULT true,
+    reschedule_before_hours SMALLINT NOT NULL DEFAULT 2
+        CHECK (reschedule_before_hours >= 0),
+
+    -- Cọc theo số lần không đến (no-show)
+    deposit_enabled BOOLEAN NOT NULL DEFAULT true,
+    no_show_threshold SMALLINT NOT NULL DEFAULT 2
+        CHECK (no_show_threshold >= 1),
+    no_show_lookback_days INTEGER NOT NULL DEFAULT 180
+        CHECK (no_show_lookback_days >= 1),
+    deposit_percent NUMERIC(5,2) NOT NULL DEFAULT 30
+        CHECK (deposit_percent BETWEEN 0 AND 100),
+    -- 0 = không giới hạn; > 0 = mức cọc tối đa
+    deposit_max_amount NUMERIC(14,2) NOT NULL DEFAULT 0
+        CHECK (deposit_max_amount >= 0),
+
+    CONSTRAINT appointment_settings_deposit_value_check CHECK (
+        deposit_enabled = false OR deposit_percent > 0
+    ),
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TRIGGER trg_appointment_settings_updated_at
+    BEFORE UPDATE ON appointment_settings
+    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- ==========================================
+-- 27. RECEIPT_SETTINGS (Cấu hình in hóa đơn / phiếu thu)
+-- 1 dòng / organization.
+-- ==========================================
+CREATE TABLE receipt_settings (
+    organization_id UUID PRIMARY KEY REFERENCES organizations(id) ON DELETE CASCADE,
+
+    -- Khổ giấy & máy in
+    paper_size VARCHAR(20) NOT NULL DEFAULT 'K80'
+        CHECK (paper_size IN ('K80', 'K57', 'A4', 'A5')),
+    auto_cut_paper BOOLEAN NOT NULL DEFAULT true,
+    open_cash_drawer BOOLEAN NOT NULL DEFAULT true,
+
+    -- Header
+    show_logo BOOLEAN NOT NULL DEFAULT true,
+    logo_url TEXT,
+    header_text TEXT,
+    show_branch_address BOOLEAN NOT NULL DEFAULT true,
+    show_cashier_name BOOLEAN NOT NULL DEFAULT true,
+
+    -- Body & customer
+    show_customer_info BOOLEAN NOT NULL DEFAULT true,
+    mask_customer_phone BOOLEAN NOT NULL DEFAULT false,
+    show_vietqr BOOLEAN NOT NULL DEFAULT true,
+
+    -- Footer
+    footer_text TEXT,
+    show_wifi_info BOOLEAN NOT NULL DEFAULT false,
+    wifi_name VARCHAR(100),
+    wifi_pass VARCHAR(100),
+
+    -- Automation
+    auto_print_on_checkout BOOLEAN NOT NULL DEFAULT true,
+    print_copy_count INT NOT NULL DEFAULT 1
+        CHECK (print_copy_count >= 1),
+
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TRIGGER trg_receipt_settings_updated_at
+    BEFORE UPDATE ON receipt_settings
+    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- ==========================================
+-- 28. PAYMENT_METHODS (Phương thức thanh toán tại quầy)
+-- Mỗi phương thức gắn với 1 quỹ (funds) để hạch toán khi chốt đơn.
+-- ==========================================
+CREATE TABLE payment_methods (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    fund_id UUID NOT NULL REFERENCES funds(id) ON DELETE RESTRICT,
+
+    code VARCHAR(50) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+
+    is_system BOOLEAN NOT NULL DEFAULT false,
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    sort_order INT NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+    CONSTRAINT unique_org_method_code UNIQUE (organization_id, code)
+);
+CREATE TRIGGER trg_payment_methods_updated_at
+    BEFORE UPDATE ON payment_methods
+    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- ==========================================
 -- INDEXES (multi-tenant + FK + nghiệp vụ)
 -- ==========================================
 CREATE INDEX idx_organizations_slug ON organizations(slug);
@@ -609,6 +842,11 @@ CREATE INDEX idx_appointments_status ON appointments(organization_id, status);
 CREATE INDEX idx_appointments_device_id ON appointments(organization_id, device_id);
 CREATE INDEX idx_appointments_client_ip ON appointments(organization_id, client_ip);
 
+-- Tra cứu nhanh số lần no_show của 1 khách trong khoảng thời gian.
+CREATE INDEX idx_appointments_customer_noshow
+    ON appointments (organization_id, customer_id, start_time)
+    WHERE status = 'no_show';
+
 CREATE INDEX idx_appointment_items_appointment_id ON appointment_items(appointment_id);
 
 CREATE INDEX idx_suppliers_org_id ON suppliers(organization_id);
@@ -624,6 +862,14 @@ CREATE INDEX idx_orders_org_id ON orders(organization_id);
 CREATE INDEX idx_orders_customer ON orders(customer_id);
 CREATE INDEX idx_orders_appointment ON orders(appointment_id);
 CREATE INDEX idx_orders_status ON orders(organization_id, status);
+
+-- Mỗi lịch hẹn chỉ có tối đa 1 đơn còn hiệu lực.
+-- Đơn cancelled/refunded được phép tạo lại; partial index chống cả race
+-- khi 2 request tạo đơn cùng appointment_id.
+CREATE UNIQUE INDEX uq_orders_appointment_active
+    ON orders (organization_id, appointment_id)
+    WHERE appointment_id IS NOT NULL
+      AND status NOT IN ('cancelled', 'refunded');
 
 CREATE INDEX idx_order_items_org_id ON order_items(organization_id);
 CREATE INDEX idx_order_items_order_id ON order_items(order_id);
@@ -652,3 +898,12 @@ CREATE INDEX idx_cash_flows_order ON cash_flows(order_id) WHERE order_id IS NOT 
 
 CREATE INDEX idx_payrolls_org_period ON payrolls(organization_id, period_month DESC);
 CREATE INDEX idx_payrolls_staff ON payrolls(staff_id, period_month DESC);
+
+CREATE INDEX idx_salary_adjustments_staff_date ON staff_salary_adjustments(staff_id, effective_date);
+CREATE INDEX idx_attendances_staff_date ON attendances(staff_id, target_date);
+
+CREATE INDEX idx_staff_leaves_staff_date
+    ON staff_leaves (organization_id, staff_id, start_date);
+
+CREATE INDEX idx_payment_methods_org ON payment_methods (organization_id) WHERE is_active;
+CREATE INDEX idx_payment_methods_fund ON payment_methods (fund_id);

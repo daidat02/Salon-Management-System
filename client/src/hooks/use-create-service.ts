@@ -7,6 +7,7 @@ export function useCreateService() {
     mutationFn: (payload: CreateServicePayload) => createService(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['services'] });
+      queryClient.invalidateQueries({ queryKey: ['service-stats'] });
     },
   });
 }

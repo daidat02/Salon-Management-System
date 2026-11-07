@@ -1,4 +1,3 @@
-import { History, Pencil, SquarePlus } from 'lucide-react';
 import { cn } from 'cn';
 import { Tag } from '@/components/ui/tag';
 import type { DashColumn } from '@/components/dashboard/DashTable';
@@ -13,14 +12,6 @@ import {
   getStockUnit,
   type InventoryStatus,
 } from './inventoryUtils';
-
-function Shelves(props: React.ComponentProps<'svg'>) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...props}>
-      <path d="M3 5h18M3 12h18M3 19h18M5 5v14M19 5v14" />
-    </svg>
-  );
-}
 
 function StatusBadge({ status }: { status: InventoryStatus }) {
   if (status === 'low')
@@ -77,12 +68,17 @@ export const inventoryColumns: DashColumn<Product>[] = [
   },
   {
     id: 'category',
-    header: 'Phân loại',
-    cell: () => (
-      <Tag variant="slate" size="sm" shape="rounded">
-        Chưa phân loại
-      </Tag>
-    ),
+    header: 'Danh mục',
+    cell: (row) =>
+      row.category_name ? (
+        <Tag variant="slate" size="sm" shape="rounded">
+          {row.category_name}
+        </Tag>
+      ) : (
+        <Tag variant="slate" size="sm" shape="rounded">
+          Chưa phân loại
+        </Tag>
+      ),
   },
   {
     id: 'stock',
@@ -143,32 +139,5 @@ export const inventoryColumns: DashColumn<Product>[] = [
     header: 'Trạng thái',
     className: 'text-center',
     cell: (row) => <StatusBadge status={getInventoryStatus(row)} />,
-  },
-  {
-    id: 'actions',
-    header: 'Thao tác',
-    className: 'text-center',
-    cell: () => (
-      <div className="flex items-center justify-center gap-1 text-on-surface-variant">
-        <button
-          className="hover:text-primary hover:bg-primary-container rounded p-1 transition-colors"
-          title="Nhập thêm"
-        >
-          <SquarePlus className="h-[17px] w-[17px]" />
-        </button>
-        <button
-          className="hover:text-primary hover:bg-surface-container rounded p-1 transition-colors"
-          title="Điều chỉnh kho"
-        >
-          <Pencil className="h-[17px] w-[17px]" />
-        </button>
-        <button
-          className="hover:text-primary hover:bg-surface-container rounded p-1 transition-colors"
-          title="Lịch sử thẻ kho"
-        >
-          <History className="h-[17px] w-[17px]" />
-        </button>
-      </div>
-    ),
   },
 ];

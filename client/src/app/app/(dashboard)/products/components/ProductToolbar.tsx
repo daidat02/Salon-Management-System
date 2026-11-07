@@ -1,5 +1,6 @@
 'use client';
 import DashToolbar from '@/components/dashboard/DashToolbar';
+import useCategory from '@/hooks/use-category';
 import React, { useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 const ProductToolbar = () => {
@@ -7,13 +8,19 @@ const ProductToolbar = () => {
   const searchParams = useSearchParams();
   const search = searchParams.get('search') || '';
   const status = searchParams.get('status') || '';
+  const categoryId = searchParams.get('category_id') || '';
   const sort = searchParams.get('sort') || '';
-  const brand = searchParams.get('brand') || '';
   const [inputValue, setInputValue] = React.useState(search);
-
-  useEffect(() => {
+  const [lastSearch, setLastSearch] = React.useState(search);
+  if (search !== lastSearch) {
+    setLastSearch(search);
     setInputValue(search);
-  }, [search]);
+  }
+
+  const { data: categoryData } = useCategory({ page: 1, pageSize: 100 });
+  const categoryOptions = (categoryData?.data ?? [])
+    .filter((c) => c.is_active && c.type !== 'service')
+    .map((c) => ({ value: c.id, label: c.name }));
 
   useEffect(() => {
     if (inputValue === search) return;
@@ -43,19 +50,12 @@ const ProductToolbar = () => {
       onSearchChange={(v) => setInputValue(v)}
       filters={[
         {
-          id: 'brand',
-          placeholder: 'Tất cả thương hiệu',
-          value: brand || undefined,
-          widthClass: 'sm:w-44',
-          options: [
-            'Tất cả thương hiệu',
-            'Moroccanoil',
-            'Olaplex',
-            'Kérastase',
-            'Goldwell',
-            'Obsidian',
-          ],
-          onValueChange: (value) => handleFilterChange('brand', value, 'Tất cả thương hiệu'),
+          id: 'category_id',
+          placeholder: 'Tất cả danh mục',
+          value: categoryId || undefined,
+          widthClass: 'sm:w-48',
+          options: [{ value: '', label: 'Tất cả danh mục' }, ...categoryOptions],
+          onValueChange: (value) => handleFilterChange('category_id', value, 'Tất cả danh mục'),
         },
         {
           id: 'status',

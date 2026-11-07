@@ -220,23 +220,6 @@ export const SHIFT_OPTIONS: { label: string; value: WeekShift }[] = [
   { label: 'Nghỉ', value: 'off' },
 ];
 
-export type LeaveRow = {
-  id: string;
-  date: string;
-  days: string;
-  type: 'paid' | 'unpaid';
-  reason: string;
-  status: 'approved' | 'pending';
-};
-
-export const mockLeaves: LeaveRow[] = [
-  { id: 'l-01', date: '04/10/2026', days: '1 ngày', type: 'paid', reason: 'Việc gia đình', status: 'approved' },
-  { id: 'l-02', date: '15/09/2026', days: '1 ngày', type: 'paid', reason: 'Cảm sốt (có giấy BS)', status: 'approved' },
-  { id: 'l-03', date: '18/10/2026', days: '2 ngày', type: 'paid', reason: 'Du lịch cùng gia đình', status: 'pending' },
-];
-
-export const mockLeaveBalance = { used: 2, total: 12 };
-
 // --- Hiệu suất tháng này (khối trong header mẫu) ---
 
 export const mockMonthStats = {

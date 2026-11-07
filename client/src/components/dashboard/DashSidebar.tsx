@@ -63,7 +63,6 @@ const MAIN_NAV: NavItem[] = [
   { key: 'staff', label: 'Nhân viên', href: '/app/staff', icon: UserCheck },
   { key: 'cashflow', label: 'Thu & Chi', href: '/app/cashflow', icon: Wallet },
   { key: 'reports', label: 'Báo cáo', href: '/app/reports', icon: ChartColumn },
-  { key: 'palette', label: 'Bảng màu', href: '/app/palette', icon: Palette },
 ];
 
 type DashSidebarProps = {

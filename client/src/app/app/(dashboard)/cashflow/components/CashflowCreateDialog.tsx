@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { ArrowDownCircle, ArrowUpCircle, Info } from 'lucide-react';
 import { DashDialog, DashDialogFooter } from '@/components/dashboard/DashDialog';
+import { DashDatePicker } from '@/components/dashboard/DashDatePicker';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { DashInput } from '@/components/dashboard/DashInput';
@@ -32,15 +33,9 @@ type CashflowCreateDialogProps = {
   onSuccess?: () => void;
 };
 
-function toDateTimeLocal(date: Date): string {
+function toTimeValue(date: Date): string {
   const pad = (value: number) => String(value).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(
-    date.getHours(),
-  )}:${pad(date.getMinutes())}`;
-}
-
-function nowDateTimeLocal(): string {
-  return toDateTimeLocal(new Date());
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 export function CashflowCreateDialog({
@@ -55,7 +50,8 @@ export function CashflowCreateDialog({
   const [categoryId, setCategoryId] = React.useState('');
   const [fundId, setFundId] = React.useState('');
   const [amount, setAmount] = React.useState('');
-  const [occurredAt, setOccurredAt] = React.useState(nowDateTimeLocal);
+  const [occurredDate, setOccurredDate] = React.useState<Date>(() => new Date());
+  const [occurredTime, setOccurredTime] = React.useState(() => toTimeValue(new Date()));
   const [description, setDescription] = React.useState('');
   const [error, setError] = React.useState<string | null>(null);
 
@@ -67,7 +63,8 @@ export function CashflowCreateDialog({
       setCategoryId('');
       setFundId('');
       setAmount('');
-      setOccurredAt(nowDateTimeLocal());
+      setOccurredDate(new Date());
+      setOccurredTime(toTimeValue(new Date()));
       setDescription('');
       setError(null);
     }
@@ -101,11 +98,19 @@ export function CashflowCreateDialog({
       return;
     }
 
-    const occurredDate = new Date(occurredAt);
-    if (!occurredAt || Number.isNaN(occurredDate.getTime())) {
+    if (!occurredDate || Number.isNaN(occurredDate.getTime())) {
       setError('Vui lòng chọn ngày phát sinh hợp lệ');
       return;
     }
+
+    const [hours, minutes] = occurredTime.split(':').map(Number);
+    const occurred = new Date(occurredDate);
+    occurred.setHours(
+      Number.isFinite(hours) ? hours : 0,
+      Number.isFinite(minutes) ? minutes : 0,
+      0,
+      0,
+    );
 
     const payload: CreateCashflowFormValues = {
       kind,
@@ -113,7 +118,7 @@ export function CashflowCreateDialog({
       fund_id: fundId,
       amount: amountValue,
       description: description.trim() || null,
-      occurred_at: occurredDate.toISOString(),
+      occurred_at: occurred.toISOString(),
     };
 
     mutate(payload, {
@@ -165,7 +170,7 @@ export function CashflowCreateDialog({
         )}
 
         <div>
-          <Label className="mb-1 block font-semibold text-slate-700">
+          <Label className="mb-1.5 block min-w-0 text-xs font-semibold text-on-surface">
             Loại phiếu <span className="text-error">*</span>
           </Label>
           <div className="grid grid-cols-2 gap-2">
@@ -200,7 +205,7 @@ export function CashflowCreateDialog({
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <Label className="mb-1 block font-semibold text-slate-700">
+            <Label className="mb-1.5 block min-w-0 text-xs font-semibold text-on-surface">
               Số tiền <span className="text-error">*</span>
             </Label>
             <DashInput
@@ -220,18 +225,26 @@ export function CashflowCreateDialog({
           </div>
 
           <div>
-            <Label className="mb-1 block font-semibold text-slate-700">
+            <Label className="mb-1.5 block min-w-0 text-xs font-semibold text-on-surface">
               Ngày phát sinh <span className="text-error">*</span>
             </Label>
-            <DashInput
-              type="datetime-local"
-              value={occurredAt}
-              onChange={(event) => setOccurredAt(event.target.value)}
-            />
+            <div className="flex items-center gap-2">
+              <DashDatePicker
+                value={occurredDate}
+                onValueChange={(date) => date && setOccurredDate(date)}
+                className="flex-1"
+              />
+              <DashInput
+                type="time"
+                value={occurredTime}
+                onChange={(event) => setOccurredTime(event.target.value)}
+                className="w-28 shrink-0"
+              />
+            </div>
           </div>
 
           <div>
-            <Label className="mb-1 block font-semibold text-slate-700">
+            <Label className="mb-1.5 block min-w-0 text-xs font-semibold text-on-surface">
               Quỹ hạch toán <span className="text-error">*</span>
             </Label>
             <DashSelect
@@ -244,7 +257,7 @@ export function CashflowCreateDialog({
           </div>
 
           <div>
-            <Label className="mb-1 block font-semibold text-slate-700">Danh mục</Label>
+            <Label className="mb-1.5 block min-w-0 text-xs font-semibold text-on-surface">Danh mục</Label>
             <DashCombobox
               value={categoryId}
               onValueChange={setCategoryId}
@@ -255,7 +268,7 @@ export function CashflowCreateDialog({
         </div>
 
         <div>
-          <Label className="mb-1 block font-semibold text-slate-700">Diễn giải</Label>
+          <Label className="mb-1.5 block min-w-0 text-xs font-semibold text-on-surface">Diễn giải</Label>
           <Textarea
             value={description}
             onChange={(event) => setDescription(event.target.value)}

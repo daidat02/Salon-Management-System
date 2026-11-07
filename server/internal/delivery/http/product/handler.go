@@ -55,7 +55,7 @@ func (h *ProductHandler) CreateProduct(c *gin.Context) {
 		SKU:           req.SKU,
 		Name:          req.Name,
 		Unit:          req.Unit,
-		NetUnit:       req.	NetUnit,
+		NetUnit:       req.NetUnit,
 		NetAmount:     req.NetAmount,
 		ProductType:   req.ProductType,
 		ShowOnWeb:     boolOrDefault(req.ShowOnWeb, true),
@@ -82,8 +82,9 @@ func (h *ProductHandler) CreateProduct(c *gin.Context) {
 // @Security     BearerAuth
 // @Param        page       query     int     false  "Trang (mặc định 1)"
 // @Param        page_size  query     int     false  "Số dòng/trang (mặc định 20, tối đa 100)"
-// @Param        search     query     string  false  "Tìm theo tên, SKU hoặc loại sản phẩm (ILIKE)"
-// @Param        status     query     string  false  "Lọc trạng thái" Enums(active,low_stock,out_of_stock)
+// @Param        search       query     string  false  "Tìm theo tên, SKU hoặc loại sản phẩm (ILIKE)"
+// @Param        status       query     string  false  "Lọc trạng thái" Enums(active,low_stock,out_of_stock)
+// @Param        category_id  query     string  false  "Lọc theo ID danh mục sản phẩm"
 // @Param        sort       query     string  false  "Sắp xếp" Enums(created_at_desc,price_asc,price_desc,stock_asc)
 // @Success      200        {object}  response.SuccessResponse  "Danh sách sản phẩm kèm phân trang {data, page, page_size, total, total_pages}"
 // @Failure      400        {object}  response.ErrorResponse    "Thiếu organization"
@@ -95,14 +96,40 @@ func (h *ProductHandler) GetProductsByOrgID(c *gin.Context) {
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
 	search := c.DefaultQuery("search", "")
 	status := c.DefaultQuery("status", "")
+	categoryID := c.DefaultQuery("category_id", "")
 	sort := c.DefaultQuery("sort", "created_at_desc")
-	result, err := h.uc.GetProductsByOrgID(c.Request.Context(), search, status, sort, page, pageSize)
+	result, err := h.uc.GetProductsByOrgID(c.Request.Context(), search, status, categoryID, sort, page, pageSize)
 	if err != nil {
 		response.Error(c, err)
 		c.Abort()
 		return
 	}
 	response.Success(c, 200, "Danh sách sản phẩm", result)
+}
+
+// GetProductByID godoc
+// @Summary      Lấy chi tiết sản phẩm
+// @Description  Trả về thông tin đầy đủ của sản phẩm kèm doanh số tháng hiện tại và doanh thu 6 tháng gần nhất. stock_quantity và min_stock được quy đổi về đơn vị bán (unit).
+// @Tags         Products
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id   path      string  true  "ID sản phẩm"
+// @Success      200  {object}  response.SuccessResponse  "Chi tiết sản phẩm"
+// @Failure      400  {object}  response.ErrorResponse    "Thiếu id / thiếu organization"
+// @Failure      401  {object}  response.ErrorResponse    "Thiếu token / token không hợp lệ"
+// @Failure      404  {object}  response.ErrorResponse    "Không tìm thấy sản phẩm"
+// @Failure      500  {object}  response.ErrorResponse    "Lỗi server"
+// @Router       /products/{id} [get]
+func (h *ProductHandler) GetProductByID(c *gin.Context) {
+	id := c.Param("id")
+
+	result, err := h.uc.GetProductByID(c.Request.Context(), id)
+	if err != nil {
+		response.Error(c, err)
+		c.Abort()
+		return
+	}
+	response.Success(c, 200, "Chi tiết sản phẩm", result)
 }
 
 // GetProductStats godoc
@@ -152,6 +179,8 @@ func (h *ProductHandler) UpdateProduct(c *gin.Context) {
 		SKU:           req.SKU,
 		Name:          req.Name,
 		Unit:          req.Unit,
+		NetUnit:       req.NetUnit,
+		NetAmount:     req.NetAmount,
 		ProductType:   req.ProductType,
 		ShowOnWeb:     boolOrDefault(req.ShowOnWeb, true),
 		CostPrice:     req.CostPrice,

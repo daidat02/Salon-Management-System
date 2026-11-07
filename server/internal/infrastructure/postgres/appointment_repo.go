@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
@@ -10,15 +11,19 @@ import (
 	domain "github.com/daidat02/server/internal/domain/appointment"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5/stdlib"
+	"github.com/jmoiron/sqlx"
 )
 
 type PostgresAppointmentRepository struct {
 	db *pgxpool.Pool
+	qx *sqlx.DB
 }
 
 func NewPostgresAppointmentRepository(db *pgxpool.Pool) *PostgresAppointmentRepository {
 	return &PostgresAppointmentRepository{
 		db: db,
+		qx: sqlx.NewDb(stdlib.OpenDBFromPool(db), "pgx"),
 	}
 }
 
@@ -71,6 +76,50 @@ func (r *PostgresAppointmentRepository) CreateAppointment(ctx context.Context, a
 	return nil
 }
 
+// UpdateAppointment ghi đè lịch hẹn + thay toàn bộ items trong 1 transaction.
+func (r *PostgresAppointmentRepository) UpdateAppointment(ctx context.Context, appointment *domain.Appointment, items []*domain.AppointmentItem) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("lỗi khi bắt đầu transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	tag, err := tx.Exec(
+		ctx,
+		updateAppointmentQuery,
+		appointment.OrganizationID,
+		appointment.ID,
+		appointment.CustomerID,
+		nullableUUID(appointment.StaffID),
+		appointment.StartTime,
+		appointment.EndTime,
+		appointment.Status,
+		appointment.Source,
+		appointment.TotalAmount,
+		appointment.Note,
+		appointment.RequiredDepositAmount,
+		appointment.DepositStatus,
+	)
+	if err != nil {
+		return fmt.Errorf("lỗi khi cập nhật cuộc hẹn: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("cập nhật cuộc hẹn %s: %w", appointment.ID, domain.ErrAppointmentNotFound)
+	}
+
+	if _, err := tx.Exec(ctx, deleteAppointmentItemsQuery, appointment.OrganizationID, appointment.ID); err != nil {
+		return fmt.Errorf("lỗi khi xóa chi tiết cũ của cuộc hẹn: %w", err)
+	}
+	if err := bulkInsertAppointmentItems(ctx, tx, items); err != nil {
+		return fmt.Errorf("lỗi khi thêm chi tiết cuộc hẹn: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("lỗi khi commit transaction: %w", err)
+	}
+	return nil
+}
+
 func bulkInsertAppointmentItems(ctx context.Context, tx pgx.Tx, items []*domain.AppointmentItem) error {
 	if len(items) == 0 {
 		return nil
@@ -103,144 +152,108 @@ func bulkInsertAppointmentItems(ctx context.Context, tx pgx.Tx, items []*domain.
 	return err
 }
 
-// scanAppointmentRow map 1 dòng appointments sang entity.
-// created_at/updated_at format RFC3339 để giữ nguyên kiểu *string của entity.
-func scanAppointmentRow(scan func(dest ...any) error) (*domain.Appointment, error) {
-	var a domain.Appointment
-	var customerID, staffID, note, cancelReason, deviceID, clientIP *string
-	var startTime, endTime time.Time
-	var createdAt, updatedAt time.Time
+// appointmentRow hứng 1 dòng appointments; map sang entity sau khi scan
+// (sqlx không scan được NULL vào field string và time.Time vào field string).
+type appointmentRow struct {
+	ID                    string    `db:"id"`
+	OrganizationID        string    `db:"organization_id"`
+	Code                  string    `db:"code"`
+	CustomerID            *string   `db:"customer_id"`
+	StaffID               *string   `db:"staff_id"`
+	StartTime             time.Time `db:"start_time"`
+	EndTime               time.Time `db:"end_time"`
+	Status                string    `db:"status"`
+	Source                string    `db:"source"`
+	TotalAmount           float64   `db:"total_amount"`
+	Note                  *string   `db:"note"`
+	CancelReason          *string   `db:"cancelled_reason"`
+	DeviceID              *string   `db:"device_id"`
+	ClientIP              *string   `db:"client_ip"`
+	RequiredDepositAmount float64   `db:"required_deposit_amount"`
+	DepositStatus         string    `db:"deposit_status"`
+	CreatedAt             time.Time `db:"created_at"`
+	UpdatedAt             time.Time `db:"updated_at"`
+}
 
-	if err := scan(
-		&a.ID,
-		&a.OrganizationID,
-		&a.Code,
-		&customerID,
-		&staffID,
-		&startTime,
-		&endTime,
-		&a.Status,
-		&a.Source,
-		&a.TotalAmount,
-		&note,
-		&cancelReason,
-		&deviceID,
-		&clientIP,
-		&a.RequiredDepositAmount,
-		&a.DepositStatus,
-		&createdAt,
-		&updatedAt,
-	); err != nil {
-		return nil, err
+// toDomain map row sang entity; created_at/updated_at format RFC3339 để giữ
+// nguyên kiểu *string của entity.
+func (row appointmentRow) toDomain() *domain.Appointment {
+	a := &domain.Appointment{
+		ID:                    row.ID,
+		OrganizationID:        row.OrganizationID,
+		Code:                  row.Code,
+		StartTime:             row.StartTime.Format(time.RFC3339),
+		EndTime:               row.EndTime.Format(time.RFC3339),
+		Status:                row.Status,
+		Source:                row.Source,
+		TotalAmount:           row.TotalAmount,
+		RequiredDepositAmount: row.RequiredDepositAmount,
+		DepositStatus:         row.DepositStatus,
 	}
-	if customerID != nil {
-		a.CustomerID = *customerID
+	if row.CustomerID != nil {
+		a.CustomerID = *row.CustomerID
 	}
-	if staffID != nil {
-		a.StaffID = *staffID
+	if row.StaffID != nil {
+		a.StaffID = *row.StaffID
 	}
-	if note != nil {
-		a.Note = *note
+	if row.Note != nil {
+		a.Note = *row.Note
 	}
-	if cancelReason != nil {
-		a.CancelReason = *cancelReason
+	if row.CancelReason != nil {
+		a.CancelReason = *row.CancelReason
 	}
-	if deviceID != nil {
-		a.DeviceID = *deviceID
+	if row.DeviceID != nil {
+		a.DeviceID = *row.DeviceID
 	}
-	if clientIP != nil {
-		a.ClientIP = *clientIP
+	if row.ClientIP != nil {
+		a.ClientIP = *row.ClientIP
 	}
-	a.StartTime = startTime.Format(time.RFC3339)
-	a.EndTime = endTime.Format(time.RFC3339)
-	created := createdAt.Format(time.RFC3339)
-	updated := updatedAt.Format(time.RFC3339)
+	created := row.CreatedAt.Format(time.RFC3339)
+	updated := row.UpdatedAt.Format(time.RFC3339)
 	a.CreatedAt = &created
 	a.UpdatedAt = &updated
 
-	return &a, nil
+	return a
 }
 
-func (r *PostgresAppointmentRepository) GetAppointmentByID(ctx context.Context, orgID, id string) (*domain.Appointment, error) {
-	var (
-		customerID, staffID, note, cancelReason, deviceID, clientIP *string
-		startTime, endTime  time.Time
-		createdAt, updatedAt time.Time
-	)
-	a := &domain.Appointment{}
-
-	err := r.db.QueryRow(ctx, getAppointmentByIDQuery, orgID, id).Scan(
-		&a.ID,
-		&a.OrganizationID,
-		&a.Code,
-		&customerID,
-		&staffID,
-		&startTime,
-		&endTime,
-		&a.Status,
-		&a.Source,
-		&a.TotalAmount,
-		&note,
-		&cancelReason,
-		&deviceID,
-		&clientIP,
-		&a.RequiredDepositAmount,
-		&a.DepositStatus,
-		&createdAt,
-		&updatedAt,
-	)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, fmt.Errorf("lịch hẹn %s: %w", id, domain.ErrAppointmentNotFound)
+func (r *PostgresAppointmentRepository) GetAppointmentByID(ctx context.Context, orgID, id string) (*domain.AppointmentResponse, error) {
+	var appointment domain.AppointmentResponse
+	if err := r.qx.GetContext(ctx, &appointment, getAppointmentByIDQuery, orgID, id); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, domain.ErrAppointmentNotFound
 		}
 		return nil, fmt.Errorf("lỗi khi lấy lịch hẹn: %w", err)
 	}
-	if customerID != nil {
-		a.CustomerID = *customerID
-	}
-	if staffID != nil {
-		a.StaffID = *staffID
-	}
-	if note != nil {
-		a.Note = *note
-	}
-	if cancelReason != nil {
-		a.CancelReason = *cancelReason
-	}
-	if deviceID != nil {
-		a.DeviceID = *deviceID
-	}
-	if clientIP != nil {
-		a.ClientIP = *clientIP
-	}
-	a.StartTime = startTime.Format(time.RFC3339)
-	a.EndTime = endTime.Format(time.RFC3339)
-	created := createdAt.Format(time.RFC3339)
-	updated := updatedAt.Format(time.RFC3339)
-	a.CreatedAt = &created
-	a.UpdatedAt = &updated
 
-	return a, nil
+	return &appointment, nil
 }
 
 // appointmentListFilter dựng mệnh đề WHERE động cho list/count.
-func appointmentListFilter(status, from, to string, startIdx int) (string, []any) {
+func appointmentListFilter(status, from, to, search string, startIdx int) (string, []any) {
 	var conds []string
 	var args []any
 	idx := startIdx
 	if strings.TrimSpace(status) != "" {
-		conds = append(conds, fmt.Sprintf("status = $%d", idx))
+		conds = append(conds, fmt.Sprintf("a.status = $%d", idx))
 		args = append(args, strings.TrimSpace(status))
 		idx++
 	}
 	if strings.TrimSpace(from) != "" {
-		conds = append(conds, fmt.Sprintf("start_time >= $%d", idx))
+		conds = append(conds, fmt.Sprintf("a.start_time >= $%d", idx))
 		args = append(args, strings.TrimSpace(from))
 		idx++
 	}
 	if strings.TrimSpace(to) != "" {
-		conds = append(conds, fmt.Sprintf("start_time <= $%d", idx))
+		conds = append(conds, fmt.Sprintf("a.start_time <= $%d", idx))
 		args = append(args, strings.TrimSpace(to))
+		idx++
+	}
+	if s := strings.TrimSpace(search); s != "" {
+		conds = append(conds, fmt.Sprintf(
+			"(unaccent(a.code) ILIKE unaccent($%d) OR unaccent(c.full_name) ILIKE unaccent($%d) OR unaccent(c.phone) ILIKE unaccent($%d) OR unaccent(s.full_name) ILIKE unaccent($%d))",
+			idx, idx, idx, idx,
+		))
+		args = append(args, "%"+s+"%")
 		idx++
 	}
 	if len(conds) == 0 {
@@ -249,77 +262,69 @@ func appointmentListFilter(status, from, to string, startIdx int) (string, []any
 	return " AND " + strings.Join(conds, " AND "), args
 }
 
-func (r *PostgresAppointmentRepository) GetAppointmentsByOrgID(ctx context.Context, orgID, status, from, to string, limit, offset int) ([]*domain.Appointment, error) {
-	filter, args := appointmentListFilter(status, from, to, 2)
+func (r *PostgresAppointmentRepository) GetAppointmentsByOrgID(ctx context.Context, orgID, status, from, to, search string, limit, offset int) ([]*domain.AppointmentResponse, error) {
+	filter, args := appointmentListFilter(status, from, to, search, 2)
 	query := fmt.Sprintf(`
-		SELECT %s
-		FROM appointments
-		WHERE organization_id = $1%s
-		ORDER BY start_time DESC
-		LIMIT $%d OFFSET $%d
-	`, appointmentColumns, filter, len(args)+2, len(args)+3)
+        SELECT %s
+        FROM appointments a
+        LEFT JOIN customers c ON a.customer_id = c.id
+        LEFT JOIN staff s ON a.staff_id = s.id
+        WHERE a.organization_id = $1%s
+        ORDER BY a.start_time DESC
+        LIMIT $%d OFFSET $%d
+    `, appointmentColumns, filter, len(args)+2, len(args)+3)
 	args = append([]any{orgID}, append(args, limit, offset)...)
 
-	rows, err := r.db.Query(ctx, query, args...)
-	if err != nil {
+	appointments := make([]*domain.AppointmentResponse, 0)
+	if err := r.qx.SelectContext(ctx, &appointments, query, args...); err != nil {
 		return nil, fmt.Errorf("lỗi khi truy vấn danh sách lịch hẹn: %w", err)
-	}
-	defer rows.Close()
-
-	appointments := make([]*domain.Appointment, 0)
-	for rows.Next() {
-		a, err := scanAppointmentRow(rows.Scan)
-		if err != nil {
-			return nil, fmt.Errorf("lỗi khi đọc dữ liệu dòng lịch hẹn: %w", err)
-		}
-		appointments = append(appointments, a)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("lỗi trong quá trình duyệt danh sách: %w", err)
 	}
 
 	return appointments, nil
 }
 
-func (r *PostgresAppointmentRepository) CountAppointmentsByOrgID(ctx context.Context, orgID, status, from, to string) (int64, error) {
-	filter, args := appointmentListFilter(status, from, to, 2)
+// GetAppointmentsByDateRange lấy toàn bộ lịch hẹn trong [from, to) để dựng lịch tuần.
+func (r *PostgresAppointmentRepository) GetAppointmentsByDateRange(ctx context.Context, orgID, from, to string) ([]*domain.AppointmentResponse, error) {
+	appointments := make([]*domain.AppointmentResponse, 0)
+	if err := r.qx.SelectContext(ctx, &appointments, listAppointmentsByDateRangeQuery, orgID, from, to); err != nil {
+		return nil, fmt.Errorf("lỗi khi truy vấn lịch hẹn theo tuần: %w", err)
+	}
+	return appointments, nil
+}
+
+func (r *PostgresAppointmentRepository) CountAppointmentsByOrgID(ctx context.Context, orgID, status, from, to, search string) (int64, error) {
+	filter, args := appointmentListFilter(status, from, to, search, 2)
 	query := fmt.Sprintf(`
 		SELECT COUNT(*)
-		FROM appointments
-		WHERE organization_id = $1%s
+		FROM appointments a
+		LEFT JOIN customers c ON a.customer_id = c.id
+		LEFT JOIN staff s ON a.staff_id = s.id
+		WHERE a.organization_id = $1%s
 	`, filter)
 	args = append([]any{orgID}, args...)
 
 	var total int64
-	if err := r.db.QueryRow(ctx, query, args...).Scan(&total); err != nil {
+	if err := r.qx.GetContext(ctx, &total, query, args...); err != nil {
 		return 0, fmt.Errorf("lỗi khi đếm danh sách lịch hẹn: %w", err)
 	}
 	return total, nil
 }
 
 func (r *PostgresAppointmentRepository) GetAppointmentsByCustomerID(ctx context.Context, orgID, customerID string, limit, offset int) ([]*domain.Appointment, error) {
-	rows, err := r.db.Query(ctx, `
+	rows := make([]appointmentRow, 0)
+	if err := r.qx.SelectContext(ctx, &rows, `
 		SELECT `+appointmentColumns+`
 		FROM appointments
 		WHERE organization_id = $1 AND customer_id = $2
 		ORDER BY start_time DESC
 		LIMIT $3 OFFSET $4
-	`, orgID, customerID, limit, offset)
-	if err != nil {
+	`, orgID, customerID, limit, offset); err != nil {
 		return nil, fmt.Errorf("lỗi khi truy vấn lịch sử lịch hẹn: %w", err)
 	}
-	defer rows.Close()
 
-	appointments := make([]*domain.Appointment, 0)
-	for rows.Next() {
-		a, err := scanAppointmentRow(rows.Scan)
-		if err != nil {
-			return nil, fmt.Errorf("lỗi khi đọc dữ liệu dòng lịch hẹn: %w", err)
-		}
-		appointments = append(appointments, a)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("lỗi trong quá trình duyệt danh sách: %w", err)
+	appointments := make([]*domain.Appointment, 0, len(rows))
+	for _, row := range rows {
+		appointments = append(appointments, row.toDomain())
 	}
 
 	return appointments, nil
@@ -327,46 +332,84 @@ func (r *PostgresAppointmentRepository) GetAppointmentsByCustomerID(ctx context.
 
 func (r *PostgresAppointmentRepository) CountAppointmentsByCustomerID(ctx context.Context, orgID, customerID string) (int64, error) {
 	var total int64
-	err := r.db.QueryRow(ctx, `
+	err := r.qx.GetContext(ctx, &total, `
 		SELECT COUNT(*)
 		FROM appointments
 		WHERE organization_id = $1 AND customer_id = $2
-	`, orgID, customerID).Scan(&total)
+	`, orgID, customerID)
 	if err != nil {
 		return 0, fmt.Errorf("lỗi khi đếm lịch sử lịch hẹn: %w", err)
 	}
 	return total, nil
 }
 
-func (r *PostgresAppointmentRepository) GetAppointmentItems(ctx context.Context, orgID, appointmentID string) ([]*domain.AppointmentItem, error) {
-	rows, err := r.db.Query(ctx, listAppointmentItemsQuery, orgID, appointmentID)
-	if err != nil {
+// appointmentSettingsRow hứng 1 dòng appointment_settings.
+type appointmentSettingsRow struct {
+	OrganizationID      string  `db:"organization_id"`
+	AllowOnlineBooking  bool    `db:"allow_online_booking"`
+	AutoConfirm         bool    `db:"auto_confirm"`
+	SlotStepMinutes     int     `db:"slot_step_minutes"`
+	MaxPerSlot          int     `db:"max_per_slot"`
+	MinLeadMinutes      int     `db:"min_lead_minutes"`
+	MaxAdvanceDays      int     `db:"max_advance_days"`
+	AllowCancel         bool    `db:"allow_cancel"`
+	CancelBeforeHours   int     `db:"cancel_before_hours"`
+	MaxCancellations    int     `db:"max_cancellations_per_month"`
+	AllowReschedule     bool    `db:"allow_reschedule"`
+	RescheduleBeforeHrs int     `db:"reschedule_before_hours"`
+	DepositEnabled      bool    `db:"deposit_enabled"`
+	NoShowThreshold     int     `db:"no_show_threshold"`
+	NoShowLookbackDays  int     `db:"no_show_lookback_days"`
+	DepositPercent      float64 `db:"deposit_percent"`
+	DepositMaxAmount    float64 `db:"deposit_max_amount"`
+}
+
+func (row appointmentSettingsRow) toDomain() *domain.AppointmentSettings {
+	return &domain.AppointmentSettings{
+		OrganizationID:      row.OrganizationID,
+		AllowOnlineBooking:  row.AllowOnlineBooking,
+		AutoConfirm:         row.AutoConfirm,
+		SlotStepMinutes:     row.SlotStepMinutes,
+		MaxPerSlot:          row.MaxPerSlot,
+		MinLeadMinutes:      row.MinLeadMinutes,
+		MaxAdvanceDays:      row.MaxAdvanceDays,
+		AllowCancel:         row.AllowCancel,
+		CancelBeforeHours:   row.CancelBeforeHours,
+		MaxCancellations:    row.MaxCancellations,
+		AllowReschedule:     row.AllowReschedule,
+		RescheduleBeforeHrs: row.RescheduleBeforeHrs,
+		DepositEnabled:      row.DepositEnabled,
+		NoShowThreshold:     row.NoShowThreshold,
+		NoShowLookbackDays:  row.NoShowLookbackDays,
+		DepositPercent:      row.DepositPercent,
+		DepositMaxAmount:    row.DepositMaxAmount,
+	}
+}
+
+func (r *PostgresAppointmentRepository) GetAppointmentSettings(ctx context.Context, orgID string) (*domain.AppointmentSettings, error) {
+	var row appointmentSettingsRow
+	if err := r.qx.GetContext(ctx, &row, getAppointmentSettingsQuery, orgID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, domain.ErrAppointmentSettingsNotFound
+		}
+		return nil, fmt.Errorf("lỗi khi lấy cấu hình đặt lịch: %w", err)
+	}
+	return row.toDomain(), nil
+}
+
+func (r *PostgresAppointmentRepository) CountCustomerNoShows(ctx context.Context, orgID, customerID string, since time.Time) (int, error) {
+	var total int
+	if err := r.qx.GetContext(ctx, &total, countCustomerNoShowsQuery, orgID, customerID, since); err != nil {
+		return 0, fmt.Errorf("lỗi khi đếm số lần không đến của khách: %w", err)
+	}
+	return total, nil
+}
+
+func (r *PostgresAppointmentRepository) GetAppointmentItems(ctx context.Context, orgID, appointmentID string) ([]*domain.AppointmentItemResponse, error) {
+	items := make([]*domain.AppointmentItemResponse, 0)
+	if err := r.qx.SelectContext(ctx, &items, listAppointmentItemsQuery, orgID, appointmentID); err != nil {
 		return nil, fmt.Errorf("lỗi khi truy vấn chi tiết lịch hẹn: %w", err)
 	}
-	defer rows.Close()
-
-	items := make([]*domain.AppointmentItem, 0)
-	for rows.Next() {
-		var item domain.AppointmentItem
-		if err := rows.Scan(
-			&item.ID,
-			&item.OrganizationID,
-			&item.AppointmentID,
-			&item.ItemType,
-			&item.ServiceID,
-			&item.ProductID,
-			&item.Quantity,
-			&item.UnitPrice,
-			&item.LineTotal,
-		); err != nil {
-			return nil, fmt.Errorf("lỗi khi đọc dữ liệu dòng chi tiết: %w", err)
-		}
-		items = append(items, &item)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("lỗi trong quá trình duyệt chi tiết: %w", err)
-	}
-
 	return items, nil
 }
 
@@ -392,6 +435,14 @@ func (r *PostgresAppointmentRepository) UpdateAppointmentStatus(ctx context.Cont
 	return nil
 }
 
+func (r *PostgresAppointmentRepository) MarkOverdueAppointmentsAsNoShow(ctx context.Context, orgID string, graceMinutes int) ([]string, error) {
+	ids := make([]string, 0)
+	if err := r.qx.SelectContext(ctx, &ids, markOverdueAppointmentsAsNoShowQuery, orgID, graceMinutes); err != nil {
+		return nil, fmt.Errorf("lỗi khi cập nhật lịch hẹn quá giờ: %w", err)
+	}
+	return ids, nil
+}
+
 func (r *PostgresAppointmentRepository) DeleteAppointment(ctx context.Context, orgID, id string) error {
 	tag, err := r.db.Exec(ctx, deleteAppointmentQuery, orgID, id)
 	if err != nil {
@@ -405,8 +456,31 @@ func (r *PostgresAppointmentRepository) DeleteAppointment(ctx context.Context, o
 
 func (r *PostgresAppointmentRepository) AppointmentExistsInOrg(ctx context.Context, orgID, appointmentID string) (bool, error) {
 	var exists bool
-	if err := r.db.QueryRow(ctx, appointmentExistsInOrgQuery, orgID, appointmentID).Scan(&exists); err != nil {
+	if err := r.qx.GetContext(ctx, &exists, appointmentExistsInOrgQuery, orgID, appointmentID); err != nil {
 		return false, fmt.Errorf("lỗi khi kiểm tra lịch hẹn: %w", err)
 	}
 	return exists, nil
+}
+
+// GetAppointmentStatus lấy trạng thái lịch hẹn thuộc salon.
+func (r *PostgresAppointmentRepository) GetAppointmentStatus(ctx context.Context, orgID, appointmentID string) (string, error) {
+	var status string
+	if err := r.qx.GetContext(ctx, &status, getAppointmentStatusQuery, orgID, appointmentID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", domain.ErrAppointmentNotFound
+		}
+		return "", fmt.Errorf("lỗi khi lấy trạng thái lịch hẹn: %w", err)
+	}
+	return status, nil
+}
+
+func (r *PostgresAppointmentRepository) CheckExitAppointmentByID(ctx context.Context, orgID, id string) (*domain.Appointment, error) {
+	var row appointmentRow
+	if err := r.qx.GetContext(ctx, &row, checkAppointmentByIDQuery, orgID, id); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, domain.ErrAppointmentNotFound
+		}
+		return nil, fmt.Errorf("lỗi khi kiểm tra lịch hẹn: %w", err)
+	}
+	return row.toDomain(), nil
 }

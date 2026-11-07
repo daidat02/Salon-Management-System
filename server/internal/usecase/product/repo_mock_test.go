@@ -17,16 +17,32 @@ func (m *MockProductRepository) CreateProduct(ctx context.Context, product *doma
 	return args.Error(0)
 }
 
-func (m *MockProductRepository) GetProductsByOrgID(ctx context.Context, orgID string, search string, status string, sort string, limit, offset int) ([]*domain.Product, error) {
-	args := m.Called(ctx, orgID, search, status, sort, limit, offset)
+func (m *MockProductRepository) GetProductByID(ctx context.Context, orgID, id string) (*domain.Product, error) {
+	args := m.Called(ctx, orgID, id)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*domain.Product), args.Error(1)
+}
+
+func (m *MockProductRepository) GetProductSalesLastMonths(ctx context.Context, orgID, productID string, months int) ([]domain.ProductMonthlySales, error) {
+	args := m.Called(ctx, orgID, productID, months)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]domain.ProductMonthlySales), args.Error(1)
+}
+
+func (m *MockProductRepository) GetProductsByOrgID(ctx context.Context, orgID string, search string, status string, categoryID string, sort string, limit, offset int) ([]*domain.Product, error) {
+	args := m.Called(ctx, orgID, search, status, categoryID, sort, limit, offset)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
 	return args.Get(0).([]*domain.Product), args.Error(1)
 }
 
-func (m *MockProductRepository) CountProductsByOrgID(ctx context.Context, orgID string, search string, status string) (int64, error) {
-	args := m.Called(ctx, orgID, search, status)
+func (m *MockProductRepository) CountProductsByOrgID(ctx context.Context, orgID string, search string, status string, categoryID string) (int64, error) {
+	args := m.Called(ctx, orgID, search, status, categoryID)
 	return args.Get(0).(int64), args.Error(1)
 }
 

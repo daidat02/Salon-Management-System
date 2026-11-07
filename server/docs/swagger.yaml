@@ -249,6 +249,8 @@ definitions:
         type: number
       method:
         type: string
+      method_payment_id:
+        type: string
       provider:
         type: string
       provider_txn_id:
@@ -333,6 +335,41 @@ definitions:
         type: number
       unit:
         type: string
+    type: object
+  github_com_daidat02_server_internal_domain_organization.CreateOrganizationRequest:
+    properties:
+      address:
+        type: string
+      email:
+        type: string
+      logo_url:
+        type: string
+      name:
+        type: string
+      owner_full_name:
+        type: string
+      owner_password:
+        type: string
+      owner_phone:
+        description: Tài khoản owner tạo kèm tổ chức.
+        type: string
+      phone:
+        type: string
+      slogan:
+        type: string
+      slug:
+        type: string
+      tax_code:
+        type: string
+      timezone:
+        type: string
+      website:
+        type: string
+    required:
+    - name
+    - owner_password
+    - owner_phone
+    - slug
     type: object
   github_com_daidat02_server_internal_domain_product.CreateProductRequest:
     properties:
@@ -446,6 +483,195 @@ definitions:
       price:
         type: number
     type: object
+  github_com_daidat02_server_internal_domain_setting.BookingSettings:
+    properties:
+      allow_cancel:
+        type: boolean
+      allow_online_booking:
+        type: boolean
+      allow_reschedule:
+        type: boolean
+      auto_confirm:
+        type: boolean
+      cancel_before_hours:
+        type: integer
+      deposit_enabled:
+        type: boolean
+      deposit_max_amount:
+        type: number
+      deposit_percent:
+        type: number
+      max_advance_days:
+        type: integer
+      max_cancellations_per_month:
+        type: integer
+      max_per_slot:
+        type: integer
+      min_lead_minutes:
+        type: integer
+      no_show_lookback_days:
+        type: integer
+      no_show_threshold:
+        type: integer
+      reschedule_before_hours:
+        type: integer
+      slot_step_minutes:
+        type: integer
+    type: object
+  github_com_daidat02_server_internal_domain_setting.GeneralSettingsResponse:
+    properties:
+      organization:
+        $ref: '#/definitions/github_com_daidat02_server_internal_domain_setting.OrganizationInfo'
+      working_hours:
+        items:
+          $ref: '#/definitions/github_com_daidat02_server_internal_domain_setting.WorkingHourDay'
+        type: array
+    type: object
+  github_com_daidat02_server_internal_domain_setting.NotificationSettings:
+    properties:
+      appointment_reminder:
+        type: boolean
+      birthday_voucher:
+        type: boolean
+      daily_report_time:
+        type: string
+      daily_revenue_report:
+        type: boolean
+      low_stock_alert:
+        type: boolean
+      low_stock_threshold:
+        type: integer
+      new_booking_alert:
+        type: boolean
+      reminder_hours_before:
+        type: integer
+    type: object
+  github_com_daidat02_server_internal_domain_setting.OrganizationInfo:
+    properties:
+      address:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      logo_url:
+        type: string
+      name:
+        type: string
+      phone:
+        type: string
+      slogan:
+        type: string
+      slug:
+        type: string
+      status:
+        type: string
+      tax_code:
+        type: string
+      timezone:
+        type: string
+      website:
+        type: string
+    type: object
+  github_com_daidat02_server_internal_domain_setting.PaymentMethod:
+    properties:
+      code:
+        type: string
+      fund_id:
+        type: string
+      fund_name:
+        type: string
+      fund_type:
+        type: string
+      id:
+        type: string
+      is_active:
+        type: boolean
+      is_system:
+        type: boolean
+      name:
+        type: string
+      sort_order:
+        type: integer
+    type: object
+  github_com_daidat02_server_internal_domain_setting.PaymentSettingsResponse:
+    properties:
+      payment_methods:
+        items:
+          $ref: '#/definitions/github_com_daidat02_server_internal_domain_setting.PaymentMethod'
+        type: array
+      receipt:
+        $ref: '#/definitions/github_com_daidat02_server_internal_domain_setting.ReceiptSettings'
+    type: object
+  github_com_daidat02_server_internal_domain_setting.ReceiptSettings:
+    properties:
+      auto_cut_paper:
+        type: boolean
+      auto_print_on_checkout:
+        type: boolean
+      footer_text:
+        type: string
+      header_text:
+        type: string
+      logo_url:
+        type: string
+      mask_customer_phone:
+        type: boolean
+      open_cash_drawer:
+        type: boolean
+      paper_size:
+        type: string
+      print_copy_count:
+        type: integer
+      show_branch_address:
+        type: boolean
+      show_cashier_name:
+        type: boolean
+      show_customer_info:
+        type: boolean
+      show_logo:
+        type: boolean
+      show_vietqr:
+        type: boolean
+      show_wifi_info:
+        type: boolean
+      wifi_name:
+        type: string
+      wifi_pass:
+        type: string
+    type: object
+  github_com_daidat02_server_internal_domain_setting.WorkingHourDay:
+    properties:
+      break_end:
+        type: string
+      break_start:
+        type: string
+      close_time:
+        type: string
+      is_open:
+        type: boolean
+      note:
+        type: string
+      open_time:
+        type: string
+      weekday:
+        type: integer
+    type: object
+  github_com_daidat02_server_internal_domain_staff.CreateStaffLeaveRequest:
+    properties:
+      end_date:
+        type: string
+      leave_type:
+        type: string
+      note:
+        type: string
+      start_date:
+        type: string
+    required:
+    - end_date
+    - leave_type
+    - start_date
+    type: object
   github_com_daidat02_server_internal_domain_staff.CreateStaffRequest:
     properties:
       address:
@@ -481,6 +707,19 @@ definitions:
       position:
         type: string
       status:
+        type: string
+    type: object
+  github_com_daidat02_server_internal_domain_staff.SalaryAdjustmentRequest:
+    properties:
+      adjustment_type:
+        type: string
+      amount:
+        type: number
+      effective_date:
+        type: string
+      reason:
+        type: string
+      staff_id:
         type: string
     type: object
   github_com_daidat02_server_internal_domain_staff.UpdateStaffRequest:
@@ -567,6 +806,13 @@ definitions:
       message:
         type: string
     type: object
+  internal_delivery_http_staff.CreatePayrollRequest:
+    properties:
+      target_month:
+        type: string
+    required:
+    - target_month
+    type: object
 info:
   contact: {}
   description: 'API quản lý salon: user, nhân viên, khách hàng.'
@@ -595,6 +841,10 @@ paths:
       - description: Đến thời điểm (ISO8601, lọc start_time)
         in: query
         name: to
+        type: string
+      - description: Tìm theo mã lịch, tên/SĐT khách, tên nhân viên
+        in: query
+        name: search
         type: string
       produces:
       - application/json
@@ -717,6 +967,49 @@ paths:
       summary: Chi tiết lịch hẹn kèm items
       tags:
       - Appointments
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: ID lịch hẹn
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Thông tin lịch hẹn (total do server tính từ items)
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_daidat02_server_internal_domain_appointment.AppointmentCreateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Cập nhật lịch hẹn thành công
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+        "400":
+          description: Dữ liệu không hợp lệ / thiếu organization
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "401":
+          description: Thiếu token / token không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "404":
+          description: Không tìm thấy lịch hẹn / service/product
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "500":
+          description: Lỗi server
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Cập nhật toàn bộ lịch hẹn (kèm thay items)
+      tags:
+      - Appointments
   /appointments/{id}/cancel:
     post:
       consumes:
@@ -835,6 +1128,38 @@ paths:
       security:
       - BearerAuth: []
       summary: Chuyển trạng thái lịch hẹn (theo state machine)
+      tags:
+      - Appointments
+  /appointments/weekly:
+    get:
+      parameters:
+      - description: Ngày bất kỳ trong tuần (YYYY-MM-DD hoặc ISO8601, mặc định tuần
+          hiện tại)
+        in: query
+        name: week_start
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Lịch tuần gồm 7 ngày và danh sách lịch hẹn mỗi ngày
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+        "400":
+          description: week_start không hợp lệ / thiếu organization
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "401":
+          description: Thiếu token / token không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "500":
+          description: Lỗi server
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Lấy lịch hẹn theo tuần (tách danh sách theo từng ngày)
       tags:
       - Appointments
   /cashflow-categories:
@@ -1795,6 +2120,29 @@ paths:
       summary: Lấy danh sách sản phẩm tồn thấp
       tags:
       - Inventory
+  /inventory/stats:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Thống kê kho hàng
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+        "400":
+          description: Thiếu organization
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "401":
+          description: Thiếu token / token không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Thống kê tổng quan kho hàng (SKU, sắp hết, giá trị tồn, chi phí nhập
+        tháng)
+      tags:
+      - Inventory
   /inventory/transactions:
     get:
       parameters:
@@ -2469,6 +2817,41 @@ paths:
       summary: Thống kê đơn hàng (tổng/doanh thu hôm nay, chờ thanh toán, hủy/hoàn)
       tags:
       - Orders
+  /organizations:
+    post:
+      consumes:
+      - application/json
+      description: Tạo organization + user owner (role=owner) + business_hours/notification/appointment/receipt
+        settings trong cùng transaction.
+      parameters:
+      - description: Thông tin tổ chức + tài khoản owner (owner_phone, owner_password)
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_daidat02_server_internal_domain_organization.CreateOrganizationRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Tạo tổ chức thành công
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+        "400":
+          description: Dữ liệu không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "409":
+          description: Slug đã tồn tại
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "500":
+          description: Lỗi server
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+      summary: Tạo tổ chức mới kèm tài khoản owner và settings mặc định
+      tags:
+      - Organizations
   /products:
     get:
       parameters:
@@ -2491,6 +2874,10 @@ paths:
         - out_of_stock
         in: query
         name: status
+        type: string
+      - description: Lọc theo ID danh mục sản phẩm
+        in: query
+        name: category_id
         type: string
       - description: Sắp xếp
         enum:
@@ -2590,6 +2977,44 @@ paths:
       security:
       - BearerAuth: []
       summary: Xóa sản phẩm
+      tags:
+      - Products
+    get:
+      description: Trả về thông tin đầy đủ của sản phẩm kèm doanh số tháng hiện tại
+        và doanh thu 6 tháng gần nhất. stock_quantity và min_stock được quy đổi về
+        đơn vị bán (unit).
+      parameters:
+      - description: ID sản phẩm
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Chi tiết sản phẩm
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+        "400":
+          description: Thiếu id / thiếu organization
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "401":
+          description: Thiếu token / token không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "404":
+          description: Không tìm thấy sản phẩm
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "500":
+          description: Lỗi server
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Lấy chi tiết sản phẩm
       tags:
       - Products
     put:
@@ -2724,6 +3149,10 @@ paths:
         - inactive
         in: query
         name: status
+        type: string
+      - description: Lọc theo ID danh mục dịch vụ
+        in: query
+        name: category_id
         type: string
       - description: Sắp xếp
         enum:
@@ -2897,6 +3326,264 @@ paths:
       summary: Lấy chi tiết dịch vụ và nguyên vật liệu
       tags:
       - Services
+  /services/stats:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Thống kê dịch vụ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+        "400":
+          description: Thiếu organization
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "401":
+          description: Thiếu token / token không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Thống kê tổng quan dịch vụ
+      tags:
+      - Services
+  /settings/booking:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Cài đặt lịch hẹn
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+        "401":
+          description: Thiếu token / token không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "500":
+          description: Lỗi server
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Lấy cài đặt lịch hẹn
+      tags:
+      - Settings
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Cấu hình lịch hẹn
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_daidat02_server_internal_domain_setting.BookingSettings'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Cập nhật thành công
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+        "400":
+          description: Dữ liệu không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "401":
+          description: Thiếu token / token không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "500":
+          description: Lỗi server
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Cập nhật cài đặt lịch hẹn
+      tags:
+      - Settings
+  /settings/general:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Cài đặt chung
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+        "401":
+          description: Thiếu token / token không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "404":
+          description: Không tìm thấy tổ chức
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "500":
+          description: Lỗi server
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Lấy cài đặt chung (thông tin salon + giờ làm việc)
+      tags:
+      - Settings
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Cấu hình chung
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_daidat02_server_internal_domain_setting.GeneralSettingsResponse'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Cập nhật thành công
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+        "400":
+          description: Dữ liệu không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "401":
+          description: Thiếu token / token không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "404":
+          description: Không tìm thấy tổ chức
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "500":
+          description: Lỗi server
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Cập nhật cài đặt chung (thông tin salon + giờ làm việc)
+      tags:
+      - Settings
+  /settings/notifications:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Cài đặt thông báo
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+        "401":
+          description: Thiếu token / token không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "500":
+          description: Lỗi server
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Lấy cài đặt thông báo
+      tags:
+      - Settings
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Cấu hình thông báo
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_daidat02_server_internal_domain_setting.NotificationSettings'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Cập nhật thành công
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+        "400":
+          description: Dữ liệu không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "401":
+          description: Thiếu token / token không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "500":
+          description: Lỗi server
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Cập nhật cài đặt thông báo
+      tags:
+      - Settings
+  /settings/payment:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Cài đặt thanh toán
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+        "401":
+          description: Thiếu token / token không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "404":
+          description: Không tìm thấy tổ chức
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "500":
+          description: Lỗi server
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Lấy cài đặt thanh toán (hóa đơn + phương thức thanh toán)
+      tags:
+      - Settings
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Cấu hình thanh toán
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_daidat02_server_internal_domain_setting.PaymentSettingsResponse'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Cập nhật thành công
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+        "400":
+          description: Dữ liệu không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "401":
+          description: Thiếu token / token không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "500":
+          description: Lỗi server
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Cập nhật cài đặt thanh toán (hóa đơn + phương thức thanh toán)
+      tags:
+      - Settings
   /staff:
     get:
       parameters:
@@ -3020,6 +3707,41 @@ paths:
       summary: Xóa mềm nhân viên
       tags:
       - Staff
+    get:
+      parameters:
+      - description: ID nhân viên
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Thông tin chi tiết nhân viên
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+        "400":
+          description: Thiếu id
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "401":
+          description: Thiếu token / token không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "404":
+          description: Không tìm thấy nhân viên
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "500":
+          description: Lỗi server
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Lấy thông tin chi tiết nhân viên
+      tags:
+      - Staff
     put:
       consumes:
       - application/json
@@ -3057,6 +3779,341 @@ paths:
       security:
       - BearerAuth: []
       summary: Cập nhật nhân viên
+      tags:
+      - Staff
+  /staff/{id}/leaves:
+    get:
+      parameters:
+      - description: ID nhân viên
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Danh sách ngày nghỉ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+        "400":
+          description: Thiếu id
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "401":
+          description: Thiếu token / token không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "404":
+          description: Không tìm thấy nhân viên
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "500":
+          description: Lỗi server
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Lấy danh sách ngày nghỉ của nhân viên
+      tags:
+      - Staff
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: ID nhân viên
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Thông tin ngày nghỉ
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_daidat02_server_internal_domain_staff.CreateStaffLeaveRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Tạo ngày nghỉ thành công
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+        "400":
+          description: Dữ liệu không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "401":
+          description: Thiếu token / token không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "404":
+          description: Không tìm thấy nhân viên
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "409":
+          description: Khoảng ngày đã được chốt trong bảng lương
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "500":
+          description: Lỗi server
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Tạo ngày nghỉ cho nhân viên
+      tags:
+      - Staff
+  /staff/{id}/payroll:
+    get:
+      parameters:
+      - description: ID nhân viên
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Từ ngày (yyyy-MM-dd hoặc RFC3339), mặc định đầu tháng
+        in: query
+        name: date_from
+        type: string
+      - description: Đến ngày (yyyy-MM-dd hoặc RFC3339), mặc định cuối tháng
+        in: query
+        name: date_to
+        type: string
+      - description: Số ngày công chuẩn (mặc định 26)
+        in: query
+        name: standard_working_days
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Bảng lương nhân viên
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+        "400":
+          description: Thiếu id / tham số không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "401":
+          description: Thiếu token / token không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "404":
+          description: Không tìm thấy nhân viên
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "500":
+          description: Lỗi server
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Lấy bảng lương nhân viên theo kỳ
+      tags:
+      - Staff
+    post:
+      parameters:
+      - description: ID nhân viên
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Kỳ bảng lương (yyyy-MM)
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_delivery_http_staff.CreatePayrollRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Tạo bảng lương thành công
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+        "400":
+          description: Thiếu id / thiếu target_month / tham số không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "401":
+          description: Thiếu token / token không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "404":
+          description: Không tìm thấy nhân viên
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "409":
+          description: Đã tồn tại bảng lương của nhân viên trong kỳ này
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "500":
+          description: Lỗi server
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Tạo bảng lương nhân viên
+      tags:
+      - Staff
+  /staff/{id}/salary-adjustments:
+    get:
+      parameters:
+      - description: ID nhân viên
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Tháng điều chỉnh
+        in: query
+        name: period_month
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Lấy danh sách điều chỉnh lương thành công
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+        "400":
+          description: Thiếu id
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "401":
+          description: Thiếu token / token không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "500":
+          description: Lỗi server
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Lấy danh sách điều chỉnh lương của nhân viên
+      tags:
+      - Staff
+  /staff/{id}/service-history:
+    get:
+      parameters:
+      - description: ID nhân viên
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Từ ngày (yyyy-MM-dd hoặc RFC3339), mặc định đầu tháng
+        in: query
+        name: date_from
+        type: string
+      - description: Đến ngày (yyyy-MM-dd hoặc RFC3339), mặc định cuối tháng
+        in: query
+        name: date_to
+        type: string
+      - description: Tìm theo mã đơn, tên khách hoặc tên dịch vụ
+        in: query
+        name: search
+        type: string
+      - description: Trang (mặc định 1)
+        in: query
+        name: page
+        type: integer
+      - description: Số dòng/trang (mặc định 20, tối đa 100)
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Lịch sử dịch vụ kèm tổng hợp và phân trang
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+        "400":
+          description: Thiếu id / tham số không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "401":
+          description: Thiếu token / token không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "404":
+          description: Không tìm thấy nhân viên
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "500":
+          description: Lỗi server
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Lấy lịch sử dịch vụ nhân viên đã thực hiện
+      tags:
+      - Staff
+  /staff/salary-adjustment:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Thông tin điều chỉnh lương
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_daidat02_server_internal_domain_staff.SalaryAdjustmentRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Tạo điều chỉnh lương thành công
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+        "400":
+          description: Dữ liệu không hợp lệ / thiếu organization
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "401":
+          description: Thiếu token / token không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "500":
+          description: Lỗi server
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Tạo điều chỉnh lương nhân viên
+      tags:
+      - Staff
+  /staff/salary-adjustment/{id}:
+    delete:
+      parameters:
+      - description: ID điều chỉnh lương
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Xóa điều chỉnh lương thành công
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+        "400":
+          description: Thiếu id
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "401":
+          description: Thiếu token / token không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "404":
+          description: Không tìm thấy điều chỉnh lương hoặc đã bị khóa
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Xóa điều chỉnh lương nhân viên
       tags:
       - Staff
 securityDefinitions:

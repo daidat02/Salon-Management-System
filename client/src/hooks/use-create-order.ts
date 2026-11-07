@@ -8,6 +8,9 @@ export function useCreateOrder() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       queryClient.invalidateQueries({ queryKey: ['customers'] });
+      // Tạo đơn từ lịch hẹn làm lịch đổi sang in_progress.
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
+      queryClient.invalidateQueries({ queryKey: ['appointment-detail'] });
     },
   });
 }

@@ -12,7 +12,10 @@ export type StaffContact = {
   phone: string;
   email: string;
   position: string;
-  branch: string;
+  branch?: string;
+  code?: string;
+  hireDate?: string;
+  seniority?: string;
 };
 
 type StaffProfileCardProps = {
@@ -21,6 +24,12 @@ type StaffProfileCardProps = {
 };
 
 export default function StaffProfileCard({ profile, working }: StaffProfileCardProps) {
+  // API chưa có các trường này -> giữ dữ liệu mẫu như trước.
+  const branch = profile.branch || mockStaffProfile.branch;
+  const code = profile.code || mockStaffProfile.code;
+  const hireDate = profile.hireDate || mockStaffProfile.hireDate;
+  const seniority = profile.seniority || mockStaffProfile.seniority;
+
   return (
     <aside className="overflow-hidden rounded-xl border border-outline bg-surface shadow-sm">
       <div className="p-5">
@@ -55,7 +64,7 @@ export default function StaffProfileCard({ profile, working }: StaffProfileCardP
                 dot
                 className="font-bold"
               >
-                {working ? 'ĐANG LÀM VIỆC' : 'NGHỈ PHÉP'}
+                {working ? 'ĐANG LÀM VIỆC' : 'TẠM NGƯNG'}
               </Tag>
             </div>
           </div>
@@ -70,9 +79,7 @@ export default function StaffProfileCard({ profile, working }: StaffProfileCardP
           </Tag>
           <span className="text-[11px] text-on-surface-variant">
             Mã nhân viên:{' '}
-            <span className="font-mono font-semibold text-on-surface">
-              {mockStaffProfile.code}
-            </span>
+            <span className="font-mono font-semibold text-on-surface">{code}</span>
           </span>
         </div>
 
@@ -87,18 +94,18 @@ export default function StaffProfileCard({ profile, working }: StaffProfileCardP
           </li>
           <li className="flex items-center gap-2">
             <Store className="h-3.5 w-3.5 shrink-0 text-primary" />
-            <span>{profile.branch}</span>
+            <span>{branch}</span>
           </li>
         </ul>
 
         <dl className="mt-3 space-y-2 border-t border-outline pt-3 text-xs">
           <div className="flex justify-between gap-2">
             <dt className="text-on-surface-variant">Ngày gia nhập</dt>
-            <dd className="font-semibold">{mockStaffProfile.hireDate}</dd>
+            <dd className="font-semibold">{hireDate}</dd>
           </div>
           <div className="flex justify-between gap-2">
             <dt className="text-on-surface-variant">Thâm niên</dt>
-            <dd className="font-semibold">{mockStaffProfile.seniority}</dd>
+            <dd className="font-semibold">{seniority}</dd>
           </div>
         </dl>
 

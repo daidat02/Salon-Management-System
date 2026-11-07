@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -53,6 +54,38 @@ func (r *PostgresProductRepository) CreateProduct(ctx context.Context, product *
 	return nil
 }
 
+func (r *PostgresProductRepository) GetProductByID(ctx context.Context, orgID, id string) (*domain.Product, error) {
+	product, err := scanProductRow(r.db.QueryRow(ctx, getProductDetailQuery, id, orgID).Scan)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("tìm sản phẩm %s: %w", id, domain.ErrProductNotFound)
+		}
+		return nil, fmt.Errorf("lỗi khi lấy chi tiết sản phẩm: %w", err)
+	}
+	return product, nil
+}
+
+func (r *PostgresProductRepository) GetProductSalesLastMonths(ctx context.Context, orgID, productID string, months int) ([]domain.ProductMonthlySales, error) {
+	rows, err := r.db.Query(ctx, productSalesLastMonthsQuery, orgID, productID, months)
+	if err != nil {
+		return nil, fmt.Errorf("lỗi khi truy vấn doanh số sản phẩm: %w", err)
+	}
+	defer rows.Close()
+
+	sales := make([]domain.ProductMonthlySales, 0, months)
+	for rows.Next() {
+		var item domain.ProductMonthlySales
+		if err := rows.Scan(&item.MonthStart, &item.Quantity, &item.Revenue); err != nil {
+			return nil, fmt.Errorf("lỗi khi đọc doanh số sản phẩm: %w", err)
+		}
+		sales = append(sales, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("lỗi trong quá trình duyệt doanh số sản phẩm: %w", err)
+	}
+	return sales, nil
+}
+
 func scanProductRow(scan func(dest ...any) error) (*domain.Product, error) {
 	var p domain.Product
 	var unit *string
@@ -61,6 +94,7 @@ func scanProductRow(scan func(dest ...any) error) (*domain.Product, error) {
 		&p.ID,
 		&p.OrganizationID,
 		&p.CategoryID,
+		&p.CategoryName,
 		&p.SKU,
 		&p.Name,
 		&unit,
@@ -90,21 +124,24 @@ func (r *PostgresProductRepository) GetProductsByOrgID(
 	orgID string,
 	search string,
 	status string,
+	categoryID string,
 	sort string,
 	limit, offset int,
 ) ([]*domain.Product, error) {
 
-	// 1. Nối toàn bộ các khối hằng số lại với nhau theo đúng thứ tự $1, $2, $3, $4
+	// 1. Nối toàn bộ các khối hằng số lại với nhau theo đúng thứ tự $1..$5
 	query := listProductsByOrgIDQuery +
 		searchProductsFilter +
 		filterProductsStatus +
+		filterProductCategory +
 		sortProductsFilter
 
-	// 2. Chuẩn bị mảng tham số cố định 4 vị trí đầu tiên ($1, $2, $3, $4)
+	// 2. Chuẩn bị mảng tham số cố định 5 vị trí đầu tiên ($1..$5)
 	// - $1: orgID
 	// - $2: search (nếu rỗng thì truyền "", SQL nhận diện qua ($2 = '' OR ...))
 	// - $3: status (nếu rỗng thì truyền "", SQL nhận diện qua ($3 = '' OR ...))
-	// - $4: sort   (truyền thẳng chuỗi sort vào, CASE WHEN sẽ tự so khớp)
+	// - $4: categoryID (nếu rỗng thì truyền "", SQL nhận diện qua ($4 = '' OR ...))
+	// - $5: sort   (truyền thẳng chuỗi sort vào, CASE WHEN sẽ tự so khớp)
 
 	formattedSearch := ""
 	if strings.TrimSpace(search) != "" {
@@ -115,10 +152,11 @@ func (r *PostgresProductRepository) GetProductsByOrgID(
 		orgID,           // $1
 		formattedSearch, // $2
 		status,          // $3
-		sort,            // $4
+		categoryID,      // $4
+		sort,            // $5
 	}
 
-	// 3. Tự động cộng thêm phần Phân trang ở cuối dựa trên số lượng args hiện tại ($5, $6)
+	// 3. Tự động cộng thêm phần Phân trang ở cuối dựa trên số lượng args hiện tại ($6, $7)
 	query += fmt.Sprintf(" LIMIT $%d OFFSET $%d", len(args)+1, len(args)+2)
 	args = append(args, limit, offset)
 
@@ -143,16 +181,56 @@ func (r *PostgresProductRepository) GetProductsByOrgID(
 		return nil, fmt.Errorf("lỗi trong quá trình duyệt danh sách: %w", err)
 	}
 
+	if err := r.attachRevenueThisMonth(ctx, orgID, products); err != nil {
+		return nil, err
+	}
+
 	return products, nil
 }
 
-func (r *PostgresProductRepository) CountProductsByOrgID(ctx context.Context, orgID string, search string, status string) (int64, error) {
+// attachRevenueThisMonth gắn doanh thu tháng hiện tại cho các sản phẩm trong page.
+func (r *PostgresProductRepository) attachRevenueThisMonth(ctx context.Context, orgID string, products []*domain.Product) error {
+	if len(products) == 0 {
+		return nil
+	}
+
+	ids := make([]string, 0, len(products))
+	for _, p := range products {
+		ids = append(ids, p.ID)
+	}
+
+	rows, err := r.db.Query(ctx, productRevenueThisMonthQuery, orgID, ids)
+	if err != nil {
+		return fmt.Errorf("lỗi khi truy vấn doanh thu sản phẩm: %w", err)
+	}
+	defer rows.Close()
+
+	revenues := make(map[string]float64, len(products))
+	for rows.Next() {
+		var productID string
+		var revenue float64
+		if err := rows.Scan(&productID, &revenue); err != nil {
+			return fmt.Errorf("lỗi khi đọc doanh thu sản phẩm: %w", err)
+		}
+		revenues[productID] = revenue
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("lỗi trong quá trình duyệt doanh thu sản phẩm: %w", err)
+	}
+
+	for _, p := range products {
+		p.RevenueThisMonth = revenues[p.ID]
+	}
+	return nil
+}
+
+func (r *PostgresProductRepository) CountProductsByOrgID(ctx context.Context, orgID string, search string, status string, categoryID string) (int64, error) {
 	formattedSearch := ""
 	if strings.TrimSpace(search) != "" {
 		formattedSearch = "%" + strings.TrimSpace(search) + "%"
 	}
-	args := []any{orgID, formattedSearch, status}
-	query := countProductsByOrgIDQuery + searchProductsFilter + filterProductsStatus
+	args := []any{orgID, formattedSearch, status, categoryID}
+	query := countProductsByOrgIDQuery + searchProductsFilter + filterProductsStatus + filterProductCategory
 
 	var total int64
 	if err := r.db.QueryRow(ctx, query, args...).Scan(&total); err != nil {
@@ -178,6 +256,8 @@ func (r *PostgresProductRepository) UpdateProduct(ctx context.Context, product *
 		product.StockQuantity,
 		product.MinStock,
 		product.IsActive,
+		product.NetUnit,
+		product.NetAmount,
 	)
 	if err != nil {
 		return fmt.Errorf("lỗi khi cập nhật sản phẩm: %w", err)

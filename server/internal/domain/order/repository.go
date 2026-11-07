@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	customerdomain "github.com/daidat02/server/internal/domain/customer"
+	settingDomain "github.com/daidat02/server/internal/domain/setting"
 )
 
 // ErrOrderNotFound dùng để usecase map đúng 404 khi sai id/khác organization.
@@ -48,7 +49,7 @@ type ServiceMaterialUsage struct {
 	QuantityPerService float64
 	UnitCost           float64
 	// Unit đơn vị của QuantityPerService (lưu trong service_materials.unit).
-	Unit               string
+	Unit string
 }
 
 // ErrOrderNotEditable dùng khi đơn đã khóa sửa (đã hoàn tất/hủy/hoàn).
@@ -68,8 +69,14 @@ type OrderRepository interface {
 	GetOrdersByOrgID(ctx context.Context, orgID, status string, limit, offset int) ([]*Order, error)
 	CountOrdersByOrgID(ctx context.Context, orgID, status string) (int64, error)
 	GetOrderByID(ctx context.Context, orgID, id string) (*Order, error)
+	// FindActiveOrderByAppointment tìm đơn còn hiệu lực (không cancelled/refunded)
+	// của 1 lịch hẹn; không có thì (nil, nil).
+	FindActiveOrderByAppointment(ctx context.Context, orgID, appointmentID string) (*Order, error)
 	// GetOrderStats gom 4 số thẻ thống kê đơn (1 query aggregate).
 	GetOrderStats(ctx context.Context, orgID string) (*OrderStatsResponse, error)
+	// GetStaffCommissionStats thống kê hoa hồng dịch vụ của 1 NV trong khoảng ngày
+	// (dateFrom/dateTo rỗng = tháng hiện tại). Dùng nội bộ, không expose HTTP.
+	GetStaffCommissionStats(ctx context.Context, orgID, staffID, dateFrom, dateTo string) (*StaffCommissionStats, error)
 	// ListHistoriesOrderByCustomerId lịch sử đơn hàng của 1 khách (mới nhất trước).
 	ListHistoriesOrderByCustomerId(ctx context.Context, orgID, customerID string, limit, offset int) ([]*Order, error)
 	// CountHistoriesOrderByCustomerId đếm lịch sử đơn hàng của 1 khách.
@@ -108,8 +115,9 @@ type OrderRepository interface {
 	ApplyCancel(ctx context.Context, orgID, orderID, newStatus string, restores []StockDeduction, releases []StockDeduction) error
 	// CompleteOrderWithSlip chốt đơn (pending/confirm/delivery -> completed):
 	// trừ kho thật + nhả giữ chỗ + ghi sổ sale + sinh phiếu bán hàng,
-	// tất cả 1 tx. Trả về mã phiếu vừa sinh.
-	CompleteOrderWithSlip(ctx context.Context, orgID, orderID string, lines []SaleSlipLine) (SaleSlipResult, error)
+	// tất cả 1 tx. appointmentID khác nil/rỗng thì lịch hẹn của đơn cũng được
+	// chuyển completed trong cùng tx. Trả về mã phiếu vừa sinh.
+	CompleteOrderWithSlip(ctx context.Context, orgID, orderID string, appointmentID *string, lines []SaleSlipLine, fundID string) (SaleSlipResult, error)
 	// 5. Thanh toán.
 	// FindPaymentByProviderTxn tìm theo cặp cổng/mã GD (idempotency), không thấy -> (nil, nil).
 	FindPaymentByProviderTxn(ctx context.Context, provider, txnID string) (*Payment, error)
@@ -174,4 +182,13 @@ type CustomerStore interface {
 type AppointmentStore interface {
 	// AppointmentExistsInOrg kiểm tra lịch hẹn thuộc đúng salon.
 	AppointmentExistsInOrg(ctx context.Context, orgID, appointmentID string) (bool, error)
+	// GetAppointmentStatus lấy trạng thái lịch hẹn thuộc salon.
+	GetAppointmentStatus(ctx context.Context, orgID, appointmentID string) (string, error)
+	// UpdateAppointmentStatus đổi trạng thái lịch hẹn (order dùng để đưa
+	// lịch sang in_progress sau khi tạo đơn).
+	UpdateAppointmentStatus(ctx context.Context, orgID, id, status, cancelReason string) error
+}
+
+type SettingStore interface {
+	GetPaymentMethodByID(ctx context.Context, orgID string, code *string) (*settingDomain.PaymentMethod, error)
 }

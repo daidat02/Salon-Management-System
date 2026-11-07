@@ -1,7 +1,7 @@
 package postgres
 
 const (
-	createInventoryDocumentQuery =`
+	createInventoryDocumentQuery = `
 		INSERT INTO inventory_documents (id,organization_id,supplier_id,order_id,document_code,type,total_amount,reason,note,created_by)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9,$10)
 	`
@@ -110,6 +110,39 @@ const (
 		SELECT COUNT(*)
 		FROM products
 		WHERE organization_id = $1 AND stock_quantity <= min_stock
+	`
+	// Thống kê trang kho: tổng SKU (tách bán lẻ/vật tư), sắp hết hàng,
+	// giá trị tồn kho và chi phí nhập tháng này.
+	// stock_quantity lưu đơn vị nhỏ nhất, cost_price theo đơn vị lớn
+	// -> quy đổi qua net_amount trước khi nhân giá vốn.
+	getInventoryStatsQuery = `
+		SELECT
+			COUNT(p.id) AS total_skus,
+			COUNT(p.id) FILTER (WHERE p.product_type IN ('retail', 'both')) AS retail_skus,
+			COUNT(p.id) FILTER (WHERE p.product_type IN ('material', 'both')) AS material_skus,
+			COUNT(p.id) FILTER (WHERE p.stock_quantity <= p.min_stock) AS low_stock_skus,
+			COALESCE(SUM(
+				CASE WHEN p.net_amount > 0
+					THEN p.stock_quantity / p.net_amount
+					ELSE p.stock_quantity
+				END * p.cost_price
+			), 0) AS inventory_value,
+			COALESCE((
+				SELECT SUM(d.total_amount)
+				FROM inventory_documents d
+				WHERE d.organization_id = $1
+					AND d.type = 'import'
+					AND date_trunc('month', d.created_at) = date_trunc('month', NOW())
+			), 0) AS import_cost_month,
+			(
+				SELECT COUNT(*)
+				FROM inventory_documents d
+				WHERE d.organization_id = $1
+					AND d.type = 'import'
+					AND date_trunc('month', d.created_at) = date_trunc('month', NOW())
+			) AS import_documents_month
+		FROM products p
+		WHERE p.organization_id = $1
 	`
 	InventoryDocumentDetailsQuery = `
 			SELECT 

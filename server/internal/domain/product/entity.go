@@ -11,10 +11,18 @@ const (
 	ProductTypeBoth     = "both"
 )
 
+// ProductMonthlySales là doanh số bán ra của một sản phẩm trong một tháng.
+type ProductMonthlySales struct {
+	MonthStart time.Time
+	Quantity   float64
+	Revenue    float64
+}
+
 type Product struct {
 	ID             string
 	OrganizationID string
 	CategoryID     *string
+	CategoryName   *string
 	SKU            string
 	Name           string
 	Unit           string
@@ -27,8 +35,10 @@ type Product struct {
 	StockQuantity  float64
 	MinStock       float64
 	IsActive       bool
-	CreatedAt      *time.Time
-	UpdatedAt      *time.Time
+	// RevenueThisMonth chỉ dùng cho list API, không phải cột trong bảng products.
+	RevenueThisMonth float64
+	CreatedAt        *time.Time
+	UpdatedAt        *time.Time
 }
 
 func (p *Product) Validate() error {

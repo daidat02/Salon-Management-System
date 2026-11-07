@@ -79,15 +79,29 @@ export function DashDateRangePicker({
   align = 'end',
 }: DashDateRangePickerProps) {
   const [open, setOpen] = React.useState(false);
+  const [draft, setDraft] = React.useState<DateRange | undefined>(value);
+
+  const handleOpenChange = (next: boolean) => {
+    if (next) setDraft(value);
+    setOpen(next);
+  };
 
   const handleSelect = (range: DateRange | undefined) => {
-    onValueChange?.(range);
-    if (range?.from && range?.to) setOpen(false);
+    setDraft(range);
+  };
+
+  const handleApply = () => {
+    onValueChange?.(draft);
+    setOpen(false);
+  };
+
+  const handleClear = () => {
+    setDraft(undefined);
   };
 
   return (
     <div className={className}>
-      <Popover open={open} onOpenChange={setOpen}>
+      <Popover open={open} onOpenChange={handleOpenChange}>
         <PopoverTrigger
           disabled={disabled}
           className={cn(
@@ -112,8 +126,7 @@ export function DashDateRangePicker({
                 key={preset.label}
                 type="button"
                 onClick={() => {
-                  onValueChange?.(preset.getRange());
-                  setOpen(false);
+                  setDraft(preset.getRange());
                 }}
                 className="rounded-md border border-outline bg-surface px-2.5 py-1 text-[11px] font-medium text-on-surface-variant transition-colors hover:border-primary/40 hover:text-primary"
               >
@@ -123,7 +136,7 @@ export function DashDateRangePicker({
           </div>
           <Calendar
             mode="range"
-            selected={value}
+            selected={draft}
             onSelect={handleSelect}
             numberOfMonths={2}
             locale={vi}
@@ -131,18 +144,26 @@ export function DashDateRangePicker({
           />
           <div className="flex items-center justify-between gap-4 border-t border-outline px-3 py-2">
             <span className="text-[11px] font-medium text-on-surface-variant">
-              {formatRange(value, placeholder, dateFormat)}
+              {formatRange(draft, placeholder, dateFormat)}
             </span>
-            <button
-              type="button"
-              onClick={() => {
-                onValueChange?.(undefined);
-                setOpen(false);
-              }}
-              className="text-[11px] font-semibold text-primary hover:underline"
-            >
-              Xóa
-            </button>
+            {draft?.from && (
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleClear}
+                  className="text-[11px] font-semibold text-on-surface-variant hover:text-error hover:underline"
+                >
+                  Xóa
+                </button>
+                <button
+                  type="button"
+                  onClick={handleApply}
+                  className="rounded-md bg-primary px-3 py-1 text-[11px] font-semibold text-on-primary transition-colors hover:bg-[#436b95]"
+                >
+                  Áp dụng
+                </button>
+              </div>
+            )}
           </div>
         </PopoverContent>
       </Popover>

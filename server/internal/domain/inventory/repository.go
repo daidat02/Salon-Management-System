@@ -21,7 +21,8 @@ type InventoryRepository interface {
 	CountTransactionsByOrgID(ctx context.Context, orgID, productID string) (int64, error)
 	GetLowStockProducts(ctx context.Context, orgID string, limit, offset int) ([]*LowStockItem, error)
 	CountLowStockProducts(ctx context.Context, orgID string) (int64, error)
+	GetInventoryStats(ctx context.Context, orgID string) (*InventoryStatsResponse, error)
 	GetDocumentByID(ctx context.Context, orgID string, documentID string) (*DocumentDetailResponse, error)
-	GetInventoryTransactionsByProdID(ctx context.Context, orgID string, productID string,limit int,  offset int , sort string, inventory_type string , date string) ([]*InventoryTransactionResponse, error)
+	GetInventoryTransactionsByProdID(ctx context.Context, orgID string, productID string, limit int, offset int, sort string, inventory_type string, date string) ([]*InventoryTransactionResponse, error)
 	CountInventoryTransactionsByProdID(ctx context.Context, orgID string, productID string) (int64, error)
 }

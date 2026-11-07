@@ -48,9 +48,3 @@ type CashFlowRepository interface {
 	GetCashFlowStats(ctx context.Context, orgID, dateFrom, dateTo string) (*CashFlowStats, error)
 }
 
-type PayrollRepository interface {
-	CreatePayroll(ctx context.Context, payroll *Payroll) error
-	GetPayrollsByPeriod(ctx context.Context, orgID, periodMonth string) ([]*Payroll, error)
-	ApprovePayroll(ctx context.Context, orgID, id, approvedBy string) error
-	MarkPayrollPaid(ctx context.Context, orgID, id, cashFlowID string) error
-}

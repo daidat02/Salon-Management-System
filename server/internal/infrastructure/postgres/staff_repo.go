@@ -2,21 +2,27 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	domain "github.com/daidat02/server/internal/domain/staff"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5/stdlib"
+	"github.com/jmoiron/sqlx"
 )
 
 type PostgresStaffRepository struct {
 	db *pgxpool.Pool
+	qx *sqlx.DB
 }
 
 func NewPostgresStaffRepository(db *pgxpool.Pool) *PostgresStaffRepository {
 	return &PostgresStaffRepository{
 		db: db,
+		qx: sqlx.NewDb(stdlib.OpenDBFromPool(db), "pgx"),
 	}
 }
 
@@ -121,61 +127,86 @@ func (r *PostgresStaffRepository) GetStaffByOrgID(
 	query += fmt.Sprintf(" LIMIT $%d OFFSET $%d", len(args)+1, len(args)+2)
 	args = append(args, limit, offset)
 
-	// 4. Thực thi câu lệnh
-	rows, err := r.db.Query(ctx, query, args...)
-	if err != nil {
+	staffs := make([]*domain.Staff, 0)
+	if err := r.qx.SelectContext(ctx, &staffs, query, args...); err != nil {
 		return nil, fmt.Errorf("lỗi khi truy vấn danh sách nhân viên: %w", err)
 	}
 
-	// Đảm bảo đóng rows để giải phóng kết nối database
-	defer rows.Close()
-
-	// 2. Khởi tạo mảng kết quả (non-nil để JSON ra [] thay vì null)
-	staffs := make([]*domain.Staff, 0)
-
-	// 3. Vòng lặp duyệt qua TỪNG DÒNG dữ liệu
-	for rows.Next() {
-		// Tạo một object trống để hứng dữ liệu cho dòng hiện tại
-		var s domain.Staff
-
-		// Scan dữ liệu của dòng đó vào object s
-		err := rows.Scan(
-			&s.ID,
-			&s.OrganizationID,
-			&s.Code,
-			&s.FullName,
-			&s.Phone,
-			&s.Email,
-			&s.BirthDate,
-			&s.Gender,
-			&s.Address,
-			&s.Position,
-			&s.EmploymentType,
-			&s.CommissionRate,
-			&s.BaseSalary,
-			&s.BankName,
-			&s.BankAccountNumber,
-			&s.BankAccountHolder,
-			&s.Status,
-			&s.HireDate,
-			&s.CreatedAt,
-			&s.UpdatedAt,
-			&s.DeletedAt,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("lỗi khi đọc dữ liệu dòng nhân viên: %w", err)
-		}
-
-		// Push object vừa scan được vào mảng kết quả
-		staffs = append(staffs, &s)
-	}
-
-	// 4. Kiểm tra xem có lỗi ẩn nào xảy ra trong quá trình chạy vòng lặp không
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("lỗi trong quá trình duyệt danh sách: %w", err)
-	}
-
 	return staffs, nil
+}
+
+func (r *PostgresStaffRepository) GetStaffByID(ctx context.Context, orgID, id string) (*domain.Staff, error) {
+	var staff domain.Staff
+	if err := r.qx.GetContext(ctx, &staff, getStaffByIDQuery, orgID, id); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("nhân viên %s: %w", id, domain.ErrStaffNotFound)
+		}
+		return nil, fmt.Errorf("lỗi khi lấy thông tin nhân viên: %w", err)
+	}
+	return &staff, nil
+}
+
+func (r *PostgresStaffRepository) GetStaffPayroll(ctx context.Context, orgID, staffID, dateFrom, dateTo string, standardWorkingDays int) (*domain.StaffPayrollResponse, error) {
+	var payroll domain.StaffPayrollResponse
+	if err := r.qx.GetContext(ctx, &payroll, getStaffPayrollQuery, orgID, staffID, dateFrom, dateTo, standardWorkingDays); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("nhân viên %s: %w", staffID, domain.ErrStaffNotFound)
+		}
+		return nil, fmt.Errorf("lỗi khi lấy bảng lương nhân viên: %w", err)
+	}
+	return &payroll, nil
+}
+
+func (r *PostgresStaffRepository) GetStaffServiceHistory(
+	ctx context.Context,
+	orgID, staffID, dateFrom, dateTo, search string,
+	limit, offset int,
+) (*domain.StaffServiceHistorySummary, []*domain.StaffServiceHistoryItem, int64, error) {
+	formattedSearch := ""
+	if strings.TrimSpace(search) != "" {
+		formattedSearch = "%" + strings.TrimSpace(search) + "%"
+	}
+
+	var summary domain.StaffServiceHistorySummary
+	if err := r.qx.GetContext(
+		ctx,
+		&summary,
+		getStaffCommissionStatsQuery+filtterByDateRange+staffServiceHistorySearchFilter,
+		orgID,
+		staffID,
+		dateFrom,
+		dateTo,
+		formattedSearch,
+	); err != nil {
+		return nil, nil, 0, fmt.Errorf("lỗi khi lấy tổng hợp lịch sử dịch vụ nhân viên: %w", err)
+	}
+
+	items := make([]*domain.StaffServiceHistoryItem, 0)
+	query := getServiceHistoryQuery +
+		filtterByDateRange +
+		staffServiceHistorySearchFilter +
+		fmt.Sprintf(" ORDER BY ois.created_at DESC LIMIT $%d OFFSET $%d", 6, 7)
+	if err := r.qx.SelectContext(
+		ctx,
+		&items,
+		query,
+		orgID,
+		staffID,
+		dateFrom,
+		dateTo,
+		formattedSearch,
+		limit,
+		offset,
+	); err != nil {
+		return nil, nil, 0, fmt.Errorf("lỗi khi truy vấn lịch sử dịch vụ nhân viên: %w", err)
+	}
+
+	var total int64
+	if len(items) > 0 {
+		total = items[0].TotalCount
+	}
+
+	return &summary, items, total, nil
 }
 
 func (r *PostgresStaffRepository) CountStaffsByOrgID(ctx context.Context, orgID string, search string, status string) (int64, error) {
@@ -187,7 +218,7 @@ func (r *PostgresStaffRepository) CountStaffsByOrgID(ctx context.Context, orgID 
 	query := countStaffsByOrgIDQuery + searchStaffsFilter + filterStaffsStatus
 
 	var total int64
-	if err := r.db.QueryRow(ctx, query, args...).Scan(&total); err != nil {
+	if err := r.qx.GetContext(ctx, &total, query, args...); err != nil {
 		return 0, fmt.Errorf("lỗi khi đếm danh sách nhân viên: %w", err)
 	}
 	return total, nil
@@ -242,23 +273,18 @@ func (r *PostgresStaffRepository) DeleteStaff(ctx context.Context, orgID, id str
 
 	return nil
 }
+
 func (r *PostgresStaffRepository) StaffsExistInOrg(ctx context.Context, orgID string, staffIDs []string) ([]string, error) {
-	rows, err := r.db.Query(ctx, staffsExistInOrgQuery, orgID, staffIDs)
-	if err != nil {
+	ids := make([]string, 0)
+	if err := r.qx.SelectContext(ctx, &ids, staffsExistInOrgQuery, orgID, staffIDs); err != nil {
 		return nil, fmt.Errorf("lỗi khi kiểm tra nhân viên: %w", err)
 	}
-	defer rows.Close()
-	found := map[string]struct{}{}
-	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			return nil, fmt.Errorf("lỗi khi đọc nhân viên: %w", err)
-		}
+
+	found := make(map[string]struct{}, len(ids))
+	for _, id := range ids {
 		found[id] = struct{}{}
 	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("lỗi trong quá trình duyệt nhân viên: %w", err)
-	}
+
 	var missing []string
 	for _, id := range staffIDs {
 		if _, ok := found[id]; !ok {
@@ -266,4 +292,186 @@ func (r *PostgresStaffRepository) StaffsExistInOrg(ctx context.Context, orgID st
 		}
 	}
 	return missing, nil
+}
+
+func (r *PostgresStaffRepository) GetStaffBasicByID(ctx context.Context, orgID, staffID string) (*domain.StaffBasicInfo, error) {
+	var info domain.StaffBasicInfo
+	if err := r.qx.GetContext(ctx, &info, getStaffBasicByIDQuery, orgID, staffID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("nhân viên %s: %w", staffID, domain.ErrStaffNotFound)
+		}
+		return nil, fmt.Errorf("lỗi khi kiểm tra tồn tại nhân viên: %w", err)
+	}
+	return &info, nil
+}
+
+func (r *PostgresStaffRepository) CreatePayroll(ctx context.Context, payroll *domain.Payroll, staffInfo *domain.StaffBasicInfo) error {
+	// 1. Bắt đầu Transaction ngay từ đầu
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("lỗi khi bắt đầu transaction tạo bảng lương: %w", err)
+	}
+	defer tx.Rollback(ctx) // Tự động hoàn tác nếu có lỗi và chưa Commit
+
+	// 2. Kiểm tra tồn tại
+	isExist := false
+	// Lưu ý: Nếu dùng sqlx, hàm của tx là tx.GetContext. Nếu pgx, dùng tx.QueryRow(ctx).Scan(&isExist)
+	err = tx.QueryRow(ctx, existPayrollOfStaffAndPeriodQuery, payroll.OrganizationID, payroll.StaffID, payroll.PeriodMonth).Scan(&isExist)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("lỗi khi kiểm tra bảng lương tồn tại: %w", err)
+	}
+
+	if isExist {
+		return fmt.Errorf("bảng lương tháng %s của nhân viên này đã tồn tại: %w", payroll.PeriodMonth, domain.ExistingPayrollOfStaffAndPeriod)
+	}
+
+	// 3. TẠO PHIẾU CHI TRƯỚC (Để lấy cashFlowID)
+	cashFlowID, err := insertPayrollExpenseVoucherTx(ctx, tx, payroll.OrganizationID, staffInfo.ID, staffInfo.FullName, payroll.NetPay)
+	if err != nil {
+		return fmt.Errorf("lỗi khi tạo phiếu chi bảng lương: %w", err)
+	}
+
+	// 4. TẠO BẢNG LƯƠNG (Gắn luôn cashFlowID, bỏ được 1 lệnh UPDATE)
+	if _, err := tx.Exec(
+		ctx,
+		createPayrollQuery,
+		payroll.ID,
+		payroll.OrganizationID,
+		payroll.StaffID,
+		payroll.PeriodMonth,
+		payroll.BaseSalary,
+		payroll.CommissionAmount,
+		payroll.BonusAmount,
+		payroll.AdvanceAmount,
+		payroll.DeductionAmount,
+		payroll.NetPay,
+		payroll.Status,
+		cashFlowID, // Đưa thẳng ID vừa tạo vào đây
+		payroll.CreatedBy,
+		payroll.ApprovedBy,
+	); err != nil {
+		return fmt.Errorf("lỗi khi tạo bảng lương: %w", err)
+	}
+
+	// 5. Khóa các khoản Thưởng/Phạt
+	if _, err = tx.Exec(ctx, updateStaffSalaryAdjustmentsQuery, payroll.OrganizationID, payroll.StaffID, payroll.PeriodMonth, payroll.ID); err != nil {
+		return fmt.Errorf("lỗi khi cập nhật payroll_id cho các điều chỉnh lương: %w", err)
+	}
+
+	// 6. Khóa Bảng chấm công
+	if _, err = tx.Exec(ctx, updateAttendancesQuery, payroll.OrganizationID, payroll.StaffID, payroll.PeriodMonth, payroll.ID); err != nil {
+		return fmt.Errorf("lỗi khi cập nhật payroll_id cho bảng chấm công: %w", err) // Đã sửa message
+	}
+
+	// 7. Hoàn tất
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("lỗi khi commit tạo bảng lương: %w", err)
+	}
+
+	return nil
+}
+
+func (r *PostgresStaffRepository) CreateSalaryAdjustment(ctx context.Context, adjustment *domain.SalaryAdjustment) error {
+	_, err := r.db.Exec(
+		ctx,
+		createSalaryAdjustmentQuery,
+		adjustment.ID,
+		adjustment.OrganizationID,
+		adjustment.StaffID,
+		adjustment.AdjustmentType,
+		adjustment.Amount,
+		adjustment.Reason,
+		adjustment.EffectiveDate,
+	)
+	if err != nil {
+		return fmt.Errorf("lỗi khi tạo điều chỉnh lương: %w", err)
+	}
+	return nil
+}
+
+func (r *PostgresStaffRepository) GetSalaryAdjustments(ctx context.Context, orgID, staffID, periodMonth string) ([]*domain.SalaryAdjustment, error) {
+	adjustments := make([]*domain.SalaryAdjustment, 0)
+	if err := r.qx.SelectContext(ctx, &adjustments, getSalaryAdjustmentsQuery, orgID, staffID, periodMonth); err != nil {
+		return nil, fmt.Errorf("lỗi khi truy vấn điều chỉnh lương: %w", err)
+	}
+	return adjustments, nil
+}
+
+func (r *PostgresStaffRepository) DeleteSalaryAdjustment(ctx context.Context, orgID, adjustmentID string) error {
+	tag, err := r.db.Exec(ctx, deleteStaffSalaryAdjustmentsQuery, orgID, adjustmentID)
+	if err != nil {
+		return fmt.Errorf("lỗi khi xóa điều chỉnh lương: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return domain.ErrAdjustmentLockedOrNotFound
+	}
+	return nil
+}
+func (r *PostgresStaffRepository) CreateStaffLeave(ctx context.Context, leave *domain.StaffLeave) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("lỗi khi bắt đầu transaction tạo ngày nghỉ: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	var locked bool
+	if err := tx.QueryRow(
+		ctx,
+		lockedAttendanceInRangeQuery,
+		leave.OrganizationID,
+		leave.StaffID,
+		leave.StartDate,
+		leave.EndDate,
+	).Scan(&locked); err != nil {
+		return fmt.Errorf("lỗi khi kiểm tra bảng chấm công đã chốt: %w", err)
+	}
+	if locked {
+		return domain.ErrLeaveLocked
+	}
+
+	if _, err := tx.Exec(
+		ctx,
+		createStaffLeaveQuery,
+		leave.ID,
+		leave.OrganizationID,
+		leave.StaffID,
+		leave.LeaveType,
+		leave.StartDate,
+		leave.EndDate,
+		nullableStaffString(leave.Note),
+	); err != nil {
+		return fmt.Errorf("lỗi khi tạo ngày nghỉ: %w", err)
+	}
+
+	status := "LEAVE_EXCUSED"
+	if leave.LeaveType == domain.LeaveTypeLate {
+		status = "LATE"
+	}
+
+	for day := leave.StartDate; !day.After(leave.EndDate); day = day.AddDate(0, 0, 1) {
+		if _, err := tx.Exec(
+			ctx,
+			upsertLeaveAttendanceQuery,
+			leave.OrganizationID,
+			leave.StaffID,
+			day,
+			status,
+			nullableStaffString(leave.Note),
+		); err != nil {
+			return fmt.Errorf("lỗi khi ghi nhận chấm công ngày %s: %w", day.Format("2006-01-02"), err)
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("lỗi khi commit tạo ngày nghỉ: %w", err)
+	}
+	return nil
+}
+
+func (r *PostgresStaffRepository) GetStaffLeaves(ctx context.Context, orgID, staffID string) ([]*domain.StaffLeave, error) {
+	leaves := make([]*domain.StaffLeave, 0)
+	if err := r.qx.SelectContext(ctx, &leaves, getStaffLeavesQuery, orgID, staffID); err != nil {
+		return nil, fmt.Errorf("lỗi khi truy vấn ngày nghỉ: %w", err)
+	}
+	return leaves, nil
 }

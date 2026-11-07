@@ -4,12 +4,24 @@ import * as React from 'react';
 import { AlertTriangle, Banknote, Boxes, Package, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DashDrawer } from '@/components/dashboard/DashDrawer';
+import useProductDetail from '@/hooks/use-product-detail';
 import type { Product } from '@/types/product';
 import type { InventoryTransaction, InventoryTransactionType } from '@/types/inventory';
-import { formatShortDateTime, formatVND } from '@/lib/format';
+import { formatDateTime, formatShortDateTime, formatVND } from '@/lib/format';
+import { ProductFormDialog } from './ProductFormDialog';
 
-// Mock data cho drawer chi tiết sản phẩm — bám cấu trúc CustomerDrawer.
-// Chưa kết nối API.
+const formatCompactVND = (value: number) => {
+  if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(1).replace('.', ',')}B`;
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1).replace('.', ',')}M`;
+  if (value >= 1_000) return `${Math.round(value / 1_000)}K`;
+  return formatVND(value);
+};
+
+const PRODUCT_TYPE_LABEL: Record<string, string> = {
+  retail: 'Bán lẻ',
+  material: 'Vật tư tiêu hao',
+  both: 'Cả hai',
+};
 
 type TxnRow = Pick<
   InventoryTransaction,
@@ -26,15 +38,6 @@ const mockTxns: TxnRow[] = [
   { id: 'txn-07', product_id: 'p-01', type: 'import', quantity: 30, reference_type: 'purchase_order', created_at: '2026-09-28T10:00:00+07:00', actor: 'Lê Tuấn' },
 ];
 
-const mockRevenue = [
-  { month: 'T5', value: 42 },
-  { month: 'T6', value: 55 },
-  { month: 'T7', value: 38 },
-  { month: 'T8', value: 61 },
-  { month: 'T9', value: 47 },
-  { month: 'T10', value: 70, active: true },
-];
-
 const TXN_META: Record<InventoryTransactionType, { label: string; badge: string; sign: string }> = {
   import: { label: 'Nhập kho', badge: 'bg-emerald-50 text-emerald-700', sign: '+' },
   export: { label: 'Xuất kho', badge: 'bg-amber-50 text-amber-700', sign: '−' },
@@ -46,24 +49,51 @@ const TXN_META: Record<InventoryTransactionType, { label: string; badge: string;
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Sản phẩm đã chọn (header + tồn kho lấy thật, còn lại mock). */
+  /** Sản phẩm đã chọn, dùng làm fallback trong lúc tải chi tiết. */
   product: Product | null;
 };
 
 export function ProductDrawer({ open, onOpenChange, product }: Props) {
-  const lowStock = (product?.stock_quantity ?? 0) <= (product?.min_stock ?? 0);
-  const stockValue = (product?.stock_quantity ?? 0) * (product?.cost_price ?? 0);
+  const { data: detail, isLoading } = useProductDetail(open ? product?.id ?? null : null);
+  const [editOpen, setEditOpen] = React.useState(false);
+  const item = detail ?? product;
+
+  // API chi tiết đã quy đổi tồn kho về đơn vị bán (unit); row trong bảng vẫn
+  // là đơn vị cơ sở nên quy đổi tại đây để tránh lệch khi đang tải.
+  const toUnit = (value: number | undefined, netAmount: number | null | undefined) =>
+    netAmount && netAmount > 0 ? (value ?? 0) / netAmount : (value ?? 0);
+  const stockQuantity = detail
+    ? detail.stock_quantity
+    : toUnit(product?.stock_quantity, product?.net_amount);
+  const minStock = detail ? detail.min_stock : toUnit(product?.min_stock, product?.net_amount);
+
+  // Form sửa nhận tồn kho theo đơn vị lớn (khớp API chi tiết + cách tạo SP).
+  const editProduct = item
+    ? { ...item, stock_quantity: stockQuantity, min_stock: minStock }
+    : null;
+
+  const lowStock = stockQuantity <= minStock;
+  const stockValue = stockQuantity * (item?.cost_price ?? 0);
+  const revenueChart = detail?.revenue_last_6_months ?? [];
+  const maxRevenue = Math.max(...revenueChart.map((m) => m.revenue), 1);
+  const averageRevenue = revenueChart.length
+    ? revenueChart.reduce((sum, m) => sum + m.revenue, 0) / revenueChart.length
+    : 0;
+  const currentMonth = new Date().getMonth() + 1;
+  const currentMonthLabel =
+    revenueChart[revenueChart.length - 1]?.month ?? `T${currentMonth}`;
 
   return (
+    <>
     <DashDrawer
       open={open}
       onOpenChange={onOpenChange}
       title="Chi tiết sản phẩm"
-      subtitle={product ? `SKU: ${product.sku}` : undefined}
+      subtitle={item ? `SKU: ${item.sku}` : undefined}
       badge={
-        product && (
+        item && (
           <span className="text-xs font-mono font-semibold text-primary bg-primary-container/60 px-2 py-0.5 rounded">
-            {product.unit}
+            {item.unit}
           </span>
         )
       }
@@ -76,7 +106,13 @@ export function ProductDrawer({ open, onOpenChange, product }: Props) {
           >
             Đóng
           </Button>
-          <Button className="bg-primary hover:bg-[#436b95] text-on-primary">Chỉnh sửa</Button>
+          <Button
+            className="bg-primary hover:bg-[#436b95] text-on-primary"
+            onClick={() => setEditOpen(true)}
+            disabled={!editProduct}
+          >
+            Chỉnh sửa
+          </Button>
         </>
       }
       widthClass="!max-w-[640px] !w-[540px]"
@@ -89,9 +125,13 @@ export function ProductDrawer({ open, onOpenChange, product }: Props) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
             <h4 className="text-base font-bold text-slate-900 truncate">
-              {product?.name ?? 'Sản phẩm'}
+              {item?.name ?? 'Sản phẩm'}
             </h4>
-            {lowStock ? (
+            {item && !item.is_active ? (
+              <span className="shrink-0 text-[11px] font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">
+                Ngừng bán
+              </span>
+            ) : lowStock ? (
               <span className="flex shrink-0 items-center gap-1 text-[11px] font-semibold text-error bg-red-50 px-2 py-0.5 rounded-full border border-red-200">
                 <AlertTriangle className="h-3 w-3" /> Sắp hết hàng
               </span>
@@ -103,20 +143,48 @@ export function ProductDrawer({ open, onOpenChange, product }: Props) {
           </div>
           <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-on-surface-variant">
             <p>
-              Giá vốn: <span className="font-semibold text-slate-800">{formatVND(product?.cost_price ?? 0)}</span>
+              Giá vốn: <span className="font-semibold text-slate-800">{formatVND(item?.cost_price ?? 0)}</span>
             </p>
             <p>
-              Giá bán: <span className="font-semibold text-primary">{formatVND(product?.sell_price ?? 0)}</span>
+              Giá bán: <span className="font-semibold text-primary">{formatVND(item?.sell_price ?? 0)}</span>
             </p>
             <p>
-              Tồn tối thiểu: <span className="font-medium text-slate-800">{product?.min_stock ?? 0} {product?.unit ?? ''}</span>
+              Tồn tối thiểu: <span className="font-medium text-slate-800">{minStock} {item?.unit ?? ''}</span>
             </p>
             <p>
               Quy cách:{' '}
               <span className="font-medium text-slate-800">
-                {product?.net_amount && product?.net_unit
-                  ? `${product.net_amount}${product.net_unit}/${product.unit}`
-                  : `1 ${product?.unit ?? ''}`}
+                {item?.net_amount && item?.net_unit
+                  ? `${item.net_amount}${item.net_unit}/${item.unit}`
+                  : `1 ${item?.unit ?? ''}`}
+              </span>
+            </p>
+            <p>
+              Danh mục:{' '}
+              <span className="font-medium text-slate-800">
+                {item?.category_name ?? 'Chưa phân loại'}
+              </span>
+            </p>
+            <p>
+              Loại:{' '}
+              <span className="font-medium text-slate-800">
+                {PRODUCT_TYPE_LABEL[item?.product_type ?? ''] ?? '—'}
+              </span>
+            </p>
+            <p>
+              Hiển thị web:{' '}
+              <span className="font-medium text-slate-800">{item?.show_on_web ? 'Có' : 'Không'}</span>
+            </p>
+            <p>
+              Trạng thái:{' '}
+              <span className="font-medium text-slate-800">
+                {item?.is_active ? 'Đang kinh doanh' : 'Ngừng bán'}
+              </span>
+            </p>
+            <p className="col-span-2">
+              Cập nhật:{' '}
+              <span className="font-medium text-slate-800">
+                {formatDateTime(item?.updated_at ?? null)}
               </span>
             </p>
           </div>
@@ -129,16 +197,22 @@ export function ProductDrawer({ open, onOpenChange, product }: Props) {
           <p className="text-[10px] text-on-surface-variant uppercase font-medium">Tồn kho</p>
           <p className="mt-0.5 flex items-center justify-center gap-1 text-base font-bold text-primary">
             <Boxes className="h-3.5 w-3.5" />
-            {product?.stock_quantity ?? 0}
+            {stockQuantity}
           </p>
         </div>
         <div className="p-2.5 rounded-lg bg-surface border border-outline">
-          <p className="text-[10px] text-on-surface-variant uppercase font-medium">Đã bán T10</p>
-          <p className="text-base font-bold text-slate-900 mt-0.5">48</p>
+          <p className="text-[10px] text-on-surface-variant uppercase font-medium">
+            Đã bán {currentMonthLabel}
+          </p>
+          <p className="text-base font-bold text-slate-900 mt-0.5">
+            {detail?.sold_this_month ?? 0}
+          </p>
         </div>
         <div className="p-2.5 rounded-lg bg-surface border border-outline">
           <p className="text-[10px] text-on-surface-variant uppercase font-medium">Doanh thu</p>
-          <p className="text-xs font-bold text-slate-900 mt-1">9.1M</p>
+          <p className="text-xs font-bold text-slate-900 mt-1">
+            {formatCompactVND(item?.revenue_this_month ?? 0)}
+          </p>
         </div>
         <div className="p-2.5 rounded-lg bg-surface border border-outline">
           <p className="text-[10px] text-on-surface-variant uppercase font-medium">Giá trị tồn</p>
@@ -153,25 +227,33 @@ export function ProductDrawer({ open, onOpenChange, product }: Props) {
             <TrendingUp className="h-3.5 w-3.5 text-primary" />
             Doanh thu 6 tháng gần nhất
           </span>
-          <span className="text-[11px] text-primary font-medium">Trung bình: 6.2M/tháng</span>
+          <span className="text-[11px] text-primary font-medium">
+            Trung bình: {formatCompactVND(averageRevenue)}/tháng
+          </span>
         </div>
         <div className="h-20 flex items-end justify-between gap-3 pt-2">
-          {mockRevenue.map((m, i) => {
-            const active = i === mockRevenue.length - 1;
-            return (
-              <div key={m.month} className="flex-1 flex flex-col items-center gap-1">
-                <div
-                  style={{ height: Math.max(6, Math.round((m.value / 70) * 64)) }}
-                  className={`w-full rounded-t ${active ? 'bg-primary shadow-xs' : 'bg-primary-container'}`}
-                />
-                <span
-                  className={`text-[10px] ${active ? 'font-bold text-primary' : 'text-on-surface-variant'}`}
-                >
-                  {m.month}
-                </span>
-              </div>
-            );
-          })}
+          {revenueChart.length === 0 ? (
+            <p className="w-full text-center text-[11px] text-on-surface-variant">
+              {isLoading ? 'Đang tải doanh thu...' : 'Chưa có dữ liệu doanh thu'}
+            </p>
+          ) : (
+            revenueChart.map((m, i) => {
+              const active = i === revenueChart.length - 1;
+              return (
+                <div key={m.month} className="flex-1 flex flex-col items-center gap-1">
+                  <div
+                    style={{ height: Math.max(6, Math.round((m.revenue / maxRevenue) * 64)) }}
+                    className={`w-full rounded-t ${active ? 'bg-primary shadow-xs' : 'bg-primary-container'}`}
+                  />
+                  <span
+                    className={`text-[10px] ${active ? 'font-bold text-primary' : 'text-on-surface-variant'}`}
+                  >
+                    {m.month}
+                  </span>
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
 
@@ -223,5 +305,11 @@ export function ProductDrawer({ open, onOpenChange, product }: Props) {
         </p>
       </div>
     </DashDrawer>
+    <ProductFormDialog
+      open={editOpen}
+      onOpenChange={setEditOpen}
+      product={editProduct}
+    />
+    </>
   );
 }

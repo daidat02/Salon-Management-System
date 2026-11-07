@@ -52,6 +52,12 @@
                         "description": "Đến thời điểm (ISO8601, lọc start_time)",
                         "name": "to",
                         "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Tìm theo mã lịch, tên/SĐT khách, tên nhân viên",
+                        "name": "search",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -136,6 +142,56 @@
                 }
             }
         },
+        "/appointments/weekly": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Appointments"
+                ],
+                "summary": "Lấy lịch hẹn theo tuần (tách danh sách theo từng ngày)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Ngày bất kỳ trong tuần (YYYY-MM-DD hoặc ISO8601, mặc định tuần hiện tại)",
+                        "name": "week_start",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Lịch tuần gồm 7 ngày và danh sách lịch hẹn mỗi ngày",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "week_start không hợp lệ / thiếu organization",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Thiếu token / token không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Lỗi server",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/appointments/{id}": {
             "get": {
                 "security": [
@@ -180,6 +236,73 @@
                     },
                     "404": {
                         "description": "Không tìm thấy lịch hẹn",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Appointments"
+                ],
+                "summary": "Cập nhật toàn bộ lịch hẹn (kèm thay items)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID lịch hẹn",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Thông tin lịch hẹn (total do server tính từ items)",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_internal_domain_appointment.AppointmentCreateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Cập nhật lịch hẹn thành công",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Dữ liệu không hợp lệ / thiếu organization",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Thiếu token / token không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Không tìm thấy lịch hẹn / service/product",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Lỗi server",
                         "schema": {
                             "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
                         }
@@ -1900,6 +2023,42 @@
                 }
             }
         },
+        "/inventory/stats": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Inventory"
+                ],
+                "summary": "Thống kê tổng quan kho hàng (SKU, sắp hết, giá trị tồn, chi phí nhập tháng)",
+                "responses": {
+                    "200": {
+                        "description": "Thống kê kho hàng",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Thiếu organization",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Thiếu token / token không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/inventory/transactions": {
             "get": {
                 "security": [
@@ -3008,6 +3167,58 @@
                 }
             }
         },
+        "/organizations": {
+            "post": {
+                "description": "Tạo organization + user owner (role=owner) + business_hours/notification/appointment/receipt settings trong cùng transaction.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Organizations"
+                ],
+                "summary": "Tạo tổ chức mới kèm tài khoản owner và settings mặc định",
+                "parameters": [
+                    {
+                        "description": "Thông tin tổ chức + tài khoản owner (owner_phone, owner_password)",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_internal_domain_organization.CreateOrganizationRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Tạo tổ chức thành công",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Dữ liệu không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Slug đã tồn tại",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Lỗi server",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/products": {
             "get": {
                 "security": [
@@ -3050,6 +3261,12 @@
                         "type": "string",
                         "description": "Lọc trạng thái",
                         "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Lọc theo ID danh mục sản phẩm",
+                        "name": "category_id",
                         "in": "query"
                     },
                     {
@@ -3184,6 +3401,62 @@
             }
         },
         "/products/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Trả về thông tin đầy đủ của sản phẩm kèm doanh số tháng hiện tại và doanh thu 6 tháng gần nhất. stock_quantity và min_stock được quy đổi về đơn vị bán (unit).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Products"
+                ],
+                "summary": "Lấy chi tiết sản phẩm",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID sản phẩm",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Chi tiết sản phẩm",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Thiếu id / thiếu organization",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Thiếu token / token không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Không tìm thấy sản phẩm",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Lỗi server",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            },
             "put": {
                 "security": [
                     {
@@ -3415,6 +3688,12 @@
                         "in": "query"
                     },
                     {
+                        "type": "string",
+                        "description": "Lọc theo ID danh mục dịch vụ",
+                        "name": "category_id",
+                        "in": "query"
+                    },
+                    {
                         "enum": [
                             "created_at_desc",
                             "price_asc",
@@ -3503,6 +3782,42 @@
                     },
                     "500": {
                         "description": "Lỗi server",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/services/stats": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Services"
+                ],
+                "summary": "Thống kê tổng quan dịch vụ",
+                "responses": {
+                    "200": {
+                        "description": "Thống kê dịch vụ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Thiếu organization",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Thiếu token / token không hợp lệ",
                         "schema": {
                             "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
                         }
@@ -3673,6 +3988,384 @@
                 }
             }
         },
+        "/settings/booking": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Settings"
+                ],
+                "summary": "Lấy cài đặt lịch hẹn",
+                "responses": {
+                    "200": {
+                        "description": "Cài đặt lịch hẹn",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Thiếu token / token không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Lỗi server",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Settings"
+                ],
+                "summary": "Cập nhật cài đặt lịch hẹn",
+                "parameters": [
+                    {
+                        "description": "Cấu hình lịch hẹn",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_internal_domain_setting.BookingSettings"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Cập nhật thành công",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Dữ liệu không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Thiếu token / token không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Lỗi server",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/settings/general": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Settings"
+                ],
+                "summary": "Lấy cài đặt chung (thông tin salon + giờ làm việc)",
+                "responses": {
+                    "200": {
+                        "description": "Cài đặt chung",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Thiếu token / token không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Không tìm thấy tổ chức",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Lỗi server",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Settings"
+                ],
+                "summary": "Cập nhật cài đặt chung (thông tin salon + giờ làm việc)",
+                "parameters": [
+                    {
+                        "description": "Cấu hình chung",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_internal_domain_setting.GeneralSettingsResponse"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Cập nhật thành công",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Dữ liệu không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Thiếu token / token không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Không tìm thấy tổ chức",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Lỗi server",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/settings/notifications": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Settings"
+                ],
+                "summary": "Lấy cài đặt thông báo",
+                "responses": {
+                    "200": {
+                        "description": "Cài đặt thông báo",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Thiếu token / token không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Lỗi server",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Settings"
+                ],
+                "summary": "Cập nhật cài đặt thông báo",
+                "parameters": [
+                    {
+                        "description": "Cấu hình thông báo",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_internal_domain_setting.NotificationSettings"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Cập nhật thành công",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Dữ liệu không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Thiếu token / token không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Lỗi server",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/settings/payment": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Settings"
+                ],
+                "summary": "Lấy cài đặt thanh toán (hóa đơn + phương thức thanh toán)",
+                "responses": {
+                    "200": {
+                        "description": "Cài đặt thanh toán",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Thiếu token / token không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Không tìm thấy tổ chức",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Lỗi server",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Settings"
+                ],
+                "summary": "Cập nhật cài đặt thanh toán (hóa đơn + phương thức thanh toán)",
+                "parameters": [
+                    {
+                        "description": "Cấu hình thanh toán",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_internal_domain_setting.PaymentSettingsResponse"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Cập nhật thành công",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Dữ liệu không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Thiếu token / token không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Lỗi server",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/staff": {
             "get": {
                 "security": [
@@ -3812,7 +4505,169 @@
                 }
             }
         },
+        "/staff/salary-adjustment": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Staff"
+                ],
+                "summary": "Tạo điều chỉnh lương nhân viên",
+                "parameters": [
+                    {
+                        "description": "Thông tin điều chỉnh lương",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_internal_domain_staff.SalaryAdjustmentRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Tạo điều chỉnh lương thành công",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Dữ liệu không hợp lệ / thiếu organization",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Thiếu token / token không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Lỗi server",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/staff/salary-adjustment/{id}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Staff"
+                ],
+                "summary": "Xóa điều chỉnh lương nhân viên",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID điều chỉnh lương",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Xóa điều chỉnh lương thành công",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Thiếu id",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Thiếu token / token không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Không tìm thấy điều chỉnh lương hoặc đã bị khóa",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/staff/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Staff"
+                ],
+                "summary": "Lấy thông tin chi tiết nhân viên",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID nhân viên",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Thông tin chi tiết nhân viên",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Thiếu id",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Thiếu token / token không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Không tìm thấy nhân viên",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Lỗi server",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            },
             "put": {
                 "security": [
                     {
@@ -3917,6 +4772,425 @@
                     },
                     "404": {
                         "description": "Không tìm thấy nhân viên",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/staff/{id}/leaves": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Staff"
+                ],
+                "summary": "Lấy danh sách ngày nghỉ của nhân viên",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID nhân viên",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Danh sách ngày nghỉ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Thiếu id",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Thiếu token / token không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Không tìm thấy nhân viên",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Lỗi server",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Staff"
+                ],
+                "summary": "Tạo ngày nghỉ cho nhân viên",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID nhân viên",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Thông tin ngày nghỉ",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_internal_domain_staff.CreateStaffLeaveRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Tạo ngày nghỉ thành công",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Dữ liệu không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Thiếu token / token không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Không tìm thấy nhân viên",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Khoảng ngày đã được chốt trong bảng lương",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Lỗi server",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/staff/{id}/payroll": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Staff"
+                ],
+                "summary": "Lấy bảng lương nhân viên theo kỳ",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID nhân viên",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Từ ngày (yyyy-MM-dd hoặc RFC3339), mặc định đầu tháng",
+                        "name": "date_from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Đến ngày (yyyy-MM-dd hoặc RFC3339), mặc định cuối tháng",
+                        "name": "date_to",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Số ngày công chuẩn (mặc định 26)",
+                        "name": "standard_working_days",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Bảng lương nhân viên",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Thiếu id / tham số không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Thiếu token / token không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Không tìm thấy nhân viên",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Lỗi server",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Staff"
+                ],
+                "summary": "Tạo bảng lương nhân viên",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID nhân viên",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Kỳ bảng lương (yyyy-MM)",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_delivery_http_staff.CreatePayrollRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Tạo bảng lương thành công",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Thiếu id / thiếu target_month / tham số không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Thiếu token / token không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Không tìm thấy nhân viên",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Đã tồn tại bảng lương của nhân viên trong kỳ này",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Lỗi server",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/staff/{id}/salary-adjustments": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Staff"
+                ],
+                "summary": "Lấy danh sách điều chỉnh lương của nhân viên",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID nhân viên",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Tháng điều chỉnh",
+                        "name": "period_month",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Lấy danh sách điều chỉnh lương thành công",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Thiếu id",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Thiếu token / token không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Lỗi server",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/staff/{id}/service-history": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Staff"
+                ],
+                "summary": "Lấy lịch sử dịch vụ nhân viên đã thực hiện",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID nhân viên",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Từ ngày (yyyy-MM-dd hoặc RFC3339), mặc định đầu tháng",
+                        "name": "date_from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Đến ngày (yyyy-MM-dd hoặc RFC3339), mặc định cuối tháng",
+                        "name": "date_to",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Tìm theo mã đơn, tên khách hoặc tên dịch vụ",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Trang (mặc định 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Số dòng/trang (mặc định 20, tối đa 100)",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Lịch sử dịch vụ kèm tổng hợp và phân trang",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Thiếu id / tham số không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Thiếu token / token không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Không tìm thấy nhân viên",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Lỗi server",
                         "schema": {
                             "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
                         }
@@ -4307,6 +5581,9 @@
                 "method": {
                     "type": "string"
                 },
+                "method_payment_id": {
+                    "type": "string"
+                },
                 "provider": {
                     "type": "string"
                 },
@@ -4429,6 +5706,57 @@
                     "type": "number"
                 },
                 "unit": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_daidat02_server_internal_domain_organization.CreateOrganizationRequest": {
+            "type": "object",
+            "required": [
+                "name",
+                "owner_password",
+                "owner_phone",
+                "slug"
+            ],
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "logo_url": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "owner_full_name": {
+                    "type": "string"
+                },
+                "owner_password": {
+                    "type": "string"
+                },
+                "owner_phone": {
+                    "description": "Tài khoản owner tạo kèm tổ chức.",
+                    "type": "string"
+                },
+                "phone": {
+                    "type": "string"
+                },
+                "slogan": {
+                    "type": "string"
+                },
+                "slug": {
+                    "type": "string"
+                },
+                "tax_code": {
+                    "type": "string"
+                },
+                "timezone": {
+                    "type": "string"
+                },
+                "website": {
                     "type": "string"
                 }
             }
@@ -4599,6 +5927,293 @@
                 }
             }
         },
+        "github_com_daidat02_server_internal_domain_setting.BookingSettings": {
+            "type": "object",
+            "properties": {
+                "allow_cancel": {
+                    "type": "boolean"
+                },
+                "allow_online_booking": {
+                    "type": "boolean"
+                },
+                "allow_reschedule": {
+                    "type": "boolean"
+                },
+                "auto_confirm": {
+                    "type": "boolean"
+                },
+                "cancel_before_hours": {
+                    "type": "integer"
+                },
+                "deposit_enabled": {
+                    "type": "boolean"
+                },
+                "deposit_max_amount": {
+                    "type": "number"
+                },
+                "deposit_percent": {
+                    "type": "number"
+                },
+                "max_advance_days": {
+                    "type": "integer"
+                },
+                "max_cancellations_per_month": {
+                    "type": "integer"
+                },
+                "max_per_slot": {
+                    "type": "integer"
+                },
+                "min_lead_minutes": {
+                    "type": "integer"
+                },
+                "no_show_lookback_days": {
+                    "type": "integer"
+                },
+                "no_show_threshold": {
+                    "type": "integer"
+                },
+                "reschedule_before_hours": {
+                    "type": "integer"
+                },
+                "slot_step_minutes": {
+                    "type": "integer"
+                }
+            }
+        },
+        "github_com_daidat02_server_internal_domain_setting.GeneralSettingsResponse": {
+            "type": "object",
+            "properties": {
+                "organization": {
+                    "$ref": "#/definitions/github_com_daidat02_server_internal_domain_setting.OrganizationInfo"
+                },
+                "working_hours": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_daidat02_server_internal_domain_setting.WorkingHourDay"
+                    }
+                }
+            }
+        },
+        "github_com_daidat02_server_internal_domain_setting.NotificationSettings": {
+            "type": "object",
+            "properties": {
+                "appointment_reminder": {
+                    "type": "boolean"
+                },
+                "birthday_voucher": {
+                    "type": "boolean"
+                },
+                "daily_report_time": {
+                    "type": "string"
+                },
+                "daily_revenue_report": {
+                    "type": "boolean"
+                },
+                "low_stock_alert": {
+                    "type": "boolean"
+                },
+                "low_stock_threshold": {
+                    "type": "integer"
+                },
+                "new_booking_alert": {
+                    "type": "boolean"
+                },
+                "reminder_hours_before": {
+                    "type": "integer"
+                }
+            }
+        },
+        "github_com_daidat02_server_internal_domain_setting.OrganizationInfo": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "logo_url": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "phone": {
+                    "type": "string"
+                },
+                "slogan": {
+                    "type": "string"
+                },
+                "slug": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "tax_code": {
+                    "type": "string"
+                },
+                "timezone": {
+                    "type": "string"
+                },
+                "website": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_daidat02_server_internal_domain_setting.PaymentMethod": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "fund_id": {
+                    "type": "string"
+                },
+                "fund_name": {
+                    "type": "string"
+                },
+                "fund_type": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "is_system": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "sort_order": {
+                    "type": "integer"
+                }
+            }
+        },
+        "github_com_daidat02_server_internal_domain_setting.PaymentSettingsResponse": {
+            "type": "object",
+            "properties": {
+                "payment_methods": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_daidat02_server_internal_domain_setting.PaymentMethod"
+                    }
+                },
+                "receipt": {
+                    "$ref": "#/definitions/github_com_daidat02_server_internal_domain_setting.ReceiptSettings"
+                }
+            }
+        },
+        "github_com_daidat02_server_internal_domain_setting.ReceiptSettings": {
+            "type": "object",
+            "properties": {
+                "auto_cut_paper": {
+                    "type": "boolean"
+                },
+                "auto_print_on_checkout": {
+                    "type": "boolean"
+                },
+                "footer_text": {
+                    "type": "string"
+                },
+                "header_text": {
+                    "type": "string"
+                },
+                "logo_url": {
+                    "type": "string"
+                },
+                "mask_customer_phone": {
+                    "type": "boolean"
+                },
+                "open_cash_drawer": {
+                    "type": "boolean"
+                },
+                "paper_size": {
+                    "type": "string"
+                },
+                "print_copy_count": {
+                    "type": "integer"
+                },
+                "show_branch_address": {
+                    "type": "boolean"
+                },
+                "show_cashier_name": {
+                    "type": "boolean"
+                },
+                "show_customer_info": {
+                    "type": "boolean"
+                },
+                "show_logo": {
+                    "type": "boolean"
+                },
+                "show_vietqr": {
+                    "type": "boolean"
+                },
+                "show_wifi_info": {
+                    "type": "boolean"
+                },
+                "wifi_name": {
+                    "type": "string"
+                },
+                "wifi_pass": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_daidat02_server_internal_domain_setting.WorkingHourDay": {
+            "type": "object",
+            "properties": {
+                "break_end": {
+                    "type": "string"
+                },
+                "break_start": {
+                    "type": "string"
+                },
+                "close_time": {
+                    "type": "string"
+                },
+                "is_open": {
+                    "type": "boolean"
+                },
+                "note": {
+                    "type": "string"
+                },
+                "open_time": {
+                    "type": "string"
+                },
+                "weekday": {
+                    "type": "integer"
+                }
+            }
+        },
+        "github_com_daidat02_server_internal_domain_staff.CreateStaffLeaveRequest": {
+            "type": "object",
+            "required": [
+                "end_date",
+                "leave_type",
+                "start_date"
+            ],
+            "properties": {
+                "end_date": {
+                    "type": "string"
+                },
+                "leave_type": {
+                    "type": "string"
+                },
+                "note": {
+                    "type": "string"
+                },
+                "start_date": {
+                    "type": "string"
+                }
+            }
+        },
         "github_com_daidat02_server_internal_domain_staff.CreateStaffRequest": {
             "type": "object",
             "properties": {
@@ -4651,6 +6266,26 @@
                     "type": "string"
                 },
                 "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_daidat02_server_internal_domain_staff.SalaryAdjustmentRequest": {
+            "type": "object",
+            "properties": {
+                "adjustment_type": {
+                    "type": "string"
+                },
+                "amount": {
+                    "type": "number"
+                },
+                "effective_date": {
+                    "type": "string"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "staff_id": {
                     "type": "string"
                 }
             }
@@ -4779,6 +6414,17 @@
                 },
                 "data": {},
                 "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "internal_delivery_http_staff.CreatePayrollRequest": {
+            "type": "object",
+            "required": [
+                "target_month"
+            ],
+            "properties": {
+                "target_month": {
                     "type": "string"
                 }
             }

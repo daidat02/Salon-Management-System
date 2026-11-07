@@ -15,21 +15,19 @@ export default function ProductsTable() {
   const searchParams = useSearchParams();
   const search = searchParams.get('search') || '';
   const status = searchParams.get('status') || '';
+  const categoryId = searchParams.get('category_id') || '';
   const sort = searchParams.get('sort') || '';
-  const brand = searchParams.get('brand') || '';
   const pageFromUrl = parseInt(searchParams.get('page') || '1', 10) || 1;
 
   const page = pageFromUrl || 1;
   const initialPageSize = 20;
 
-  // brand hiện chưa có API riêng, map tạm vào search để lọc theo tên thương hiệu
-  const effectiveSearch = brand ? (search ? `${search} ${brand}` : brand) : search;
-
   const { data, isLoading, isError, error } = useProduct({
     page,
     pageSize: initialPageSize,
-    search: effectiveSearch,
+    search,
     status,
+    categoryId,
     sort,
   });
 

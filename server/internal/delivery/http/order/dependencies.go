@@ -19,7 +19,8 @@ func NewDependencies(dbPool *pgxpool.Pool) *Dependencies {
 	customerRepo := repo.NewPostgresCustomerRepository(dbPool)
 	appointmentRepo := repo.NewPostgresAppointmentRepository(dbPool)
 	staffRepo := repo.NewPostgresStaffRepository(dbPool)
-	useCase := uc.NewOrderUsecase(orderRepo, serviceRepo, productRepo, serviceRepo, customerRepo, appointmentRepo, staffRepo)
+	settingRepo := repo.NewPostgresSettingRepository(dbPool)
+	useCase := uc.NewOrderUsecase(orderRepo, serviceRepo, productRepo, serviceRepo, customerRepo, appointmentRepo, staffRepo, settingRepo)
 	handler := NewOrderHandler(useCase)
 
 	return &Dependencies{

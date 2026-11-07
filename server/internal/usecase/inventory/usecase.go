@@ -7,10 +7,10 @@ import (
 	"log"
 	"strings"
 
-	"github.com/daidat02/server/internal/usecase/shared"
 	domain "github.com/daidat02/server/internal/domain/inventory"
 	orderdomain "github.com/daidat02/server/internal/domain/order"
 	productdomain "github.com/daidat02/server/internal/domain/product"
+	"github.com/daidat02/server/internal/usecase/shared"
 	"github.com/daidat02/server/pkg/apperror"
 	"github.com/daidat02/server/pkg/pagination"
 	"github.com/daidat02/server/pkg/utils"
@@ -39,7 +39,7 @@ func (u *InventoryUsecase) CreateDocument(ctx context.Context, req *domain.Creat
 	if len(req.Items) == 0 {
 		return nil, apperror.New(400, "Phiếu kho phải có ít nhất 1 sản phẩm", nil)
 	}
-	
+
 	doc := &domain.InventoryDocument{
 		ID:             utils.NewID(),
 		OrganizationID: orgID,
@@ -85,6 +85,7 @@ func (u *InventoryUsecase) CreateDocument(ctx context.Context, req *domain.Creat
 //   - giá: phiếu nhập (import) tôn trọng giá user theo unit gửi (quy về base);
 //     xuất/bán/trả/điều chỉnh (export/sale/return/adjust) lấy giá vốn server,
 //     bỏ qua số client gửi.
+//
 // Unit gửi được giữ lại để lưu lịch sử hiển thị.
 func (u *InventoryUsecase) toBaseItems(ctx context.Context, orgID, docType string, inputs []domain.DocumentItemInput) ([]*domain.DocumentItemInput, error) {
 	seen := map[string]struct{}{}
@@ -212,12 +213,28 @@ func (u *InventoryUsecase) GetLowStockProducts(ctx context.Context, page, pageSi
 	return pagination.NewResult(items, params, total), nil
 }
 
+// GetInventoryStats thống kê tổng quan trang kho hàng.
+func (u *InventoryUsecase) GetInventoryStats(ctx context.Context) (*domain.InventoryStatsResponse, error) {
+	orgID, err := shared.RequireOrgID(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	stats, err := u.repo.GetInventoryStats(ctx, orgID)
+	if err != nil {
+		log.Println("Error getting inventory stats:", err)
+		return nil, apperror.New(500, "Lỗi khi lấy thống kê kho hàng", err)
+	}
+
+	return stats, nil
+}
+
 func (u *InventoryUsecase) GetDocumentByID(ctx context.Context, documentID string) (*domain.DocumentDetailResponse, error) {
 	orgID, err := shared.RequireOrgID(ctx)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	document, err := u.repo.GetDocumentByID(ctx, orgID, documentID)
 	if err != nil {
 		if errors.Is(err, domain.ErrInventoryNotFound) {
@@ -234,11 +251,11 @@ func (u *InventoryUsecase) GetTransactionsByProductID(ctx context.Context, produ
 	if err != nil {
 		return nil, err
 	}
-	
+
 	params := pagination.Normalize(page, pageSize)
 	productID = strings.TrimSpace(productID)
 
-	txs, err := u.repo.GetInventoryTransactionsByProdID(ctx, orgID, productID, params.PageSize, params.Offset(),sort, inventory_type, date)
+	txs, err := u.repo.GetInventoryTransactionsByProdID(ctx, orgID, productID, params.PageSize, params.Offset(), sort, inventory_type, date)
 	if err != nil {
 		return nil, apperror.New(500, "Lỗi khi lấy danh sách lịch sử kho", err)
 	}

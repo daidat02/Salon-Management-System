@@ -100,6 +100,25 @@ func (h *InventoryHandler) GetLowStockProducts(c *gin.Context) {
 	response.Success(c, 200, "Danh sách tồn thấp", result)
 }
 
+// GetInventoryStats godoc
+// @Summary      Thống kê tổng quan kho hàng (SKU, sắp hết, giá trị tồn, chi phí nhập tháng)
+// @Tags         Inventory
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200  {object}  response.SuccessResponse  "Thống kê kho hàng"
+// @Failure      400  {object}  response.ErrorResponse    "Thiếu organization"
+// @Failure      401  {object}  response.ErrorResponse    "Thiếu token / token không hợp lệ"
+// @Router       /inventory/stats [get]
+func (h *InventoryHandler) GetInventoryStats(c *gin.Context) {
+	result, err := h.uc.GetInventoryStats(c.Request.Context())
+	if err != nil {
+		response.Error(c, err)
+		c.Abort()
+		return
+	}
+	response.Success(c, 200, "Thống kê kho hàng", result)
+}
+
 // GetDocumentsByOrgID godoc
 // @Summary      Lấy danh sách phiếu kho (tìm kiếm + lọc loại + sắp xếp + phân trang)
 // @Tags         Inventory
@@ -114,7 +133,7 @@ func (h *InventoryHandler) GetLowStockProducts(c *gin.Context) {
 // @Failure      400        {object}  response.ErrorResponse    "Thiếu organization"
 // @Failure      401        {object}  response.ErrorResponse    "Thiếu token / token không hợp lệ"
 // @Router       /inventory/ [get]
-func (h *InventoryHandler) GetDocumentsByOrgID(c *gin.Context){
+func (h *InventoryHandler) GetDocumentsByOrgID(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
 	search := c.DefaultQuery("search", "")
@@ -171,8 +190,8 @@ func (h *InventoryHandler) GetDocumentByID(c *gin.Context) {
 // @Router       /inventory/transactions/{product_id} [get]
 func (h *InventoryHandler) GetTransactionsByProductID(c *gin.Context) {
 	productID := c.Param("product_id")
-	page,_ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize,_ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
 	sort := c.DefaultQuery("sort", "")
 	inventoryType := c.DefaultQuery("inventory_type", "")
 	date := c.DefaultQuery("date", "")

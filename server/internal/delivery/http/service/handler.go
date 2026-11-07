@@ -58,7 +58,6 @@ func (h *ServiceHandler) CreateService(c *gin.Context) {
 		IsActive:        boolOrDefault(req.IsActive, true),
 	}
 
-
 	materials := make([]*domain.ServiceMaterialInput, len(req.Materials))
 	for i, m := range req.Materials {
 		materials[i] = &domain.ServiceMaterialInput{
@@ -67,7 +66,7 @@ func (h *ServiceHandler) CreateService(c *gin.Context) {
 			Unit:      m.Unit,
 		}
 	}
-	result, err := h.uc.CreateService(c.Request.Context(), service,materials)
+	result, err := h.uc.CreateService(c.Request.Context(), service, materials)
 	if err != nil {
 		response.Error(c, err)
 		c.Abort()
@@ -83,9 +82,10 @@ func (h *ServiceHandler) CreateService(c *gin.Context) {
 // @Security     BearerAuth
 // @Param        page       query     int     false  "Trang (mặc định 1)"
 // @Param        page_size  query     int     false  "Số dòng/trang (mặc định 20, tối đa 100)"
-// @Param        search     query     string  false  "Tìm theo tên hoặc mô tả (ILIKE)"
-// @Param        status     query     string  false  "Lọc trạng thái" Enums(active,inactive)
-// @Param        sort       query     string  false  "Sắp xếp" Enums(created_at_desc,price_asc,price_desc,duration_asc,name_asc)
+// @Param        search       query     string  false  "Tìm theo tên hoặc mô tả (ILIKE)"
+// @Param        status       query     string  false  "Lọc trạng thái" Enums(active,inactive)
+// @Param        category_id  query     string  false  "Lọc theo ID danh mục dịch vụ"
+// @Param        sort         query     string  false  "Sắp xếp" Enums(created_at_desc,price_asc,price_desc,duration_asc,name_asc)
 // @Success      200        {object}  response.SuccessResponse  "Danh sách dịch vụ kèm phân trang {data, page, page_size, total, total_pages}"
 // @Failure      400        {object}  response.ErrorResponse    "Thiếu organization"
 // @Failure      401        {object}  response.ErrorResponse    "Thiếu token / token không hợp lệ"
@@ -96,15 +96,35 @@ func (h *ServiceHandler) GetServicesByOrgID(c *gin.Context) {
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
 	search := c.DefaultQuery("search", "")
 	status := c.DefaultQuery("status", "")
+	categoryID := c.DefaultQuery("category_id", "")
 	sort := c.DefaultQuery("sort", "created_at_desc")
 
-	result, err := h.uc.GetServicesByOrgID(c.Request.Context(), search, status, sort, page, pageSize)
+	result, err := h.uc.GetServicesByOrgID(c.Request.Context(), search, status, categoryID, sort, page, pageSize)
 	if err != nil {
 		response.Error(c, err)
 		c.Abort()
 		return
 	}
 	response.Success(c, 200, "Danh sách dịch vụ", result)
+}
+
+// GetServiceStats godoc
+// @Summary      Thống kê tổng quan dịch vụ
+// @Tags         Services
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200  {object}  response.SuccessResponse  "Thống kê dịch vụ"
+// @Failure      400  {object}  response.ErrorResponse    "Thiếu organization"
+// @Failure      401  {object}  response.ErrorResponse    "Thiếu token / token không hợp lệ"
+// @Router       /services/stats [get]
+func (h *ServiceHandler) GetServiceStats(c *gin.Context) {
+	result, err := h.uc.GetServiceStats(c.Request.Context())
+	if err != nil {
+		response.Error(c, err)
+		c.Abort()
+		return
+	}
+	response.Success(c, 200, "Thống kê dịch vụ", result)
 }
 
 // UpdateService godoc
@@ -171,7 +191,6 @@ func (h *ServiceHandler) DeleteService(c *gin.Context) {
 	}
 	response.Success(c, 200, "Xóa dịch vụ thành công", gin.H{"id": deletedID})
 }
-
 
 // GetServiceDetails godoc
 // @Summary      Lấy chi tiết dịch vụ và nguyên vật liệu

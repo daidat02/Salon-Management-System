@@ -275,7 +275,7 @@ func (r *PostgresInventoryRepository) CreateDocument(ctx context.Context, doc *d
 	doc.TotalAmount = total
 
 	if _, err := dbTx.Exec(ctx, createInventoryDocumentQuery,
-		doc.ID, doc.OrganizationID, doc.SupplierID, doc.OrderID, doc.DocumentCode, doc.Type, doc.TotalAmount,doc.Reason, doc.Note, doc.CreatedBy,
+		doc.ID, doc.OrganizationID, doc.SupplierID, doc.OrderID, doc.DocumentCode, doc.Type, doc.TotalAmount, doc.Reason, doc.Note, doc.CreatedBy,
 	); err != nil {
 		return fmt.Errorf("lỗi khi tạo phiếu kho: %w", err)
 	}
@@ -295,7 +295,7 @@ func (r *PostgresInventoryRepository) CreateDocument(ctx context.Context, doc *d
 }
 
 func (r *PostgresInventoryRepository) GetDocumentsByOrgID(ctx context.Context, orgID string, search string, sort string, filter string, limit, offset int) ([]*domain.DocumentResponse, error) {
-	query := listInventoryDocumentsQuery +searchInventoryFilter + filterInventoryType +sortInventoryFilter
+	query := listInventoryDocumentsQuery + searchInventoryFilter + filterInventoryType + sortInventoryFilter
 	var formatSearch = ""
 	if search != "" {
 		formatSearch = `%` + strings.TrimSpace(search) + `%`
@@ -380,6 +380,22 @@ func (r *PostgresInventoryRepository) CountLowStockProducts(ctx context.Context,
 	return total, nil
 }
 
+// GetInventoryStats trả các chỉ số tổng quan của trang kho hàng.
+func (r *PostgresInventoryRepository) GetInventoryStats(ctx context.Context, orgID string) (*domain.InventoryStatsResponse, error) {
+	var stats domain.InventoryStatsResponse
+	if err := r.db.QueryRow(ctx, getInventoryStatsQuery, orgID).Scan(
+		&stats.TotalSKUs,
+		&stats.RetailSKUs,
+		&stats.MaterialSKUs,
+		&stats.LowStockSKUs,
+		&stats.InventoryValue,
+		&stats.ImportCostMonth,
+		&stats.ImportDocumentsMonth,
+	); err != nil {
+		return nil, fmt.Errorf("lỗi khi lấy thống kê kho hàng: %w", err)
+	}
+	return &stats, nil
+}
 
 func (r *PostgresInventoryRepository) GetDocumentByID(ctx context.Context, orgID string, documentID string) (*domain.DocumentDetailResponse, error) {
 	var rawQueryResult domain.DocumentQueryResult
@@ -388,26 +404,25 @@ func (r *PostgresInventoryRepository) GetDocumentByID(ctx context.Context, orgID
 		return nil, fmt.Errorf("lỗi khi truy vấn chi tiết tài liệu: %w", err)
 	}
 	var items []*domain.DocumentItemResponse
-    if len(rawQueryResult.ItemsRaw) > 0 {
-        if err := json.Unmarshal(rawQueryResult.ItemsRaw, &items); err != nil {
-            return nil, fmt.Errorf("lỗi khi parse items JSON: %w", err)
-        }
-    }
+	if len(rawQueryResult.ItemsRaw) > 0 {
+		if err := json.Unmarshal(rawQueryResult.ItemsRaw, &items); err != nil {
+			return nil, fmt.Errorf("lỗi khi parse items JSON: %w", err)
+		}
+	}
 
 	response := &domain.DocumentDetailResponse{
-        Document: &rawQueryResult.DocumentResponse,
-        Items:    items,
-    }
+		Document: &rawQueryResult.DocumentResponse,
+		Items:    items,
+	}
 	return response, nil
 }
 
-
-func (r *PostgresInventoryRepository) GetInventoryTransactionsByProdID(ctx context.Context, orgID string, productID string,limit int,  offset int , sort string, inventory_type string , date string) ([]*domain.InventoryTransactionResponse, error) {
+func (r *PostgresInventoryRepository) GetInventoryTransactionsByProdID(ctx context.Context, orgID string, productID string, limit int, offset int, sort string, inventory_type string, date string) ([]*domain.InventoryTransactionResponse, error) {
 	query := listInventoryTransactionsByProductIDQuery + FilterInventoryTransactionsByType + sortInventoryTransactionsFilter
-	agrs := []any{orgID,productID, inventory_type, date, sort}
+	agrs := []any{orgID, productID, inventory_type, date, sort}
 
-	query += fmt.Sprintf("Limit $%d OFFSET $%d", len(agrs) +1 , len(agrs)+2)
-	agrs = append(agrs,limit, offset)
+	query += fmt.Sprintf("Limit $%d OFFSET $%d", len(agrs)+1, len(agrs)+2)
+	agrs = append(agrs, limit, offset)
 
 	inventoryTransactions := make([]*domain.InventoryTransactionResponse, 0)
 	if err := r.qx.SelectContext(ctx, &inventoryTransactions, query, agrs...); err != nil {

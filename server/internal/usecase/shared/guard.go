@@ -17,7 +17,13 @@ func RequireOrgID(ctx context.Context) (string, error) {
 	}
 	return orgID, nil
 }
-
+func RequireUserID(ctx context.Context) (string, error) {
+	userID, err := middlewares.GetUserID(ctx)
+	if err != nil {
+		return "", apperror.New(400, "Không tìm thấy user_id trong context", err)
+	}
+	return userID, nil
+}
 // RequireID trim id, rỗng thì 400 với message của caller.
 func RequireID(id, msg string) (string, error) {
 	id = strings.TrimSpace(id)

@@ -74,7 +74,7 @@ export default function VoucherInfoCard({ form, onChange }: VoucherInfoCardProps
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <div>
-          <Label className="mb-1.5 block text-xs font-medium text-on-surface-variant">
+          <Label className="mb-1.5 block min-w-0 text-xs font-semibold text-on-surface">
             Mã chứng từ / Phiếu kho
           </Label>
           <div className="relative">
@@ -95,7 +95,7 @@ export default function VoucherInfoCard({ form, onChange }: VoucherInfoCardProps
           </div>
         </div>
         <div className="flex-1">
-          <Label className="mb-1.5 block text-xs font-medium text-on-surface-variant">
+          <Label className="mb-1.5 block min-w-0 text-xs font-semibold text-on-surface">
             Người tạo phiếu
           </Label>
           <div className="flex h-9 items-center gap-2 truncate rounded-md bg-surface-container px-3 py-2 text-xs font-medium text-on-surface">
@@ -104,7 +104,7 @@ export default function VoucherInfoCard({ form, onChange }: VoucherInfoCardProps
           </div>
         </div>
         <div>
-          <Label className="mb-1.5 block text-xs font-medium text-on-surface-variant">
+          <Label className="mb-1.5 block min-w-0 text-xs font-semibold text-on-surface">
             Ngày giờ ghi nhận
           </Label>
           <DashDatePicker
@@ -116,7 +116,7 @@ export default function VoucherInfoCard({ form, onChange }: VoucherInfoCardProps
         </div>
 
         {/* <div>
-          <Label className="mb-1.5 block text-xs font-medium text-on-surface-variant">
+          <Label className="mb-1.5 block min-w-0 text-xs font-semibold text-on-surface">
             Kho lưu trữ / Chi nhánh
           </Label>
           <DashInput
@@ -130,7 +130,7 @@ export default function VoucherInfoCard({ form, onChange }: VoucherInfoCardProps
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div>
-          <Label className="mb-1.5 block text-xs font-medium text-on-surface-variant">
+          <Label className="mb-1.5 block min-w-0 text-xs font-semibold text-on-surface">
             {meta.reasonLabel}
           </Label>
           <DashSelect
@@ -144,7 +144,7 @@ export default function VoucherInfoCard({ form, onChange }: VoucherInfoCardProps
         {isInbound ? (
           <div>
             <div className="mb-1.5 flex items-center justify-between">
-              <Label className="text-xs font-medium text-on-surface-variant">
+              <Label className="mb-1.5 block min-w-0 text-xs font-semibold text-on-surface">
                 Nhà Cung Cấp / Nhãn hàng
               </Label>
               <button
@@ -165,7 +165,7 @@ export default function VoucherInfoCard({ form, onChange }: VoucherInfoCardProps
           </div>
         ) : (
           <div>
-            <Label className="mb-1.5 block text-xs font-medium text-on-surface-variant">
+            <Label className="mb-1.5 block min-w-0 text-xs font-semibold text-on-surface">
               Người nhận / Khách hàng
             </Label>
             <DashInput
@@ -180,7 +180,7 @@ export default function VoucherInfoCard({ form, onChange }: VoucherInfoCardProps
 
       <div className="flex flex-col gap-4 md:flex-row md:items-center">
         <div className="flex-3">
-          <Label className="mb-1.5 block text-xs font-medium text-on-surface-variant">
+          <Label className="mb-1.5 block min-w-0 text-xs font-semibold text-on-surface">
             Ghi chú & Diễn giải chứng từ
           </Label>
           <DashInput
@@ -193,7 +193,7 @@ export default function VoucherInfoCard({ form, onChange }: VoucherInfoCardProps
 
         {/* <div className="grid grid-cols-2 gap-3">
           <div>
-            <Label className="mb-1.5 block text-xs font-medium text-on-surface-variant">
+            <Label className="mb-1.5 block min-w-0 text-xs font-semibold text-on-surface">
               Thủ kho giao / nhận
             </Label>
             <DashSelect

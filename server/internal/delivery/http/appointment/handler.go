@@ -51,6 +51,38 @@ func (h *AppointmentHandler) CreateAppointment(c *gin.Context) {
 	response.Success(c, 200, "Tạo lịch hẹn thành công", result)
 }
 
+// UpdateAppointment godoc
+// @Summary      Cập nhật toàn bộ lịch hẹn (kèm thay items)
+// @Tags         Appointments
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id    path      string                           true  "ID lịch hẹn"
+// @Param        body  body      domain.AppointmentCreateRequest  true  "Thông tin lịch hẹn (total do server tính từ items)"
+// @Success      200   {object}  response.SuccessResponse         "Cập nhật lịch hẹn thành công"
+// @Failure      400   {object}  response.ErrorResponse           "Dữ liệu không hợp lệ / thiếu organization"
+// @Failure      401   {object}  response.ErrorResponse           "Thiếu token / token không hợp lệ"
+// @Failure      404   {object}  response.ErrorResponse           "Không tìm thấy lịch hẹn / service/product"
+// @Failure      500   {object}  response.ErrorResponse           "Lỗi server"
+// @Router       /appointments/{id} [put]
+func (h *AppointmentHandler) UpdateAppointment(c *gin.Context) {
+	var req domain.AppointmentCreateRequest
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, apperror.New(400, "Dữ liệu không hợp lệ", err))
+		c.Abort()
+		return
+	}
+
+	result, err := h.uc.UpdateAppointment(c.Request.Context(), c.Param("id"), &req)
+	if err != nil {
+		response.Error(c, err)
+		c.Abort()
+		return
+	}
+	response.Success(c, 200, "Cập nhật lịch hẹn thành công", result)
+}
+
 // GetAppointments godoc
 // @Summary      Lấy danh sách lịch hẹn (phân trang + lọc)
 // @Tags         Appointments
@@ -61,6 +93,7 @@ func (h *AppointmentHandler) CreateAppointment(c *gin.Context) {
 // @Param        status    query     string  false  "Lọc trạng thái (pending|confirmed|...)"
 // @Param        from      query     string  false  "Từ thời điểm (ISO8601, lọc start_time)"
 // @Param        to        query     string  false  "Đến thời điểm (ISO8601, lọc start_time)"
+// @Param        search    query     string  false  "Tìm theo mã lịch, tên/SĐT khách, tên nhân viên"
 // @Success      200       {object}  response.SuccessResponse  "Danh sách lịch hẹn kèm phân trang"
 // @Failure      400       {object}  response.ErrorResponse    "Bộ lọc không hợp lệ"
 // @Failure      401       {object}  response.ErrorResponse    "Thiếu token / token không hợp lệ"
@@ -71,7 +104,7 @@ func (h *AppointmentHandler) GetAppointments(c *gin.Context) {
 
 	result, err := h.uc.GetAppointments(
 		c.Request.Context(), page, pageSize,
-		c.Query("status"), c.Query("from"), c.Query("to"),
+		c.Query("status"), c.Query("from"), c.Query("to"), c.Query("search"),
 	)
 	if err != nil {
 		response.Error(c, err)
@@ -79,6 +112,27 @@ func (h *AppointmentHandler) GetAppointments(c *gin.Context) {
 		return
 	}
 	response.Success(c, 200, "Danh sách lịch hẹn", result)
+}
+
+// GetWeeklySchedule godoc
+// @Summary      Lấy lịch hẹn theo tuần (tách danh sách theo từng ngày)
+// @Tags         Appointments
+// @Produce      json
+// @Security     BearerAuth
+// @Param        week_start query     string  false  "Ngày bất kỳ trong tuần (YYYY-MM-DD hoặc ISO8601, mặc định tuần hiện tại)"
+// @Success      200        {object}  response.SuccessResponse  "Lịch tuần gồm 7 ngày và danh sách lịch hẹn mỗi ngày"
+// @Failure      400        {object}  response.ErrorResponse    "week_start không hợp lệ / thiếu organization"
+// @Failure      401        {object}  response.ErrorResponse    "Thiếu token / token không hợp lệ"
+// @Failure      500        {object}  response.ErrorResponse    "Lỗi server"
+// @Router       /appointments/weekly [get]
+func (h *AppointmentHandler) GetWeeklySchedule(c *gin.Context) {
+	result, err := h.uc.GetWeeklySchedule(c.Request.Context(), c.Query("week_start"))
+	if err != nil {
+		response.Error(c, err)
+		c.Abort()
+		return
+	}
+	response.Success(c, 200, "Lịch hẹn theo tuần", result)
 }
 
 // GetAppointmentDetail godoc

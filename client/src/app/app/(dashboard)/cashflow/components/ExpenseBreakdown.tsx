@@ -1,14 +1,11 @@
 'use client';
 
-import * as React from 'react';
-import { BadgeCheck, Settings } from 'lucide-react';
+import { BadgeCheck } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
-import TextButton from '@/components/dashboard/TextButton';
 import { Progress, ProgressIndicator, ProgressTrack } from '@/components/ui/progress';
 import useCategoryExpenseStats from '@/hooks/use-category-expense-stats';
 import { formatVND } from '@/lib/format';
 import { cn } from 'cn';
-import CategorySettingsDialog from './CategorySettingsDialog';
 
 const PROGRESS_COLORS = [
   'bg-primary',
@@ -27,7 +24,6 @@ function formatMonth(value?: string): string {
 
 export default function ExpenseBreakdown() {
   const searchParams = useSearchParams();
-  const [settingsOpen, setSettingsOpen] = React.useState(false);
   const dateFrom = searchParams.get('date_from') || undefined;
   const dateTo = searchParams.get('date_to') || undefined;
   const { data: categories = [], isLoading } = useCategoryExpenseStats({ dateFrom, dateTo });
@@ -41,21 +37,11 @@ export default function ExpenseBreakdown() {
   const totalExpense = slices.reduce((sum, category) => sum + category.total_expense, 0);
 
   return (
-    <>
-      <div className="flex flex-col justify-between rounded-xl border border-outline bg-surface p-6 shadow-sm">
+    <div className="flex flex-col justify-between rounded-xl border border-outline bg-surface p-6 shadow-sm">
         <div>
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <h2 className="text-sm font-semibold text-on-surface">
-              Tỷ trọng Chi phí {formatMonth(dateFrom)}
-            </h2>
-            <TextButton
-              icon={Settings}
-              onClick={() => setSettingsOpen(true)}
-              aria-haspopup="dialog"
-            >
-              Cài đặt danh mục
-            </TextButton>
-          </div>
+          <h2 className="mb-2 text-sm font-semibold text-on-surface">
+            Tỷ trọng Chi phí {formatMonth(dateFrom)}
+          </h2>
           <p className="mb-4 text-xs text-on-surface-variant">
             Phân bổ chi phí vận hành theo danh mục từ dữ liệu thực tế
           </p>
@@ -111,14 +97,6 @@ export default function ExpenseBreakdown() {
             Tổng chi phí vận hành trong kỳ: {formatVND(totalExpense)}
           </p>
         </div>
-      </div>
-
-      <CategorySettingsDialog
-        open={settingsOpen}
-        onOpenChange={setSettingsOpen}
-        dateFrom={dateFrom}
-        dateTo={dateTo}
-      />
-    </>
+    </div>
   );
 }

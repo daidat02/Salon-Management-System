@@ -11,7 +11,9 @@ func RegisterAppointmentRoutes(r *gin.Engine, h *AppointmentHandler, basePath st
 	{
 		group.POST("", h.CreateAppointment)
 		group.GET("", h.GetAppointments)
+		group.GET("/weekly", h.GetWeeklySchedule)
 		group.GET("/:id", h.GetAppointmentDetail)
+		group.PUT("/:id", h.UpdateAppointment)
 		group.PUT("/:id/reschedule", h.RescheduleAppointment)
 		group.POST("/:id/cancel", h.CancelAppointment)
 		group.PATCH("/:id/status", h.UpdateAppointmentStatus)

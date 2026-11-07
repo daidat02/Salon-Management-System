@@ -10,6 +10,7 @@ func RegisterServiceRoutes(r *gin.Engine, h *ServiceHandler, basePath string) {
 	group.Use(middlewares.VerifyToken())
 	{
 		group.GET("", h.GetServicesByOrgID)
+		group.GET("/stats", h.GetServiceStats)
 		group.GET("/:id/details", h.GetServiceDetails)
 		group.POST("", h.CreateService)
 		group.PUT("/:id", h.UpdateService)

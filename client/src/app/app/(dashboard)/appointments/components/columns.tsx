@@ -3,9 +3,6 @@ import type { DashColumn } from "@/components/dashboard/DashTable"
 import type { Appointment, AppointmentStatus } from "@/types/appointment"
 import { formatShortDateTime as formatTime } from '@/lib/format';
 
-export type CustomerLookup = (id: string) => { name: string; phone: string } | undefined
-export type StaffLookup = (id: string) => string | undefined
-
 type StatusVariant = "warning" | "blue" | "teal" | "primary" | "success" | "gray" | "error" | "slate"
 
 const STATUS_META: Record<AppointmentStatus, { variant: Exclude<StatusVariant, "slate">; label: string }> = {
@@ -30,10 +27,7 @@ function durationMinutes(start: string, end: string): string {
   return `${Math.round(diff / 60000)}p`
 }
 
-export function buildAppointmentColumns(
-  findCustomer: CustomerLookup,
-  findStaff: StaffLookup,
-): DashColumn<Appointment>[] {
+export function buildAppointmentColumns(): DashColumn<Appointment>[] {
   return [
     {
       id: "time",
@@ -52,15 +46,14 @@ export function buildAppointmentColumns(
       id: "customer",
       header: "Khách hàng",
       className: "min-w-[180px]",
-      cell: (row) => {
-        const c = row.customer_id ? findCustomer(row.customer_id) : undefined
-        return (
-          <div>
-            <div className="font-semibold text-on-surface">{c?.name ?? "Khách lẻ"}</div>
-            {c && <div className="text-[11px] text-on-surface-variant">{c.phone}</div>}
-          </div>
-        )
-      },
+      cell: (row) => (
+        <div>
+          <div className="font-semibold text-on-surface">{row.customer_name || "Khách lẻ"}</div>
+          {row.customer_phone && (
+            <div className="text-[11px] text-on-surface-variant">{row.customer_phone}</div>
+          )}
+        </div>
+      ),
     },
     {
       id: "info",
@@ -78,7 +71,7 @@ export function buildAppointmentColumns(
     {
       id: "staff",
       header: "Nhân viên",
-      cell: (row) => findStaff(row.staff_id) ?? "—",
+      cell: (row) => row.staff_name || "—",
     },
     {
       id: "total",

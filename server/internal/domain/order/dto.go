@@ -38,6 +38,7 @@ type OrderItemInput struct {
 	Unit      *string             `json:"unit"`
 	Materials []ItemMaterialInput `json:"materials"`
 }
+
 type CreateOrderRequest struct {
 	CustomerID     *string          `json:"customer_id"`
 	AppointmentID  *string          `json:"appointment_id"`
@@ -64,6 +65,7 @@ type CreatePaymentRequest struct {
 	Provider      *string `json:"provider"`
 	ProviderTxnID *string `json:"provider_txn_id"`
 	Amount        float64 `json:"amount"`
+	MethodPaymentID *string `json:"method_payment_id"`
 }
 
 // UpdateOrderCustomerRequest gán khách cho đơn đã tạo.
@@ -182,6 +184,14 @@ type OrderStatsResponse struct {
 	CancelRefundMonth int64   `json:"cancel_refund_month" db:"cancel_refund_month"`
 	CancelRefundRate  float64 `json:"cancel_refund_rate"`
 	MonthTotal        int64   `json:"month_total" db:"month_total"`
+}
+
+// StaffCommissionStats thống kê hoa hồng dịch vụ của 1 nhân viên trong khoảng ngày.
+type StaffCommissionStats struct {
+	TotalOrders     int64   `json:"total_orders" db:"total_orders"`
+	TotalItems      int64   `json:"total_items" db:"total_items"`
+	TotalCommission float64 `json:"total_commission" db:"total_commission"`
+	TotalAmount     float64 `json:"total_amount" db:"total_amount_value"`
 }
 
 // OrderCompleteResponse kết quả chốt đơn kèm phiếu bán hàng vừa sinh.

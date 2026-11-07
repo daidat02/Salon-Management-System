@@ -54,6 +54,14 @@ func (m *MockInventoryRepository) CountLowStockProducts(ctx context.Context, org
 	return args.Get(0).(int64), args.Error(1)
 }
 
+func (m *MockInventoryRepository) GetInventoryStats(ctx context.Context, orgID string) (*domain.InventoryStatsResponse, error) {
+	args := m.Called(ctx, orgID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*domain.InventoryStatsResponse), args.Error(1)
+}
+
 func (m *MockInventoryRepository) GetDocumentsByOrgID(ctx context.Context, orgID, search string, sort string, filter string, limit, offset int) ([]*domain.DocumentResponse, error) {
 	args := m.Called(ctx, orgID, search, sort, filter, limit, offset)
 	if args.Get(0) == nil {
@@ -66,6 +74,7 @@ func (m *MockInventoryRepository) CountDocumentsByOrgID(ctx context.Context, org
 	args := m.Called(ctx, orgID)
 	return args.Get(0).(int64), args.Error(1)
 }
+
 // MockInventoryProducts giả lập ProductStore (đúng chủ bảng products).
 type MockInventoryProducts struct {
 	mock.Mock
@@ -103,7 +112,7 @@ func (m *MockInventoryRepository) GetDocumentByID(ctx context.Context, orgID str
 	return args.Get(0).(*domain.DocumentDetailResponse), args.Error(1)
 }
 
-func (m *MockInventoryRepository) GetInventoryTransactionsByProdID(ctx context.Context, orgID string, productID string,limit int,  offset int , sort string, inventory_type string , date string) ([]*domain.InventoryTransactionResponse, error) {
+func (m *MockInventoryRepository) GetInventoryTransactionsByProdID(ctx context.Context, orgID string, productID string, limit int, offset int, sort string, inventory_type string, date string) ([]*domain.InventoryTransactionResponse, error) {
 	args := m.Called(ctx, orgID, productID, limit, offset, sort, inventory_type, date)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)

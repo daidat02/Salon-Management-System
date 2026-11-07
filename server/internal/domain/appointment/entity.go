@@ -2,50 +2,51 @@ package appointment
 
 import "errors"
 
-const(
-	statusPending = "pending"
-	statusConfirmed = "confirmed"
-	statusCheckedIn = "checked_in"
+const (
+	statusPending    = "pending"
+	statusConfirmed  = "confirmed"
+	statusCheckedIn  = "checked_in"
 	statusInProgress = "in_progress"
-	statusCompleted = "completed"
-	statusCancelled = "cancelled"
-	statusNoShow = "no_show"
+	statusCompleted  = "completed"
+	statusCancelled  = "cancelled"
+	statusNoShow     = "no_show"
 )
 
 type Appointment struct {
-	ID			 string `json:"id"`
-	OrganizationID string `json:"organization_id"`
-	Code		   string `json:"code"`
-	CustomerID     string `json:"customer_id"`
-	StaffID        string `json:"staff_id"`
-	StartTime      string `json:"start_time"`
-	EndTime        string `json:"end_time"`
-	Status         string `json:"status"`
-	Source         string `json:"source"`
-	TotalAmount    float64 `json:"total_amount"`
-	Note           string `json:"note"`
-	CancelReason   string `json:"cancel_reason"`
-	DeviceID       string `json:"device_id"`
-	ClientIP       string `json:"client_ip"`
+	ID                    string  `json:"id"`
+	OrganizationID        string  `json:"organization_id"`
+	Code                  string  `json:"code"`
+	CustomerID            string  `json:"customer_id"`
+	StaffID               string  `json:"staff_id"`
+	StartTime             string  `json:"start_time"`
+	EndTime               string  `json:"end_time"`
+	Status                string  `json:"status"`
+	Source                string  `json:"source"`
+	TotalAmount           float64 `json:"total_amount"`
+	Note                  string  `json:"note"`
+	CancelReason          string  `json:"cancel_reason"`
+	DeviceID              string  `json:"device_id"`
+	ClientIP              string  `json:"client_ip"`
 	RequiredDepositAmount float64 `json:"required_deposit_amount"`
-	DepositStatus string `json:"deposit_status"`
-	CreatedAt      *string `json:"created_at"`
-	UpdatedAt      *string `json:"updated_at"`
+	DepositStatus         string  `json:"deposit_status"`
+	CreatedAt             *string `json:"created_at"`
+	UpdatedAt             *string `json:"updated_at"`
 }
 
 type AppointmentItem struct {
-	ID 		  string  `json:"id"`
+	ID             string  `json:"id"`
 	OrganizationID string  `json:"organization_id"`
 	AppointmentID  string  `json:"appointment_id"`
-	ItemType      string  `json:"item_type"`
-	ServiceID     *string `json:"service_id,omitempty"`
-	ProductID     *string `json:"product_id,omitempty"`
-	Quantity      float64 `json:"quantity"`
-	UnitPrice     float64 `json:"unit_price"`
-	TotalPrice    float64 `json:"total_price"`
-	LineTotal     float64 `json:"line_total"`
+	ItemType       string  `json:"item_type"`
+	ServiceID      *string `json:"service_id,omitempty"`
+	ProductID      *string `json:"product_id,omitempty"`
+	ServiceName    *string `json:"service_name,omitempty"`
+	ProductName    *string `json:"product_name,omitempty"`
+	Quantity       float64 `json:"quantity"`
+	UnitPrice      float64 `json:"unit_price"`
+	TotalPrice     float64 `json:"total_price"`
+	LineTotal      float64 `json:"line_total"`
 }
-
 
 func (a *Appointment) Validate() error {
 	if a.Status != statusPending && a.Status != statusConfirmed && a.Status != statusCheckedIn && a.Status != statusInProgress && a.Status != statusCompleted && a.Status != statusCancelled && a.Status != statusNoShow {
@@ -55,7 +56,7 @@ func (a *Appointment) Validate() error {
 }
 
 func (ai *AppointmentItem) Validate() error {
-	
+
 	if ai.ItemType != "service" && ai.ItemType != "product" {
 		return errors.New("Loại mục cuộc hẹn không hợp lệ")
 	}
@@ -70,8 +71,10 @@ func (ai *AppointmentItem) Validate() error {
 
 // AllowedTransitions định nghĩa state machine vòng đời lịch hẹn.
 var AllowedTransitions = map[string][]string{
-	statusPending:    {statusConfirmed, statusCancelled, statusNoShow},
-	statusConfirmed:  {statusCheckedIn, statusCancelled, statusNoShow},
+	// Tạo đơn tại POS được phép đưa thẳng lịch sang in_progress (kể cả khi
+	// chưa check-in) vì khách đã bắt đầu dùng dịch vụ.
+	statusPending:    {statusConfirmed, statusInProgress, statusCancelled, statusNoShow},
+	statusConfirmed:  {statusCheckedIn, statusInProgress, statusCancelled, statusNoShow},
 	statusCheckedIn:  {statusInProgress, statusNoShow},
 	statusInProgress: {statusCompleted},
 	statusCompleted:  {},

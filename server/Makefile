@@ -31,3 +31,6 @@ migrate-down:
 # 	ví dụ: make migrate-create name=name_table
 migrate-create:
 	migrate create -ext sql -dir migrations -seq $(name)
+
+swagger:
+	swag init -g cmd/main.go --parseDependency --parseInternal -o ./docs

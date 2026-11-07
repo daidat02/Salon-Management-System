@@ -198,7 +198,7 @@ func TestUserUsecase_RegisterUser(t *testing.T) {
 					Return(tt.findUser, tt.findErr)
 			}
 			if tt.expectCreate {
-				mockRepo.On("CreateUser", mock.Anything, mock.Anything).Return(tt.createErr)
+				mockRepo.On("CreateUser", mock.Anything, mock.Anything, mock.Anything).Return(tt.createErr)
 			}
 
 			uc := NewCreateUserUsecase(mockRepo)
@@ -228,10 +228,10 @@ func TestUserUsecase_RegisterUser(t *testing.T) {
 				mockRepo.AssertExpectations(t)
 			} else {
 				mockRepo.AssertNotCalled(t, "FindUserByPhoneNumber", mock.Anything, mock.Anything)
-				mockRepo.AssertNotCalled(t, "CreateUser", mock.Anything, mock.Anything)
+				mockRepo.AssertNotCalled(t, "CreateUser", mock.Anything, mock.Anything, mock.Anything)
 			}
 			if !tt.expectCreate {
-				mockRepo.AssertNotCalled(t, "CreateUser", mock.Anything, mock.Anything)
+				mockRepo.AssertNotCalled(t, "CreateUser", mock.Anything, mock.Anything, mock.Anything)
 			}
 		})
 	}

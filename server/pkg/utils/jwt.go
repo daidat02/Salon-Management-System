@@ -11,6 +11,7 @@ import (
 type CustomClaims struct {
 	OrgID string `json:"org_id,omitempty"`
 	UserID string `json:"user_id"`
+	Role string `json:"role"`
 	jwt.RegisteredClaims
 }
 
@@ -24,7 +25,7 @@ func InitJWT(secret string, accessExpire, refreshExpire time.Duration) {
 	refreshTokenExpire = refreshExpire
 }
 
-func GenerateToken(userID, orgID string) (string, error) {
+func GenerateToken(userID, orgID string, role string) (string, error) {
 
 
 	regClaims := jwt.RegisteredClaims{
@@ -35,6 +36,7 @@ func GenerateToken(userID, orgID string) (string, error) {
 	claims := CustomClaims{
 		OrgID:			  orgID,
 		UserID:           userID,
+		Role:             role,
 		RegisteredClaims: regClaims,
 	}
 
@@ -42,7 +44,7 @@ func GenerateToken(userID, orgID string) (string, error) {
 	return token.SignedString(jwtSecret)
 }
 
-func GenerateRefreshToken(userID string, orgID string) (string, error) {
+func GenerateRefreshToken(userID string, orgID string, role string) (string, error) {
 
 
 	regClaims := jwt.RegisteredClaims{
@@ -53,6 +55,7 @@ func GenerateRefreshToken(userID string, orgID string) (string, error) {
 	claims := CustomClaims{
 		OrgID:			  orgID,
 		UserID:           userID,
+		Role:             role,
 		RegisteredClaims: regClaims,
 	}
 

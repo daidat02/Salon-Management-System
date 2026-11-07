@@ -25,7 +25,7 @@ export const productColumns: DashColumn<Product>[] = [
     id: 'category',
     header: 'Danh mục',
     className: 'min-w-[120px] ',
-    cell: (row) => 'Chưa phân loại',
+    cell: (row) => row.category_name || 'Chưa phân loại',
   },
   {
     id: 'product_type',
@@ -59,10 +59,13 @@ export const productColumns: DashColumn<Product>[] = [
       row.sell_price == 0 ? 'Chưa nhập' : row.sell_price.toLocaleString('vi-VN') + ' đ', // Format tiền tệ VNĐ cho đẹp
   },
   {
-    id: 'revenue_mounth',
+    id: 'revenue_month',
     header: 'Doanh thu tháng',
-    className: 'text-center',
-    cell: (row) => 'Chưa Thống Kê',
+    className: 'text-center font-medium',
+    cell: (row) =>
+      row.revenue_this_month
+        ? row.revenue_this_month.toLocaleString('vi-VN') + ' đ'
+        : '0 đ',
   },
   {
     id: 'stock_quantity',

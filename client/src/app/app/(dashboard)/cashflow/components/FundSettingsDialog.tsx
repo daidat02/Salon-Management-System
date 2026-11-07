@@ -233,7 +233,7 @@ function FundFormCard({
 
       <div className="mt-3 space-y-2">
         <div>
-          <Label className="text-on-surface mb-1 block text-[11px] font-semibold">Mã quỹ</Label>
+          <Label className="mb-1.5 block min-w-0 text-xs font-semibold text-on-surface">Mã quỹ</Label>
           <DashInput
             value={draft.code}
             onChange={(event) => onChange('code', event.target.value.toUpperCase())}
@@ -245,7 +245,7 @@ function FundFormCard({
         </div>
 
         <div>
-          <Label className="text-on-surface mb-1 block text-[11px] font-semibold">Tên quỹ</Label>
+          <Label className="mb-1.5 block min-w-0 text-xs font-semibold text-on-surface">Tên quỹ</Label>
           <DashInput
             value={draft.name}
             onChange={(event) => onChange('name', event.target.value)}
@@ -256,7 +256,7 @@ function FundFormCard({
         </div>
 
         <div>
-          <Label className="text-on-surface mb-1 block text-[11px] font-semibold">
+          <Label className="mb-1.5 block min-w-0 text-xs font-semibold text-on-surface">
             Loại quỹ
           </Label>
           {isEditing ? (
@@ -278,7 +278,7 @@ function FundFormCard({
         {draft.fund_type !== 'cash' && (
           <>
             <div>
-              <Label className="text-on-surface mb-1 block text-[11px] font-semibold">
+              <Label className="mb-1.5 block min-w-0 text-xs font-semibold text-on-surface">
                 {draft.fund_type === 'bank' ? 'Ngân hàng' : 'Tên ví điện tử'}
               </Label>
               <DashInput
@@ -290,7 +290,7 @@ function FundFormCard({
             </div>
 
             <div>
-              <Label className="text-on-surface mb-1 block text-[11px] font-semibold">
+              <Label className="mb-1.5 block min-w-0 text-xs font-semibold text-on-surface">
                 {draft.fund_type === 'bank' ? 'Số tài khoản' : 'Số ví'}
               </Label>
               <DashInput
@@ -304,7 +304,7 @@ function FundFormCard({
         )}
 
         <div>
-          <Label className="text-on-surface mb-1 block text-[11px] font-semibold">
+          <Label className="mb-1.5 block min-w-0 text-xs font-semibold text-on-surface">
             Số dư đầu kỳ
           </Label>
           <DashInput

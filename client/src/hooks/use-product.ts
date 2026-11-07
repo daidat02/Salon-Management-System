@@ -5,13 +5,21 @@ type UseProductParams = {
   pageSize: number;
   search?: string;
   status?: string;
+  categoryId?: string;
   sort?: string;
 };
 
-export default function useProduct({ page, pageSize, search, status, sort }: UseProductParams) {
+export default function useProduct({
+  page,
+  pageSize,
+  search,
+  status,
+  categoryId,
+  sort,
+}: UseProductParams) {
   return useQuery({
-    queryKey: ['products', { page, pageSize, search, status, sort }],
-    queryFn: async () => getProductsByOrgID({ page, pageSize, search, status, sort }),
+    queryKey: ['products', { page, pageSize, search, status, categoryId, sort }],
+    queryFn: async () => getProductsByOrgID({ page, pageSize, search, status, categoryId, sort }),
     placeholderData: keepPreviousData,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });

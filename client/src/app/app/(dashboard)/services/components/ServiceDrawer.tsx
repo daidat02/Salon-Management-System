@@ -6,24 +6,8 @@ import { Button } from '@/components/ui/button';
 import { DashDrawer } from '@/components/dashboard/DashDrawer';
 import type { Service } from '@/types/service';
 import { formatVND } from '@/lib/format';
-
-// Mock data cho drawer chi tiết dịch vụ — bám cấu trúc ProductDrawer.
-// Chưa kết nối API (riêng định mức vật tư đã có API GET /services/:id/details, đấu sau).
-
-const mockRevenue = [
-  { month: 'T5', value: 55 },
-  { month: 'T6', value: 68 },
-  { month: 'T7', value: 49 },
-  { month: 'T8', value: 74 },
-  { month: 'T9', value: 62 },
-  { month: 'T10', value: 81, active: true },
-];
-
-const mockMaterials = [
-  { id: 'm-01', name: 'Thuốc nhuộm đen', qty: '1 tuýp', cost: '120.000 đ' },
-  { id: 'm-02', name: 'Oxy trợ nhuộm 9% 1000ml', qty: '0,2 can', cost: '22.000 đ' },
-  { id: 'm-03', name: 'Găng tay nilon (100 cái)', qty: '2 đôi', cost: '1.000 đ' },
-];
+import useServiceDetail from '@/hooks/use-service-detail';
+import { ServiceFormDialog } from './ServiceFormDialog';
 
 function formatDuration(min: number): string {
   if (min >= 60) {
@@ -34,23 +18,51 @@ function formatDuration(min: number): string {
   return `${min} phút`;
 }
 
+/** Số tiền gọn cho thẻ nhỏ: tỷ / triệu / nghìn. */
+function formatCompactVND(value: number): string {
+  if (value >= 1_000_000_000) {
+    return `${(value / 1_000_000_000).toLocaleString('vi-VN', { maximumFractionDigits: 1 })} tỷ`;
+  }
+  if (value >= 1_000_000) {
+    return `${(value / 1_000_000).toLocaleString('vi-VN', { maximumFractionDigits: 1 })} tr`;
+  }
+  if (value >= 1_000) {
+    return `${(value / 1_000).toLocaleString('vi-VN', { maximumFractionDigits: 0 })}k`;
+  }
+  return formatVND(value);
+}
+
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Dịch vụ đã chọn (header + giá/thời lượng lấy thật, còn lại mock). */
+  /** Dịch vụ đã chọn (header lấy ngay từ row, phần còn lại fetch detail). */
   service: Service | null;
 };
 
 export function ServiceDrawer({ open, onOpenChange, service }: Props) {
+  const { data, isLoading } = useServiceDetail(service?.id, open);
+  const [editOpen, setEditOpen] = React.useState(false);
+
+  const detail = data?.service;
+  const view = detail ?? service;
+  const materials = data?.materials ?? [];
+  const loading = isLoading && !data;
+  const val = (value: number) => (loading ? '—' : String(value));
+
+  const months = detail?.revenue_last_6_months ?? [];
+  const maxRevenue = Math.max(1, ...months.map((m) => m.revenue));
+  const avgRevenue = months.length > 0 ? months.reduce((s, m) => s + m.revenue, 0) / 6 : 0;
+
   return (
+    <>
     <DashDrawer
       open={open}
       onOpenChange={onOpenChange}
       title="Chi tiết dịch vụ"
-      subtitle={service ? `Mã: ${service.id.slice(0, 8).toUpperCase()}` : undefined}
+      subtitle={view ? `Mã: ${view.id.slice(0, 8).toUpperCase()}` : undefined}
       badge={
-        service &&
-        (service.is_active ? (
+        view &&
+        (view.is_active ? (
           <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
             Đang bán
           </span>
@@ -69,7 +81,13 @@ export function ServiceDrawer({ open, onOpenChange, service }: Props) {
           >
             Đóng
           </Button>
-          <Button className="bg-primary hover:bg-[#436b95] text-on-primary">Chỉnh sửa</Button>
+          <Button
+            className="bg-primary hover:bg-[#436b95] text-on-primary"
+            onClick={() => setEditOpen(true)}
+            disabled={!view}
+          >
+            Chỉnh sửa
+          </Button>
         </>
       }
       widthClass="!max-w-[640px] !w-[540px]"
@@ -81,24 +99,23 @@ export function ServiceDrawer({ open, onOpenChange, service }: Props) {
         </span>
         <div className="flex-1 min-w-0">
           <h4 className="text-base font-bold text-slate-900 truncate">
-            {service?.name ?? 'Dịch vụ'}
+            {view?.name ?? 'Dịch vụ'}
           </h4>
           <p className="mt-0.5 text-xs text-on-surface-variant line-clamp-2">
-            {service?.description || '—'}
+            {view?.description || '—'}
           </p>
           <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-on-surface-variant">
             <p className="flex items-center gap-1.5">
               <Banknote className="h-3.5 w-3.5 text-slate-500" />
-              Giá:{' '}
-              <span className="font-semibold text-primary">{formatVND(service?.price ?? 0)}</span>
+              Giá: <span className="font-semibold text-primary">{formatVND(view?.price ?? 0)}</span>
             </p>
             <p className="flex items-center gap-1.5">
               <Clock3 className="h-3.5 w-3.5 text-slate-500" />
               <span className="font-medium text-slate-800">
-                {formatDuration(service?.duration_minutes ?? 0)}
+                {formatDuration(view?.duration_minutes ?? 0)}
               </span>
-              {service?.buffer_minutes ? (
-                <span className="text-on-surface-variant">(+{service.buffer_minutes}p đệm)</span>
+              {view?.buffer_minutes ? (
+                <span className="text-on-surface-variant">(+{view.buffer_minutes}p đệm)</span>
               ) : null}
             </p>
           </div>
@@ -108,23 +125,29 @@ export function ServiceDrawer({ open, onOpenChange, service }: Props) {
       {/* Stats Matrix */}
       <div className="grid grid-cols-4 gap-2 text-center">
         <div className="p-2.5 rounded-lg bg-surface border border-outline">
-          <p className="text-[10px] text-on-surface-variant uppercase font-medium">Lượt đặt T10</p>
+          <p className="text-[10px] text-on-surface-variant uppercase font-medium">Lượt đặt tháng này</p>
           <p className="mt-0.5 flex items-center justify-center gap-1 text-base font-bold text-primary">
             <Users className="h-3.5 w-3.5" />
-            36
+            {val(detail?.bookings_this_month ?? 0)}
           </p>
         </div>
         <div className="p-2.5 rounded-lg bg-surface border border-outline">
           <p className="text-[10px] text-on-surface-variant uppercase font-medium">Hoàn thành</p>
-          <p className="text-base font-bold text-slate-900 mt-0.5">31</p>
+          <p className="text-base font-bold text-slate-900 mt-0.5">
+            {val(detail?.completed_this_month ?? 0)}
+          </p>
         </div>
         <div className="p-2.5 rounded-lg bg-surface border border-outline">
           <p className="text-[10px] text-on-surface-variant uppercase font-medium">Doanh thu</p>
-          <p className="text-xs font-bold text-slate-900 mt-1">12.4M</p>
+          <p className="text-xs font-bold text-slate-900 mt-1">
+            {loading ? '—' : formatCompactVND(detail?.revenue_this_month ?? 0)}
+          </p>
         </div>
         <div className="p-2.5 rounded-lg bg-surface border border-outline">
           <p className="text-[10px] text-on-surface-variant uppercase font-medium">Chi phí VT</p>
-          <p className="text-xs font-bold text-emerald-600 mt-1">1.1M</p>
+          <p className="text-xs font-bold text-emerald-600 mt-1">
+            {loading ? '—' : formatCompactVND(detail?.material_cost_this_month ?? 0)}
+          </p>
         </div>
       </div>
 
@@ -135,25 +158,34 @@ export function ServiceDrawer({ open, onOpenChange, service }: Props) {
             <TrendingUp className="h-3.5 w-3.5 text-primary" />
             Doanh thu 6 tháng gần nhất
           </span>
-          <span className="text-[11px] text-primary font-medium">Trung bình: 8.3M/tháng</span>
+          <span className="text-[11px] text-primary font-medium">
+            {loading ? 'Trung bình: …' : `Trung bình: ${formatCompactVND(avgRevenue)}/tháng`}
+          </span>
         </div>
         <div className="h-20 flex items-end justify-between gap-3 pt-2">
-          {mockRevenue.map((m, i) => {
-            const active = i === mockRevenue.length - 1;
-            return (
-              <div key={m.month} className="flex-1 flex flex-col items-center gap-1">
-                <div
-                  style={{ height: Math.max(6, Math.round((m.value / 81) * 64)) }}
-                  className={`w-full rounded-t ${active ? 'bg-primary shadow-xs' : 'bg-primary-container'}`}
-                />
-                <span
-                  className={`text-[10px] ${active ? 'font-bold text-primary' : 'text-on-surface-variant'}`}
-                >
-                  {m.month}
-                </span>
-              </div>
-            );
-          })}
+          {months.length === 0 ? (
+            <p className="w-full text-center text-[11px] text-on-surface-variant py-6">
+              {loading ? 'Đang tải…' : 'Chưa có dữ liệu doanh thu'}
+            </p>
+          ) : (
+            months.map((m, i) => {
+              const active = i === months.length - 1;
+              return (
+                <div key={`${m.month}-${i}`} className="flex-1 flex flex-col items-center gap-1">
+                  <div
+                    style={{ height: Math.max(6, Math.round((m.revenue / maxRevenue) * 64)) }}
+                    className={`w-full rounded-t ${active ? 'bg-primary shadow-xs' : 'bg-primary-container'}`}
+                    title={formatVND(m.revenue)}
+                  />
+                  <span
+                    className={`text-[10px] ${active ? 'font-bold text-primary' : 'text-on-surface-variant'}`}
+                  >
+                    {m.month}
+                  </span>
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
 
@@ -172,21 +204,35 @@ export function ServiceDrawer({ open, onOpenChange, service }: Props) {
               </tr>
             </thead>
             <tbody className="divide-y divide-outline">
-              {mockMaterials.map((m) => (
-                <tr key={m.id}>
-                  <td className="py-2 px-3 font-medium text-slate-700">{m.name}</td>
-                  <td className="py-2 px-3 text-right font-mono text-on-surface-variant">{m.qty}</td>
-                  <td className="py-2 px-3 text-right font-bold text-slate-900">{m.cost}</td>
+              {materials.length === 0 ? (
+                <tr>
+                  <td colSpan={3} className="py-4 px-3 text-center text-on-surface-variant">
+                    {loading ? 'Đang tải…' : 'Chưa có định mức vật tư'}
+                  </td>
                 </tr>
-              ))}
+              ) : (
+                materials.map((m) => (
+                  <tr key={m.id}>
+                    <td className="py-2 px-3 font-medium text-slate-700">{m.product_name}</td>
+                    <td className="py-2 px-3 text-right font-mono text-on-surface-variant">
+                      {`${Number(m.quantity).toLocaleString('vi-VN')} ${m.unit || m.product_unit || ''}`.trim()}
+                    </td>
+                    <td className="py-2 px-3 text-right font-bold text-slate-900">
+                      {formatVND(Number(m.quantity) * Number(m.cost_price))}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
-        <p className="text-[11px] text-on-surface-variant">
-          Đã có API <span className="font-mono">GET /services/:id/details</span> — đấu sau để hiện
-          định mức thật.
-        </p>
       </div>
     </DashDrawer>
+    <ServiceFormDialog
+      open={editOpen}
+      onOpenChange={setEditOpen}
+      service={view}
+    />
+    </>
   );
 }

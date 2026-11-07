@@ -28,7 +28,7 @@ const KIND_LABEL: Record<'service' | 'retail', { percent: string; profit: string
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
-    <label className="mb-1 block text-[11px] font-medium text-on-surface-variant">{children}</label>
+    <label className="mb-1.5 block min-w-0 text-xs font-semibold text-on-surface">{children}</label>
   );
 }
 

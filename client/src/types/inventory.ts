@@ -50,6 +50,16 @@ export interface InventoryDocumentItem {
   display_unit_price?: number;
 }
 
+export interface InventoryStats {
+  total_skus: number;
+  retail_skus: number;
+  material_skus: number;
+  low_stock_skus: number;
+  inventory_value: number;
+  import_cost_month: number;
+  import_documents_month: number;
+}
+
 export interface InventoryDocumentDetail {
   document: InventoryDocument;
   items: InventoryDocumentItem[];

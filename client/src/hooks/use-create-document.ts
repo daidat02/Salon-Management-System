@@ -9,6 +9,8 @@ export function useCreateDocument() {
       queryClient.invalidateQueries({ queryKey: ['inventory-documents'] });
       queryClient.invalidateQueries({ queryKey: ['inventory-transactions'] });
       queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['product-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory-stats'] });
     },
   });
 }

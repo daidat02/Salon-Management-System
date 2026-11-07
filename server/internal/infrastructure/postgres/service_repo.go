@@ -24,15 +24,15 @@ func NewPostgresServiceRepository(db *pgxpool.Pool) *PostgresServiceRepository {
 		db: db,
 	}
 }
- 
-func (r *PostgresServiceRepository) bulkUpsertServiceMaterials(ctx context.Context,tx pgx.Tx, orgID,serviceID string, materials []*domain.ServiceMaterialInput) error {
+
+func (r *PostgresServiceRepository) bulkUpsertServiceMaterials(ctx context.Context, tx pgx.Tx, orgID, serviceID string, materials []*domain.ServiceMaterialInput) error {
 	if len(materials) == 0 {
 		return nil
 	}
 	query := bulkInsertServiceMaterialsQuery
 	var args []interface{}
-		var placeholders []string
-	for _, m:= range materials{
+	var placeholders []string
+	for _, m := range materials {
 		ID := utils.NewID()
 		placeholders = append(placeholders, fmt.Sprintf("($%d, $%d, $%d, $%d, $%d, $%d)", len(args)+1, len(args)+2, len(args)+3, len(args)+4, len(args)+5, len(args)+6))
 		args = append(args, ID, orgID, serviceID, m.ProductID, m.Quantity, unitOrDefault(m.Unit))
@@ -79,7 +79,7 @@ func (r *PostgresServiceRepository) CreateService(ctx context.Context, service *
 		return fmt.Errorf("lỗi khi tạo dịch vụ: %w", err)
 	}
 
-	if(len(materials) > 0){
+	if len(materials) > 0 {
 		err = r.bulkUpsertServiceMaterials(ctx, tx, service.OrganizationID, service.ID, materials)
 		if err != nil {
 			return fmt.Errorf("lỗi khi thêm nguyên vật liệu cho dịch vụ: %w", err)
@@ -99,12 +99,15 @@ func scanServiceRow(scan func(dest ...any) error) (*domain.Service, error) {
 		&s.ID,
 		&s.OrganizationID,
 		&s.CategoryID,
+		&s.CategoryName,
 		&s.Name,
 		&description,
 		&s.DurationMinutes,
 		&s.BufferMinutes,
 		&s.Price,
 		&s.IsActive,
+		&s.SoldThisMonth,
+		&s.RevenueThisMonth,
 		&s.CreatedAt,
 		&s.UpdatedAt,
 	); err != nil {
@@ -117,8 +120,8 @@ func scanServiceRow(scan func(dest ...any) error) (*domain.Service, error) {
 	return &s, nil
 }
 
-func (r *PostgresServiceRepository) GetServicesByOrgID(ctx context.Context, orgID string, search string, status string, sort string, limit, offset int) ([]*domain.Service, error) {
-	query := listServicesByOrgIDQuery + searchServicesFilter + filterServicesStatus + sortServicesFilter
+func (r *PostgresServiceRepository) GetServicesByOrgID(ctx context.Context, orgID string, search string, status string, categoryID string, sort string, limit, offset int) ([]*domain.Service, error) {
+	query := listServicesByOrgIDQuery + searchServicesFilter + filterServicesStatus + filterServicesCategory + sortServicesFilter
 
 	formattedSearch := ""
 	if strings.TrimSpace(search) != "" {
@@ -129,7 +132,8 @@ func (r *PostgresServiceRepository) GetServicesByOrgID(ctx context.Context, orgI
 		orgID,           // $1
 		formattedSearch, // $2
 		status,          // $3
-		sort,            // $4
+		categoryID,      // $4
+		sort,            // $5
 	}
 
 	query += fmt.Sprintf(" LIMIT $%d OFFSET $%d", len(args)+1, len(args)+2)
@@ -158,19 +162,65 @@ func (r *PostgresServiceRepository) GetServicesByOrgID(ctx context.Context, orgI
 	return services, nil
 }
 
-func (r *PostgresServiceRepository) CountServicesByOrgID(ctx context.Context, orgID string, search string, status string) (int64, error) {
+func (r *PostgresServiceRepository) CountServicesByOrgID(ctx context.Context, orgID string, search string, status string, categoryID string) (int64, error) {
 	formattedSearch := ""
 	if strings.TrimSpace(search) != "" {
 		formattedSearch = "%" + strings.TrimSpace(search) + "%"
 	}
-	args := []any{orgID, formattedSearch, status}
-	query := countServicesByOrgIDQuery + searchServicesFilter + filterServicesStatus
+	args := []any{orgID, formattedSearch, status, categoryID}
+	query := countServicesByOrgIDQuery + searchServicesFilter + filterServicesStatus + filterServicesCategory
 
 	var total int64
 	if err := r.db.QueryRow(ctx, query, args...).Scan(&total); err != nil {
 		return 0, fmt.Errorf("lỗi khi đếm danh sách dịch vụ: %w", err)
 	}
 	return total, nil
+}
+
+func (r *PostgresServiceRepository) GetServiceStats(ctx context.Context, orgID string) (*domain.ServiceStatsResponse, error) {
+	var stats domain.ServiceStatsResponse
+	if err := r.db.QueryRow(ctx, getServiceStatsQuery, orgID).Scan(
+		&stats.TotalServices,
+		&stats.ActiveServices,
+		&stats.InactiveServices,
+		&stats.ServiceRevenueMonth,
+	); err != nil {
+		return nil, fmt.Errorf("lỗi khi lấy thống kê dịch vụ: %w", err)
+	}
+	return &stats, nil
+}
+
+func (r *PostgresServiceRepository) GetServiceSalesLastMonths(ctx context.Context, orgID, serviceID string, months int) ([]domain.ServiceMonthlySales, error) {
+	rows, err := r.db.Query(ctx, serviceSalesLastMonthsQuery, orgID, serviceID, months)
+	if err != nil {
+		return nil, fmt.Errorf("lỗi khi truy vấn doanh số dịch vụ: %w", err)
+	}
+	defer rows.Close()
+
+	sales := make([]domain.ServiceMonthlySales, 0, months)
+	for rows.Next() {
+		var item domain.ServiceMonthlySales
+		if err := rows.Scan(&item.MonthStart, &item.Quantity, &item.Revenue); err != nil {
+			return nil, fmt.Errorf("lỗi khi đọc doanh số dịch vụ: %w", err)
+		}
+		sales = append(sales, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("lỗi trong quá trình duyệt doanh số dịch vụ: %w", err)
+	}
+	return sales, nil
+}
+
+func (r *PostgresServiceRepository) GetServiceBookingStats(ctx context.Context, orgID, serviceID string) (*domain.ServiceBookingStats, error) {
+	var stats domain.ServiceBookingStats
+	if err := r.db.QueryRow(ctx, getServiceBookingStatsQuery, orgID, serviceID).Scan(
+		&stats.BookingsThisMonth,
+		&stats.CompletedThisMonth,
+		&stats.MaterialCostThisMonth,
+	); err != nil {
+		return nil, fmt.Errorf("lỗi khi lấy thống kê lịch hẹn dịch vụ: %w", err)
+	}
+	return &stats, nil
 }
 
 func (r *PostgresServiceRepository) CategoryExistsInOrg(ctx context.Context, orgID, categoryID string) (bool, error) {
@@ -303,9 +353,7 @@ func (r *PostgresServiceRepository) DeleteService(ctx context.Context, orgID, id
 	return nil
 }
 
-
-
-func (r *PostgresServiceRepository) GetServiceDetails(ctx context.Context, orgID, serviceID string) (*domain.ServiceResponse,[]*domain.ServiceMaterial, error) {
+func (r *PostgresServiceRepository) GetServiceDetails(ctx context.Context, orgID, serviceID string) (*domain.ServiceResponse, []*domain.ServiceMaterial, error) {
 	service := &domain.ServiceResponse{}
 	var materials []*domain.ServiceMaterial
 	var materialsJSON []byte
@@ -317,12 +365,15 @@ func (r *PostgresServiceRepository) GetServiceDetails(ctx context.Context, orgID
 		&service.ID,
 		&service.OrganizationID,
 		&service.CategoryID,
+		&service.CategoryName,
 		&service.Name,
 		&service.Description,
 		&service.DurationMinutes,
 		&service.BufferMinutes,
 		&service.Price,
 		&service.IsActive,
+		&service.SoldThisMonth,
+		&service.RevenueThisMonth,
 		&service.CreatedAt,
 		&service.UpdatedAt,
 		&materialsJSON,
@@ -333,7 +384,7 @@ func (r *PostgresServiceRepository) GetServiceDetails(ctx context.Context, orgID
 		}
 		return nil, nil, fmt.Errorf("lỗi query chi tiết dịch vụ: %w", err)
 	}
-	
+
 	log.Printf("DEBUG: materialsJSON: %s", string(materialsJSON)) // Log the raw JSON for debugging
 	if err := json.Unmarshal(materialsJSON, &materials); err != nil {
 		return nil, nil, fmt.Errorf("lỗi unmarshal materials json: %w", err)
@@ -341,6 +392,7 @@ func (r *PostgresServiceRepository) GetServiceDetails(ctx context.Context, orgID
 
 	return service, materials, nil
 }
+
 // ---------- Giá + định mức tại thời điểm bán (đúng chủ bảng services/service_materials) ----------
 
 // GetServicePrices lấy giá bán hiện tại của các dịch vụ trong 1 query

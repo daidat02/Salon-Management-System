@@ -9,6 +9,7 @@ type UseAppointmentsParams = {
   /** ISO8601 hoặc YYYY-MM-DD. */
   from?: string;
   to?: string;
+  search?: string;
 };
 
 export default function useAppointments({
@@ -17,10 +18,11 @@ export default function useAppointments({
   status = '',
   from = '',
   to = '',
+  search = '',
 }: UseAppointmentsParams) {
   return useQuery({
-    queryKey: ['appointments', { page, pageSize, status, from, to }],
-    queryFn: () => getAppointmentsByOrgID({ page, pageSize, status, from, to }),
+    queryKey: ['appointments', { page, pageSize, status, from, to, search }],
+    queryFn: () => getAppointmentsByOrgID({ page, pageSize, status, from, to, search }),
     placeholderData: keepPreviousData,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });

@@ -1,6 +1,7 @@
 package staff
 
 import (
+	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -139,6 +140,28 @@ func (h *StaffHandler) GetStaffByOrgID(c *gin.Context) {
 	response.Success(c, 200, "Danh sách nhân viên", result)
 }
 
+// GetStaffByID godoc
+// @Summary      Lấy thông tin chi tiết nhân viên
+// @Tags         Staff
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id   path      string                  true  "ID nhân viên"
+// @Success      200  {object}  response.SuccessResponse  "Thông tin chi tiết nhân viên"
+// @Failure      400  {object}  response.ErrorResponse    "Thiếu id"
+// @Failure      401  {object}  response.ErrorResponse    "Thiếu token / token không hợp lệ"
+// @Failure      404  {object}  response.ErrorResponse    "Không tìm thấy nhân viên"
+// @Failure      500  {object}  response.ErrorResponse    "Lỗi server"
+// @Router       /staff/{id} [get]
+func (h *StaffHandler) GetStaffByID(c *gin.Context) {
+	result, err := h.uc.GetStaffByID(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		response.Error(c, err)
+		c.Abort()
+		return
+	}
+	response.Success(c, 200, "Chi tiết nhân viên", result)
+}
+
 // UpdateStaff godoc
 // @Summary      Cập nhật nhân viên
 // @Tags         Staff
@@ -203,6 +226,130 @@ func (h *StaffHandler) UpdateStaff(c *gin.Context) {
 	response.Success(c, 200, "Cập nhật nhân viên thành công", result)
 }
 
+type CreatePayrollRequest struct {
+	TargetMonth string `json:"target_month" binding:"required"`
+	// Sẵn sàng mở rộng sau này:
+	// Note string `json:"note"`
+}
+
+// CreatePayroll godoc
+// @Summary      Tạo bảng lương nhân viên
+// @Tags         Staff
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id            path      string                  true  "ID nhân viên"
+// @Param        body          body      CreatePayrollRequest    true  "Kỳ bảng lương (yyyy-MM)"
+// @Success      200           {object}  response.SuccessResponse  "Tạo bảng lương thành công"
+// @Failure      400           {object}  response.ErrorResponse    "Thiếu id / thiếu target_month / tham số không hợp lệ"
+// @Failure      401           {object}  response.ErrorResponse    "Thiếu token / token không hợp lệ"
+// @Failure      404           {object}  response.ErrorResponse    "Không tìm thấy nhân viên"
+// @Failure      409           {object}  response.ErrorResponse    "Đã tồn tại bảng lương của nhân viên trong kỳ này"
+// @Failure      500           {object}  response.ErrorResponse    "Lỗi server"
+// @Router       /staff/{id}/payroll [post]
+func (h *StaffHandler) CreatePayroll(c *gin.Context) {
+	var req CreatePayrollRequest
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, apperror.New(400, "Thiếu target_month hoặc dữ liệu không hợp lệ", err))
+		c.Abort()
+		return
+	}
+
+	err := h.uc.CreatePayroll(
+		c.Request.Context(),
+		c.Param("id"),
+		req.TargetMonth,
+	)
+
+	if err != nil {
+		response.Error(c, err)
+		log.Printf("Lỗi khi tạo bảng lương: %v", err)
+		c.Abort()
+		return
+	}
+	response.Success(c, 200, "Duyệt Bảng lương nhân viên thành công", nil)
+}
+
+// GetStaffPayroll godoc
+// @Summary      Lấy bảng lương nhân viên theo kỳ
+// @Tags         Staff
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id                    path   string  true   "ID nhân viên"
+// @Param        date_from             query  string  false  "Từ ngày (yyyy-MM-dd hoặc RFC3339), mặc định đầu tháng"
+// @Param        date_to               query  string  false  "Đến ngày (yyyy-MM-dd hoặc RFC3339), mặc định cuối tháng"
+// @Param        standard_working_days query  int     false  "Số ngày công chuẩn (mặc định 26)"
+// @Success      200  {object}  response.SuccessResponse  "Bảng lương nhân viên"
+// @Failure      400  {object}  response.ErrorResponse    "Thiếu id / tham số không hợp lệ"
+// @Failure      401  {object}  response.ErrorResponse    "Thiếu token / token không hợp lệ"
+// @Failure      404  {object}  response.ErrorResponse    "Không tìm thấy nhân viên"
+// @Failure      500  {object}  response.ErrorResponse    "Lỗi server"
+// @Router       /staff/{id}/payroll [get]
+func (h *StaffHandler) GetStaffPayroll(c *gin.Context) {
+	standardWorkingDays := 0
+	if raw := strings.TrimSpace(c.Query("standard_working_days")); raw != "" {
+		parsed, err := strconv.Atoi(raw)
+		if err != nil {
+			response.Error(c, apperror.New(400, "standard_working_days không hợp lệ", err))
+			c.Abort()
+			return
+		}
+		standardWorkingDays = parsed
+	}
+
+	result, err := h.uc.GetStaffPayroll(
+		c.Request.Context(),
+		c.Param("id"),
+		c.Query("date_from"),
+		c.Query("date_to"),
+		standardWorkingDays,
+	)
+	if err != nil {
+		response.Error(c, err)
+		c.Abort()
+		return
+	}
+	response.Success(c, 200, "Bảng lương nhân viên", result)
+}
+
+// GetStaffServiceHistory godoc
+// @Summary      Lấy lịch sử dịch vụ nhân viên đã thực hiện
+// @Tags         Staff
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id         path   string  true   "ID nhân viên"
+// @Param        date_from  query  string  false  "Từ ngày (yyyy-MM-dd hoặc RFC3339), mặc định đầu tháng"
+// @Param        date_to    query  string  false  "Đến ngày (yyyy-MM-dd hoặc RFC3339), mặc định cuối tháng"
+// @Param        search     query  string  false  "Tìm theo mã đơn, tên khách hoặc tên dịch vụ"
+// @Param        page       query  int     false  "Trang (mặc định 1)"
+// @Param        page_size  query  int     false  "Số dòng/trang (mặc định 20, tối đa 100)"
+// @Success      200  {object}  response.SuccessResponse  "Lịch sử dịch vụ kèm tổng hợp và phân trang"
+// @Failure      400  {object}  response.ErrorResponse    "Thiếu id / tham số không hợp lệ"
+// @Failure      401  {object}  response.ErrorResponse    "Thiếu token / token không hợp lệ"
+// @Failure      404  {object}  response.ErrorResponse    "Không tìm thấy nhân viên"
+// @Failure      500  {object}  response.ErrorResponse    "Lỗi server"
+// @Router       /staff/{id}/service-history [get]
+func (h *StaffHandler) GetStaffServiceHistory(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+
+	result, err := h.uc.GetStaffServiceHistory(
+		c.Request.Context(),
+		c.Param("id"),
+		c.Query("date_from"),
+		c.Query("date_to"),
+		c.Query("search"),
+		page,
+		pageSize,
+	)
+	if err != nil {
+		response.Error(c, err)
+		c.Abort()
+		return
+	}
+	response.Success(c, 200, "Lịch sử dịch vụ nhân viên", result)
+}
+
 // DeleteStaff godoc
 // @Summary      Xóa mềm nhân viên
 // @Tags         Staff
@@ -224,4 +371,135 @@ func (h *StaffHandler) DeleteStaff(c *gin.Context) {
 		return
 	}
 	response.Success(c, 200, "Xóa nhân viên thành công", gin.H{"id": deletedID})
+}
+
+// CreateSalaryAdjustment godoc
+// @Summary      Tạo điều chỉnh lương nhân viên
+// @Tags         Staff
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        body  body      domain.SalaryAdjustmentRequest  true  "Thông tin điều chỉnh lương"
+// @Success      200   {object}  response.SuccessResponse   "Tạo điều chỉnh lương thành công"
+// @Failure      400   {object}  response.ErrorResponse     "Dữ liệu không hợp lệ / thiếu organization"
+// @Failure      401   {object}  response.ErrorResponse     "Thiếu token / token không hợp lệ"
+// @Failure      500   {object}  response.ErrorResponse     "Lỗi server"
+// @Router       /staff/salary-adjustment [post]
+func (h *StaffHandler) CreateSalaryAdjustment(c *gin.Context) {
+	req := &domain.SalaryAdjustmentRequest{}
+	if err := c.ShouldBindJSON(req); err != nil {
+		response.Error(c, apperror.New(400, "Dữ liệu không hợp lệ", err))
+		c.Abort()
+		return
+	}
+
+	err := h.uc.CreateSalaryAdjustment(c.Request.Context(), req)
+	if err != nil {
+		response.Error(c, err)
+		c.Abort()
+		return
+	}
+	response.Success(c, 200, "Tạo điều chỉnh lương thành công", nil)
+}
+
+// GetSalaryAdjustments godoc
+// @Summary      Lấy danh sách điều chỉnh lương của nhân viên
+// @Tags         Staff
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id             path      string  true  "ID nhân viên"
+// @Param        period_month   query     string  false "Tháng điều chỉnh"
+// @Success      200  {object}  response.SuccessResponse  "Lấy danh sách điều chỉnh lương thành công"
+// @Failure      400  {object}  response.ErrorResponse    "Thiếu id"
+// @Failure      401  {object}  response.ErrorResponse    "Thiếu token / token không hợp lệ"
+// @Failure      500  {object}  response.ErrorResponse    "Lỗi server"
+// @Router       /staff/{id}/salary-adjustments [get]
+func (h *StaffHandler) GetSalaryAdjustments(c *gin.Context) {
+	staffID := c.Param("id")
+	periodMonth := c.Query("period_month")
+
+	result, err := h.uc.GetSalaryAdjustments(c.Request.Context(), staffID, periodMonth)
+	if err != nil {
+		response.Error(c, err)
+		c.Abort()
+		return
+	}
+	response.Success(c, 200, "Danh sách điều chỉnh lương", result)
+}
+
+// DeleteSalaryAdjustment godoc
+// @Summary      Xóa điều chỉnh lương nhân viên
+// @Tags         Staff
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id   path      string                  true  "ID điều chỉnh lương"
+// @Success      200  {object}  response.SuccessResponse  "Xóa điều chỉnh lương thành công"
+// @Failure      400  {object}  response.ErrorResponse    "Thiếu id"
+// @Failure      401  {object}  response.ErrorResponse    "Thiếu token / token không hợp lệ"
+// @Failure      404  {object}  response.ErrorResponse    "Không tìm thấy điều chỉnh lương hoặc đã bị khóa"
+// @Router       /staff/salary-adjustment/{id} [delete]
+func (h *StaffHandler) DeleteSalaryAdjustment(c *gin.Context) {
+	adjustmentID := c.Param("id")
+
+	err := h.uc.DeleteSalaryAdjustment(c.Request.Context(), adjustmentID)
+	if err != nil {
+		response.Error(c, err)
+		c.Abort()
+		return
+	}
+	response.Success(c, 200, "Xóa điều chỉnh lương thành công", nil)
+}
+
+// GetStaffLeaves godoc
+// @Summary      Lấy danh sách ngày nghỉ của nhân viên
+// @Tags         Staff
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id   path      string  true  "ID nhân viên"
+// @Success      200  {object}  response.SuccessResponse  "Danh sách ngày nghỉ"
+// @Failure      400  {object}  response.ErrorResponse    "Thiếu id"
+// @Failure      401  {object}  response.ErrorResponse    "Thiếu token / token không hợp lệ"
+// @Failure      404  {object}  response.ErrorResponse    "Không tìm thấy nhân viên"
+// @Failure      500  {object}  response.ErrorResponse    "Lỗi server"
+// @Router       /staff/{id}/leaves [get]
+func (h *StaffHandler) GetStaffLeaves(c *gin.Context) {
+	result, err := h.uc.GetStaffLeaves(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		response.Error(c, err)
+		c.Abort()
+		return
+	}
+	response.Success(c, 200, "Danh sách ngày nghỉ", result)
+}
+
+// CreateStaffLeave godoc
+// @Summary      Tạo ngày nghỉ cho nhân viên
+// @Tags         Staff
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id    path      string                        true  "ID nhân viên"
+// @Param        body  body      domain.CreateStaffLeaveRequest true  "Thông tin ngày nghỉ"
+// @Success      200   {object}  response.SuccessResponse       "Tạo ngày nghỉ thành công"
+// @Failure      400   {object}  response.ErrorResponse         "Dữ liệu không hợp lệ"
+// @Failure      401   {object}  response.ErrorResponse         "Thiếu token / token không hợp lệ"
+// @Failure      404   {object}  response.ErrorResponse         "Không tìm thấy nhân viên"
+// @Failure      409   {object}  response.ErrorResponse         "Khoảng ngày đã được chốt trong bảng lương"
+// @Failure      500   {object}  response.ErrorResponse         "Lỗi server"
+// @Router       /staff/{id}/leaves [post]
+func (h *StaffHandler) CreateStaffLeave(c *gin.Context) {
+	var req domain.CreateStaffLeaveRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, apperror.New(400, "Dữ liệu không hợp lệ", err))
+		c.Abort()
+		return
+	}
+
+	result, err := h.uc.CreateStaffLeave(c.Request.Context(), c.Param("id"), &req)
+	if err != nil {
+		response.Error(c, err)
+		c.Abort()
+		return
+	}
+	response.Success(c, 200, "Tạo ngày nghỉ thành công", result)
 }

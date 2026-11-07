@@ -28,7 +28,7 @@ export default function VoucherPaymentCard({ form, onChange }: VoucherPaymentCar
 
       <div className="space-y-3.5">
         <div>
-          <Label className="mb-1 block text-xs font-medium text-on-surface-variant">
+          <Label className="mb-1.5 block min-w-0 text-xs font-semibold text-on-surface">
             Phương thức thanh toán
           </Label>
           <DashSelect
@@ -40,7 +40,7 @@ export default function VoucherPaymentCard({ form, onChange }: VoucherPaymentCar
         </div>
 
         <div>
-          <Label className="mb-1 block text-xs font-medium text-on-surface-variant">
+          <Label className="mb-1.5 block min-w-0 text-xs font-semibold text-on-surface">
             Trạng thái thanh toán
           </Label>
           <div className="grid grid-cols-3 gap-1.5 rounded-md bg-surface-container p-1 text-xs">
@@ -63,7 +63,7 @@ export default function VoucherPaymentCard({ form, onChange }: VoucherPaymentCar
         </div>
 
         <div>
-          <Label className="mb-1 block text-xs font-medium text-on-surface-variant">
+          <Label className="mb-1.5 block min-w-0 text-xs font-semibold text-on-surface">
             Mã hóa đơn VAT / Phiếu gốc
           </Label>
           <div className="relative">
@@ -78,7 +78,7 @@ export default function VoucherPaymentCard({ form, onChange }: VoucherPaymentCar
         </div>
 
         <div>
-          <Label className="mb-1.5 block text-xs font-medium text-on-surface-variant">
+          <Label className="mb-1.5 block min-w-0 text-xs font-semibold text-on-surface">
             Ảnh phiếu giao hàng / Hóa đơn đỏ
           </Label>
           <div className="cursor-pointer space-y-2 rounded-lg bg-surface-container p-3 text-center transition-colors hover:bg-surface-container/70">

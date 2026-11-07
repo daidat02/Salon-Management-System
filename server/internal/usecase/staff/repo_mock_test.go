@@ -25,6 +25,35 @@ func (m *MockStaffRepository) GetStaffByOrgID(ctx context.Context, orgID string,
 	return args.Get(0).([]*domain.Staff), args.Error(1)
 }
 
+func (m *MockStaffRepository) GetStaffByID(ctx context.Context, orgID, id string) (*domain.Staff, error) {
+	args := m.Called(ctx, orgID, id)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*domain.Staff), args.Error(1)
+}
+
+func (m *MockStaffRepository) GetStaffPayroll(ctx context.Context, orgID, staffID, dateFrom, dateTo string, standardWorkingDays int) (*domain.StaffPayrollResponse, error) {
+	args := m.Called(ctx, orgID, staffID, dateFrom, dateTo, standardWorkingDays)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*domain.StaffPayrollResponse), args.Error(1)
+}
+
+func (m *MockStaffRepository) GetStaffServiceHistory(ctx context.Context, orgID, staffID, dateFrom, dateTo, search string, limit, offset int) (*domain.StaffServiceHistorySummary, []*domain.StaffServiceHistoryItem, int64, error) {
+	args := m.Called(ctx, orgID, staffID, dateFrom, dateTo, search, limit, offset)
+	var summary *domain.StaffServiceHistorySummary
+	if args.Get(0) != nil {
+		summary = args.Get(0).(*domain.StaffServiceHistorySummary)
+	}
+	var items []*domain.StaffServiceHistoryItem
+	if args.Get(1) != nil {
+		items = args.Get(1).([]*domain.StaffServiceHistoryItem)
+	}
+	return summary, items, args.Get(2).(int64), args.Error(3)
+}
+
 func (m *MockStaffRepository) CountStaffsByOrgID(ctx context.Context, orgID string, search string, status string) (int64, error) {
 	args := m.Called(ctx, orgID, search, status)
 	return args.Get(0).(int64), args.Error(1)
@@ -38,4 +67,46 @@ func (m *MockStaffRepository) UpdateStaff(ctx context.Context, staff *domain.Sta
 func (m *MockStaffRepository) DeleteStaff(ctx context.Context, orgID, id string) error {
 	args := m.Called(ctx, orgID, id)
 	return args.Error(0)
+}
+
+func (m *MockStaffRepository) CreatePayroll(ctx context.Context, payroll *domain.Payroll, staffInfo *domain.StaffBasicInfo) error {
+	args := m.Called(ctx, payroll, staffInfo)
+	return args.Error(0)
+}
+func (m *MockStaffRepository) GetStaffBasicByID(ctx context.Context, orgID, staffID string) (*domain.StaffBasicInfo, error) {
+	args := m.Called(ctx, orgID, staffID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*domain.StaffBasicInfo), args.Error(1)
+}
+
+func (m *MockStaffRepository) CreateSalaryAdjustment(ctx context.Context, adjustment *domain.SalaryAdjustment) error {
+	args := m.Called(ctx, adjustment)
+	return args.Error(0)
+}
+
+func (m *MockStaffRepository) GetSalaryAdjustments(ctx context.Context, orgID, staffID, periodMonth string) ([]*domain.SalaryAdjustment, error) {
+	args := m.Called(ctx, orgID, staffID, periodMonth)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*domain.SalaryAdjustment), args.Error(1)
+}
+
+func (m *MockStaffRepository) DeleteSalaryAdjustment(ctx context.Context, orgID, adjustmentID string) error {
+	args := m.Called(ctx, orgID, adjustmentID)
+	return args.Error(0)
+}
+func (m *MockStaffRepository) CreateStaffLeave(ctx context.Context, leave *domain.StaffLeave) error {
+	args := m.Called(ctx, leave)
+	return args.Error(0)
+}
+
+func (m *MockStaffRepository) GetStaffLeaves(ctx context.Context, orgID, staffID string) ([]*domain.StaffLeave, error) {
+	args := m.Called(ctx, orgID, staffID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*domain.StaffLeave), args.Error(1)
 }

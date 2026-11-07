@@ -28,6 +28,13 @@ const (
 		FROM orders
 		WHERE organization_id = $1 AND id = $2
 	`
+	findActiveOrderByAppointmentQuery = `
+		SELECT ` + orderColumns + `
+		FROM orders
+		WHERE organization_id = $1 AND appointment_id = $2
+		  AND status NOT IN ('cancelled', 'refunded')
+		LIMIT 1
+	`
 	// Lịch sử đơn hàng của 1 khách (mới nhất trước, phân trang limit/offset).
 	listHistoriesOrderByCustomerIdQuery = `
 		SELECT ` + orderColumns + `
@@ -152,6 +159,12 @@ const (
 		SET status = 'completed', updated_at = now()
 		WHERE organization_id = $1 AND id = $2 AND status IN ('pending', 'confirm', 'delivery')
 	`
+	// Lịch hẹn của đơn chuyển completed cùng tx khi chốt đơn.
+	completeAppointmentQuery = `
+		UPDATE appointments
+		SET status = 'completed', updated_at = now()
+		WHERE organization_id = $1 AND id = $2
+	`
 	updateOrderStatusQuery = `
 		UPDATE orders
 		SET status = $3
@@ -202,7 +215,7 @@ const (
         SELECT * FROM (
             SELECT id, organization_id, category_id, 'product' AS type, name, NULL AS description, NULL AS duration_minutes, unit, sell_price AS price, stock_quantity, is_active
             FROM products p
-            WHERE p.organization_id = $1 AND p.is_active = true 
+            WHERE p.organization_id = $1 AND p.is_active = true
             AND (product_type = $2 OR product_type = $3)
             UNION ALL
             SELECT id, organization_id, category_id, 'service' AS type, name, description, duration_minutes, NULL AS unit, price, NULL AS stock_quantity, is_active
@@ -217,7 +230,7 @@ const (
     `
 
 	filterItemPosQuery = `
-        AND ($5 = '' OR category_id::text = $5) 
+        AND ($5 = '' OR category_id::text = $5)
     `
 
 	// Sắp xếp lại thứ tự con trỏ khớp với ORDER BY: (type, name, id)
@@ -249,7 +262,7 @@ const (
 					WHERE status = 'succeeded'
 					GROUP BY order_id
 				) p ON p.order_id = o2.id
-				WHERE o2.organization_id = $1
+				WHERE o2.organization_id = $1 
 					AND o2.status IN ('pending', 'confirm', 'delivery')
 			), 0) AS pending_amount,
 			COUNT(o.id) FILTER (WHERE o.status IN ('cancelled', 'refunded') AND DATE(o.created_at) = CURRENT_DATE) AS cancel_refund_today,
@@ -257,5 +270,59 @@ const (
 			COUNT(o.id) FILTER (WHERE date_trunc('month', o.created_at) = date_trunc('month', NOW())) AS month_total
 		FROM orders o
 		WHERE o.organization_id = $1
+	`
+
+	getStaffCommissionStatsQuery = `
+		SELECT
+			COALESCE(COUNT(DISTINCT oi.order_id), 0) AS total_orders,
+			COALESCE(COUNT(ois.id), 0) AS total_items,
+			COALESCE(SUM(ois.commission_amount), 0) AS total_commission,
+			COALESCE(SUM(oi.line_total), 0) AS total_amount_value
+		FROM order_item_staff ois
+
+		INNER JOIN order_items oi ON oi.id = ois.order_item_id
+		INNER JOIN orders o ON o.id = oi.order_id
+		LEFT JOIN customers c ON c.id = o.customer_id
+		LEFT JOIN services s ON s.id = oi.service_id
+
+		WHERE o.status = 'completed' AND (oi.service_id IS NOT NULL AND oi.product_id IS NULL)
+			AND ois.organization_id = $1
+			AND ois.staff_id = $2
+	`
+	getServiceHistoryQuery = `
+		SELECT
+			ois.id,
+			oi.order_id,
+			oi.id AS order_item_id,
+			o.code AS order_code,
+			COALESCE(c.full_name, 'Khách lẻ') AS customer_name,
+			COALESCE(s.name, 'Dịch vụ') AS service_name,
+			oi.line_total,
+			ois.commission_amount,
+			ois.type,
+			ois.share_pct,
+			ois.created_at,
+			COUNT(*) OVER() AS total_count
+		FROM order_item_staff ois
+		INNER JOIN order_items oi ON oi.id = ois.order_item_id
+		INNER JOIN orders o ON o.id = oi.order_id
+		LEFT JOIN customers c ON c.id = o.customer_id
+		LEFT JOIN services s ON s.id = oi.service_id
+
+		WHERE o.status = 'completed' AND (oi.service_id IS NOT NULL AND oi.product_id IS NULL)
+			AND ois.organization_id = $1
+			AND ois.staff_id = $2
+	`
+	filtterByDateRange = `
+			AND ois.created_at >= COALESCE(NULLIF($3, '')::timestamptz, date_trunc('month', CURRENT_TIMESTAMP))
+			AND ois.created_at < COALESCE(NULLIF($4, '')::timestamptz, date_trunc('month', CURRENT_TIMESTAMP) + INTERVAL '1 month')
+	`
+	staffServiceHistorySearchFilter = `
+			AND (
+				$5 = '' OR
+				o.code ILIKE $5 OR
+				COALESCE(c.full_name, '') ILIKE $5 OR
+				COALESCE(s.name, '') ILIKE $5
+			)
 	`
 )

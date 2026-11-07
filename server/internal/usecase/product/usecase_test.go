@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/daidat02/server/internal/delivery/http/middlewares"
 	domain "github.com/daidat02/server/internal/domain/product"
@@ -144,14 +145,16 @@ func TestProductUsecase_CreateProduct(t *testing.T) {
 }
 
 func TestProductUsecase_GetProductsByOrgID(t *testing.T) {
+	categoryName := "Chăm sóc tóc"
 	productList := []*domain.Product{
-		{ID: "prod-1", OrganizationID: "org-123", SKU: "DG-BUOI-500", Name: "Dầu gội bưởi", ProductType: domain.ProductTypeRetail, SellPrice: 150000, IsActive: true},
+		{ID: "prod-1", OrganizationID: "org-123", SKU: "DG-BUOI-500", Name: "Dầu gội bưởi", CategoryName: &categoryName, RevenueThisMonth: 1500000, ProductType: domain.ProductTypeRetail, SellPrice: 150000, IsActive: true},
 		{ID: "prod-2", OrganizationID: "org-123", SKU: "THUOC-DEN", Name: "Thuốc nhuộm đen", ProductType: domain.ProductTypeMaterial, SellPrice: 0, IsActive: true},
 	}
 
 	tests := []struct {
 		name          string
 		ctx           context.Context
+		categoryID    string
 		page          int
 		pageSize      int
 		mockReturn    []*domain.Product
@@ -171,9 +174,21 @@ func TestProductUsecase_GetProductsByOrgID(t *testing.T) {
 			callRepo: true, callCount: true, expectedError: false, expectedLen: 2, expectedTotal: 2,
 		},
 		{
+			name: "Thành công - Lọc theo danh mục", ctx: withOrgCtx("org-123"),
+			categoryID: "550e8400-e29b-41d4-a716-446655440000",
+			page:       1, pageSize: 20, mockReturn: productList, mockTotal: 2,
+			callRepo: true, callCount: true, expectedError: false, expectedLen: 2, expectedTotal: 2,
+		},
+		{
 			name: "Thành công - Danh sách rỗng", ctx: withOrgCtx("org-123"),
 			page: 1, pageSize: 20, mockReturn: []*domain.Product{}, mockTotal: 0,
 			callRepo: true, callCount: true, expectedError: false, expectedLen: 0, expectedTotal: 0,
+		},
+		{
+			name: "Thất bại - category_id không hợp lệ", ctx: withOrgCtx("org-123"),
+			categoryID: "not-a-uuid",
+			page:       1, pageSize: 20, callRepo: false, callCount: false,
+			expectedError: true, expectedCode: 400,
 		},
 		{
 			name: "Thất bại - Thiếu organization_id", ctx: context.Background(),
@@ -196,16 +211,16 @@ func TestProductUsecase_GetProductsByOrgID(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockRepo := new(MockProductRepository)
 			if tt.callRepo {
-				mockRepo.On("GetProductsByOrgID", mock.Anything, "org-123", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+				mockRepo.On("GetProductsByOrgID", mock.Anything, "org-123", mock.Anything, mock.Anything, tt.categoryID, mock.Anything, mock.Anything, mock.Anything).
 					Return(tt.mockReturn, tt.mockListErr)
 			}
 			if tt.callCount {
-				mockRepo.On("CountProductsByOrgID", mock.Anything, "org-123", mock.Anything, mock.Anything).
+				mockRepo.On("CountProductsByOrgID", mock.Anything, "org-123", mock.Anything, mock.Anything, tt.categoryID).
 					Return(tt.mockTotal, tt.mockCountErr)
 			}
 
 			uc := NewProductUsecase(mockRepo)
-			res, err := uc.GetProductsByOrgID(tt.ctx, "", "", "created_at_desc", tt.page, tt.pageSize)
+			res, err := uc.GetProductsByOrgID(tt.ctx, "", "", tt.categoryID, "created_at_desc", tt.page, tt.pageSize)
 
 			if tt.expectedError {
 				assert.Error(t, err)
@@ -217,6 +232,119 @@ func TestProductUsecase_GetProductsByOrgID(t *testing.T) {
 				assert.NotNil(t, res.Data)
 				assert.Len(t, res.Data, tt.expectedLen)
 				assert.Equal(t, tt.expectedTotal, res.Total)
+				if tt.expectedLen > 0 {
+					assert.Equal(t, &categoryName, res.Data[0].CategoryName)
+					assert.Equal(t, float64(1500000), res.Data[0].RevenueThisMonth)
+				}
+			}
+			mockRepo.AssertExpectations(t)
+		})
+	}
+}
+
+func TestProductUsecase_GetProductByID(t *testing.T) {
+	categoryName := "Dầu gội"
+	netUnit := "ml"
+	netAmount := 500.0
+	now := time.Now().UTC()
+	currentMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
+	previousMonth := currentMonth.AddDate(0, -1, 0)
+
+	product := &domain.Product{
+		ID:               "prod-1",
+		OrganizationID:   "org-123",
+		CategoryName:     &categoryName,
+		SKU:              "DG-BUOI-500",
+		Name:             "Dầu gội bưởi",
+		Unit:             "chai",
+		NetUnit:          &netUnit,
+		NetAmount:        &netAmount,
+		ProductType:      domain.ProductTypeRetail,
+		CostPrice:        80000,
+		SellPrice:        150000,
+		StockQuantity:    25000,
+		MinStock:         2500,
+		IsActive:         true,
+		RevenueThisMonth: 0,
+	}
+	sales := []domain.ProductMonthlySales{
+		{MonthStart: currentMonth, Quantity: 12, Revenue: 1800000},
+		{MonthStart: previousMonth, Quantity: 8, Revenue: 1200000},
+	}
+
+	tests := []struct {
+		name          string
+		ctx           context.Context
+		id            string
+		product       *domain.Product
+		sales         []domain.ProductMonthlySales
+		productErr    error
+		salesErr      error
+		callProduct   bool
+		callSales     bool
+		expectedError bool
+		expectedCode  int
+	}{
+		{
+			name: "Thành công - Lấy chi tiết sản phẩm", ctx: withOrgCtx("org-123"), id: "prod-1",
+			product: product, sales: sales, callProduct: true, callSales: true,
+		},
+		{
+			name: "Thất bại - Thiếu id", ctx: withOrgCtx("org-123"), id: "",
+			expectedError: true, expectedCode: 400,
+		},
+		{
+			name: "Thất bại - Thiếu organization_id", ctx: context.Background(), id: "prod-1",
+			expectedError: true, expectedCode: 400,
+		},
+		{
+			name: "Thất bại - Không tìm thấy sản phẩm", ctx: withOrgCtx("org-123"), id: "prod-1",
+			productErr: domain.ErrProductNotFound, callProduct: true,
+			expectedError: true, expectedCode: 404,
+		},
+		{
+			name: "Thất bại - Lỗi DB khi lấy sản phẩm", ctx: withOrgCtx("org-123"), id: "prod-1",
+			productErr: errors.New("db error"), callProduct: true,
+			expectedError: true, expectedCode: 500,
+		},
+		{
+			name: "Thất bại - Lỗi DB khi lấy doanh số", ctx: withOrgCtx("org-123"), id: "prod-1",
+			product: product, salesErr: errors.New("db error"), callProduct: true, callSales: true,
+			expectedError: true, expectedCode: 500,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockRepo := new(MockProductRepository)
+			if tt.callProduct {
+				mockRepo.On("GetProductByID", mock.Anything, "org-123", tt.id).
+					Return(tt.product, tt.productErr)
+			}
+			if tt.callSales {
+				mockRepo.On("GetProductSalesLastMonths", mock.Anything, "org-123", tt.id, 6).
+					Return(tt.sales, tt.salesErr)
+			}
+
+			uc := NewProductUsecase(mockRepo)
+			res, err := uc.GetProductByID(tt.ctx, tt.id)
+
+			if tt.expectedError {
+				assert.Error(t, err)
+				assert.Nil(t, res)
+				assertFlatAppError(t, err, tt.expectedCode)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, res)
+				assert.Equal(t, "prod-1", res.ID)
+				assert.Equal(t, &categoryName, res.CategoryName)
+				assert.Equal(t, float64(50), res.StockQuantity)
+				assert.Equal(t, float64(5), res.MinStock)
+				assert.Equal(t, float64(12), res.SoldThisMonth)
+				assert.Equal(t, float64(1800000), res.RevenueThisMonth)
+				assert.Len(t, res.RevenueLast6Months, 6)
+				assert.Equal(t, float64(1800000), res.RevenueLast6Months[5].Revenue)
+				assert.Equal(t, float64(1200000), res.RevenueLast6Months[4].Revenue)
 			}
 			mockRepo.AssertExpectations(t)
 		})

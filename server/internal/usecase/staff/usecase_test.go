@@ -266,6 +266,102 @@ func TestStaffUsecase_CreateStaff(f *testing.T) {
 	}
 }
 
+func TestStaffUsecase_GetStaffByID(f *testing.T) {
+	tests := []struct {
+		name          string
+		ctx           context.Context
+		id            string
+		mockStaff     *domain.Staff
+		mockErr       error
+		callRepo      bool
+		expectedError bool
+		expectedCode  int
+	}{
+		{
+			name: "Thành công - Lấy chi tiết nhân viên",
+			ctx:  withOrgCtx("org-123"),
+			id:   "staff-1",
+			mockStaff: func() *domain.Staff {
+				s := validStaff()
+				s.ID = "staff-1"
+				s.OrganizationID = "org-123"
+				return s
+			}(),
+			callRepo: true,
+		},
+		{
+			name:          "Thất bại - Thiếu id nhân viên",
+			ctx:           withOrgCtx("org-123"),
+			id:            "",
+			callRepo:      false,
+			expectedError: true,
+			expectedCode:  400,
+		},
+		{
+			name:          "Thất bại - Thiếu organization_id trong context",
+			ctx:           context.Background(),
+			id:            "staff-1",
+			callRepo:      false,
+			expectedError: true,
+			expectedCode:  400,
+		},
+		{
+			name:          "Thất bại - Không tìm thấy nhân viên",
+			ctx:           withOrgCtx("org-123"),
+			id:            "staff-missing",
+			mockErr:       domain.ErrStaffNotFound,
+			callRepo:      true,
+			expectedError: true,
+			expectedCode:  404,
+		},
+		{
+			name:          "Thất bại - Lỗi database",
+			ctx:           withOrgCtx("org-123"),
+			id:            "staff-1",
+			mockErr:       errors.New("db connection refused"),
+			callRepo:      true,
+			expectedError: true,
+			expectedCode:  500,
+		},
+	}
+
+	for _, tt := range tests {
+		f.Run(tt.name, func(t *testing.T) {
+			mockRepo := new(MockStaffRepository)
+			if tt.callRepo {
+				mockRepo.On("GetStaffByID", mock.Anything, "org-123", tt.id).Return(tt.mockStaff, tt.mockErr)
+			}
+
+			uc := NewStaffUsecase(mockRepo)
+			res, err := uc.GetStaffByID(tt.ctx, tt.id)
+
+			if tt.expectedError {
+				assert.Error(t, err)
+				assert.Nil(t, res)
+				assertFlatAppError(t, err, tt.expectedCode)
+				if tt.callRepo {
+					mockRepo.AssertExpectations(t)
+				} else {
+					mockRepo.AssertNotCalled(t, "GetStaffByID", mock.Anything, mock.Anything, mock.Anything)
+				}
+				return
+			}
+
+			assert.NoError(t, err)
+			assert.NotNil(t, res)
+			assert.Equal(t, tt.mockStaff.ID, res.ID)
+			assert.Equal(t, tt.mockStaff.OrganizationID, res.OrganizationID)
+			assert.Equal(t, tt.mockStaff.Code, res.Code)
+			assert.Equal(t, tt.mockStaff.FullName, res.FullName)
+			assert.Equal(t, tt.mockStaff.Phone, res.Phone)
+			assert.Equal(t, tt.mockStaff.Email, res.Email)
+			assert.Equal(t, tt.mockStaff.Position, res.Position)
+			assert.Equal(t, tt.mockStaff.Status, res.Status)
+			mockRepo.AssertExpectations(t)
+		})
+	}
+}
+
 func TestStaffUsecase_GetStaffByOrgID(f *testing.T) {
 	hireDate := time.Date(2024, 1, 15, 0, 0, 0, 0, time.UTC)
 	staffList := []*domain.Staff{
@@ -549,6 +645,372 @@ func TestStaffUsecase_UpdateStaff(f *testing.T) {
 				assert.True(t, tt.inputStaff.HireDate.Equal(res.HireDate))
 				mockRepo.AssertExpectations(t)
 			}
+		})
+	}
+}
+
+func TestStaffUsecase_GetStaffPayroll(f *testing.T) {
+	payroll := &domain.StaffPayrollResponse{
+		StaffID:             "staff-1",
+		BaseSalary:          8000000,
+		StandardWorkingDays: 26,
+		ActualWorkingDays:   24,
+		ProratedBaseSalary:  7384615.38,
+		TotalCommission:     1039500,
+		NetPay:              8300000,
+	}
+
+	tests := []struct {
+		name                string
+		ctx                 context.Context
+		id                  string
+		dateFrom            string
+		dateTo              string
+		standardWorkingDays int
+		mockReturn          *domain.StaffPayrollResponse
+		mockErr             error
+		callRepo            bool
+		expectedDays        int
+		expectedError       bool
+		expectedCode        int
+	}{
+		{
+			name:          "Thành công - Mặc định tháng hiện tại và 26 ngày công",
+			ctx:           withOrgCtx("org-123"),
+			id:            "staff-1",
+			mockReturn:    payroll,
+			callRepo:      true,
+			expectedDays:  26,
+			expectedError: false,
+		},
+		{
+			name:                "Thành công - Khoảng ngày và ngày công tùy chọn",
+			ctx:                 withOrgCtx("org-123"),
+			id:                  "staff-1",
+			dateFrom:            "2026-09-01",
+			dateTo:              "2026-09-30",
+			standardWorkingDays: 30,
+			mockReturn:          payroll,
+			callRepo:            true,
+			expectedDays:        30,
+			expectedError:       false,
+		},
+		{
+			name:          "Thất bại - Thiếu id nhân viên",
+			ctx:           withOrgCtx("org-123"),
+			id:            " ",
+			callRepo:      false,
+			expectedError: true,
+			expectedCode:  400,
+		},
+		{
+			name:          "Thất bại - Thiếu organization_id trong context",
+			ctx:           context.Background(),
+			id:            "staff-1",
+			callRepo:      false,
+			expectedError: true,
+			expectedCode:  400,
+		},
+		{
+			name:          "Thất bại - date_from không hợp lệ",
+			ctx:           withOrgCtx("org-123"),
+			id:            "staff-1",
+			dateFrom:      "01-09-2026",
+			callRepo:      false,
+			expectedError: true,
+			expectedCode:  400,
+		},
+		{
+			name:          "Thất bại - date_to không hợp lệ",
+			ctx:           withOrgCtx("org-123"),
+			id:            "staff-1",
+			dateTo:        "not-a-date",
+			callRepo:      false,
+			expectedError: true,
+			expectedCode:  400,
+		},
+		{
+			name:          "Thất bại - date_from sau date_to",
+			ctx:           withOrgCtx("org-123"),
+			id:            "staff-1",
+			dateFrom:      "2026-09-30",
+			dateTo:        "2026-09-01",
+			callRepo:      false,
+			expectedError: true,
+			expectedCode:  400,
+		},
+		{
+			name:                "Thất bại - Số ngày công chuẩn không hợp lệ",
+			ctx:                 withOrgCtx("org-123"),
+			id:                  "staff-1",
+			standardWorkingDays: 32,
+			callRepo:            false,
+			expectedError:       true,
+			expectedCode:        400,
+		},
+		{
+			name:          "Thất bại - Không tìm thấy nhân viên",
+			ctx:           withOrgCtx("org-123"),
+			id:            "staff-missing",
+			mockErr:       domain.ErrStaffNotFound,
+			callRepo:      true,
+			expectedDays:  26,
+			expectedError: true,
+			expectedCode:  404,
+		},
+		{
+			name:          "Thất bại - Lỗi database",
+			ctx:           withOrgCtx("org-123"),
+			id:            "staff-1",
+			mockErr:       errors.New("db connection refused"),
+			callRepo:      true,
+			expectedDays:  26,
+			expectedError: true,
+			expectedCode:  500,
+		},
+	}
+
+	for _, tt := range tests {
+		f.Run(tt.name, func(t *testing.T) {
+			mockRepo := new(MockStaffRepository)
+			if tt.callRepo {
+				mockRepo.On(
+					"GetStaffPayroll",
+					mock.Anything,
+					"org-123",
+					tt.id,
+					tt.dateFrom,
+					tt.dateTo,
+					tt.expectedDays,
+				).Return(tt.mockReturn, tt.mockErr)
+			}
+
+			uc := NewStaffUsecase(mockRepo)
+			res, err := uc.GetStaffPayroll(
+				tt.ctx,
+				tt.id,
+				tt.dateFrom,
+				tt.dateTo,
+				tt.standardWorkingDays,
+			)
+
+			if tt.expectedError {
+				assert.Error(t, err)
+				assert.Nil(t, res)
+				assertFlatAppError(t, err, tt.expectedCode)
+				if tt.callRepo {
+					mockRepo.AssertExpectations(t)
+				} else {
+					mockRepo.AssertNotCalled(t, "GetStaffPayroll", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+				}
+				return
+			}
+
+			assert.NoError(t, err)
+			assert.Equal(t, tt.mockReturn, res)
+			mockRepo.AssertExpectations(t)
+		})
+	}
+}
+
+func TestStaffUsecase_GetStaffServiceHistory(t *testing.T) {
+	staff := validStaff()
+	staff.ID = "staff-1"
+
+	summary := &domain.StaffServiceHistorySummary{
+		TotalOrders:      3,
+		TotalItems:       5,
+		TotalCommission:  450000,
+		TotalAmountValue: 3000000,
+	}
+	items := []*domain.StaffServiceHistoryItem{
+		{
+			ID:               "ois-1",
+			OrderID:          "order-1",
+			OrderItemID:      "item-1",
+			OrderCode:        "HD-001",
+			CustomerName:     "Trần Lan Anh",
+			ServiceName:      "Nhuộm Balayage",
+			LineTotal:        2800000,
+			CommissionAmount: 420000,
+			Type:             "percent",
+			SharePct:         15,
+		},
+	}
+
+	tests := []struct {
+		name           string
+		ctx            context.Context
+		id             string
+		dateFrom       string
+		dateTo         string
+		search         string
+		page           int
+		pageSize       int
+		staffErr       error
+		historyErr     error
+		total          int64
+		expectedLimit  int
+		expectedOffset int
+		expectedPage   int
+		expectedSize   int
+		expectedPages  int64
+		expectedError  bool
+		expectedCode   int
+	}{
+		{
+			name:           "Thành công - Mặc định trang 1, 20 dòng và tháng hiện tại",
+			ctx:            withOrgCtx("org-123"),
+			id:             "staff-1",
+			total:          1,
+			expectedLimit:  20,
+			expectedOffset: 0,
+			expectedPage:   1,
+			expectedSize:   20,
+			expectedPages:  1,
+		},
+		{
+			name:           "Thành công - Phân trang tùy chọn",
+			ctx:            withOrgCtx("org-123"),
+			id:             "staff-1",
+			dateFrom:       "2026-09-01",
+			dateTo:         "2026-09-30",
+			page:           2,
+			pageSize:       5,
+			total:          7,
+			expectedLimit:  5,
+			expectedOffset: 5,
+			expectedPage:   2,
+			expectedSize:   5,
+			expectedPages:  2,
+		},
+		{
+			name:           "Thành công - Có từ khóa tìm kiếm",
+			ctx:            withOrgCtx("org-123"),
+			id:             "staff-1",
+			search:         "HD-001",
+			total:          1,
+			expectedLimit:  20,
+			expectedOffset: 0,
+			expectedPage:   1,
+			expectedSize:   20,
+			expectedPages:  1,
+		},
+		{
+			name:           "Thành công - Chuẩn hóa page/page_size không hợp lệ",
+			ctx:            withOrgCtx("org-123"),
+			id:             "staff-1",
+			page:           0,
+			pageSize:       1000,
+			total:          0,
+			expectedLimit:  100,
+			expectedOffset: 0,
+			expectedPage:   1,
+			expectedSize:   100,
+			expectedPages:  0,
+		},
+		{
+			name:          "Thất bại - Thiếu id nhân viên",
+			ctx:           withOrgCtx("org-123"),
+			id:            " ",
+			expectedError: true,
+			expectedCode:  400,
+		},
+		{
+			name:          "Thất bại - Thiếu organization_id trong context",
+			ctx:           context.Background(),
+			id:            "staff-1",
+			expectedError: true,
+			expectedCode:  400,
+		},
+		{
+			name:          "Thất bại - date_from không hợp lệ",
+			ctx:           withOrgCtx("org-123"),
+			id:            "staff-1",
+			dateFrom:      "01-09-2026",
+			expectedError: true,
+			expectedCode:  400,
+		},
+		{
+			name:          "Thất bại - date_from sau date_to",
+			ctx:           withOrgCtx("org-123"),
+			id:            "staff-1",
+			dateFrom:      "2026-09-30",
+			dateTo:        "2026-09-01",
+			expectedError: true,
+			expectedCode:  400,
+		},
+		{
+			name:          "Thất bại - Không tìm thấy nhân viên",
+			ctx:           withOrgCtx("org-123"),
+			id:            "staff-missing",
+			staffErr:      domain.ErrStaffNotFound,
+			expectedError: true,
+			expectedCode:  404,
+		},
+		{
+			name:           "Thất bại - Lỗi database khi lấy lịch sử",
+			ctx:            withOrgCtx("org-123"),
+			id:             "staff-1",
+			historyErr:     errors.New("db connection refused"),
+			expectedLimit:  20,
+			expectedOffset: 0,
+			expectedError:  true,
+			expectedCode:   500,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockRepo := new(MockStaffRepository)
+			needsStaffLookup := !tt.expectedError ||
+				tt.expectedCode == 404 ||
+				tt.expectedCode == 500
+			if needsStaffLookup {
+				mockRepo.On("GetStaffByID", mock.Anything, "org-123", tt.id).Return(staff, tt.staffErr)
+			}
+			if tt.expectedCode == 0 || tt.expectedCode == 500 {
+				mockRepo.On(
+					"GetStaffServiceHistory",
+					mock.Anything,
+					"org-123",
+					tt.id,
+					tt.dateFrom,
+					tt.dateTo,
+					tt.search,
+					tt.expectedLimit,
+					tt.expectedOffset,
+				).Return(summary, items, tt.total, tt.historyErr)
+			}
+
+			uc := NewStaffUsecase(mockRepo)
+			res, err := uc.GetStaffServiceHistory(
+				tt.ctx,
+				tt.id,
+				tt.dateFrom,
+				tt.dateTo,
+				tt.search,
+				tt.page,
+				tt.pageSize,
+			)
+
+			if tt.expectedError {
+				assert.Error(t, err)
+				assert.Nil(t, res)
+				assertFlatAppError(t, err, tt.expectedCode)
+				mockRepo.AssertExpectations(t)
+				return
+			}
+
+			assert.NoError(t, err)
+			assert.NotNil(t, res)
+			assert.Equal(t, summary, res.Summary)
+			assert.Equal(t, items, res.Data)
+			assert.Equal(t, tt.expectedPage, res.Page)
+			assert.Equal(t, tt.expectedSize, res.PageSize)
+			assert.Equal(t, tt.total, res.Total)
+			assert.Equal(t, tt.expectedPages, res.TotalPages)
+			mockRepo.AssertExpectations(t)
 		})
 	}
 }

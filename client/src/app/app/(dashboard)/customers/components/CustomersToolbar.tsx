@@ -42,6 +42,7 @@ export default function CustomersToolbar() {
     params.delete('page');
     router.push(`?${params.toString()}`, { scroll: false });
   };
+
   return (
     <DashToolbar
       searchPlaceholder="Tìm tên, SĐT, mã KH..."

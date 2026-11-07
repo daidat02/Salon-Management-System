@@ -1,6 +1,7 @@
 'use client';
 
 import DashToolbar from '@/components/dashboard/DashToolbar';
+import useCategory from '@/hooks/use-category';
 import React, { useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
@@ -10,13 +11,19 @@ export default function InventoryToolbar() {
   const search = searchParams.get('search') || '';
   const status = searchParams.get('status') || '';
   const sort = searchParams.get('sort') || '';
-  const category = searchParams.get('category') || '';
-  const location = searchParams.get('location') || '';
+  const categoryId = searchParams.get('category_id') || '';
   const [inputValue, setInputValue] = React.useState(search);
+  const [lastSearch, setLastSearch] = React.useState(search);
 
-  useEffect(() => {
+  if (search !== lastSearch) {
+    setLastSearch(search);
     setInputValue(search);
-  }, [search]);
+  }
+
+  const { data: categoryData } = useCategory({ page: 1, pageSize: 100 });
+  const categoryOptions = (categoryData?.data ?? [])
+    .filter((c) => c.is_active && c.type !== 'service')
+    .map((c) => ({ value: c.id, label: c.name }));
 
   useEffect(() => {
     if (inputValue === search) return;
@@ -46,20 +53,12 @@ export default function InventoryToolbar() {
       onSearchChange={(v) => setInputValue(v)}
       filters={[
         {
-          id: 'category',
+          id: 'category_id',
           placeholder: 'Tất cả danh mục',
-          value: category || undefined,
-          widthClass: 'sm:w-44',
-          options: [
-            'Tất cả danh mục',
-            'Chăm sóc & Dưỡng',
-            'Dưỡng tóc bán lẻ',
-            'Hóa chất kỹ thuật',
-            'Phục hồi tóc',
-            'Tạo kiểu bán lẻ',
-            'Vật tư tiêu hao',
-          ],
-          onValueChange: (value) => handleFilterChange('category', value, 'Tất cả danh mục'),
+          value: categoryId || undefined,
+          widthClass: 'sm:w-48',
+          options: [{ value: '', label: 'Tất cả danh mục' }, ...categoryOptions],
+          onValueChange: (value) => handleFilterChange('category_id', value, 'Tất cả danh mục'),
         },
         {
           id: 'status',

@@ -11,13 +11,13 @@ type ServiceMaterialInput struct {
 }
 
 type CreateServiceRequest struct {
-	CategoryID      *string `json:"category_id"`
-	Name            string  `json:"name"`
-	Description     string  `json:"description"`
-	DurationMinutes int     `json:"duration_minutes"`
-	BufferMinutes   int     `json:"buffer_minutes"`
-	Price           float64 `json:"price"`
-	IsActive        *bool   `json:"is_active"`
+	CategoryID      *string                `json:"category_id"`
+	Name            string                 `json:"name"`
+	Description     string                 `json:"description"`
+	DurationMinutes int                    `json:"duration_minutes"`
+	BufferMinutes   int                    `json:"buffer_minutes"`
+	Price           float64                `json:"price"`
+	IsActive        *bool                  `json:"is_active"`
 	Materials       []ServiceMaterialInput `json:"materials"`
 }
 
@@ -32,15 +32,41 @@ type UpdateServiceRequest struct {
 }
 
 type ServiceResponse struct {
-	ID              string     `json:"id"`
-	OrganizationID  string     `json:"organization_id"`
-	CategoryID      *string    `json:"category_id"`
-	Name            string     `json:"name"`
-	Description     string     `json:"description"`
-	DurationMinutes int        `json:"duration_minutes"`
-	BufferMinutes   int        `json:"buffer_minutes"`
-	Price           float64    `json:"price"`
-	IsActive        bool       `json:"is_active"`
-	CreatedAt       *time.Time `json:"created_at"`
-	UpdatedAt       *time.Time `json:"updated_at"`
+	ID               string     `json:"id"`
+	OrganizationID   string     `json:"organization_id"`
+	CategoryID       *string    `json:"category_id"`
+	CategoryName     *string    `json:"category_name"`
+	Name             string     `json:"name"`
+	Description      string     `json:"description"`
+	DurationMinutes  int        `json:"duration_minutes"`
+	BufferMinutes    int        `json:"buffer_minutes"`
+	Price            float64    `json:"price"`
+	IsActive         bool       `json:"is_active"`
+	SoldThisMonth    float64    `json:"sold_this_month"`
+	RevenueThisMonth float64    `json:"revenue_this_month"`
+	CreatedAt        *time.Time `json:"created_at"`
+	UpdatedAt        *time.Time `json:"updated_at"`
+}
+
+// ServiceMonthlyRevenueResponse doanh thu của dịch vụ trong một tháng.
+type ServiceMonthlyRevenueResponse struct {
+	Month   string  `json:"month"`
+	Revenue float64 `json:"revenue"`
+}
+
+// ServiceDetailResponse là thông tin đầy đủ của dịch vụ kèm thống kê tháng.
+type ServiceDetailResponse struct {
+	ServiceResponse
+	BookingsThisMonth     int64                           `json:"bookings_this_month"`
+	CompletedThisMonth    int64                           `json:"completed_this_month"`
+	MaterialCostThisMonth float64                         `json:"material_cost_this_month"`
+	RevenueLast6Months    []ServiceMonthlyRevenueResponse `json:"revenue_last_6_months"`
+}
+
+// ServiceStatsResponse thống kê tổng quan dịch vụ của salon.
+type ServiceStatsResponse struct {
+	TotalServices       int64   `json:"total_services" db:"total_services"`
+	ActiveServices      int64   `json:"active_services" db:"active_services"`
+	InactiveServices    int64   `json:"inactive_services" db:"inactive_services"`
+	ServiceRevenueMonth float64 `json:"service_revenue_month" db:"service_revenue_month"`
 }

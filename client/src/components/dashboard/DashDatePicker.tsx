@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
-import { CalendarDays, ChevronDown } from 'lucide-react';
+import { CalendarDays, ChevronDown, X } from 'lucide-react';
 import { cn } from 'cn';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -18,6 +18,8 @@ type DashDatePickerProps = {
   /** date-fns format, mặc định dd/MM/yyyy */
   dateFormat?: string;
   disableFuture?: boolean;
+  /** Hiện nút X để xóa ngày đã chọn. */
+  clearable?: boolean;
 };
 
 export function DashDatePicker({
@@ -29,11 +31,12 @@ export function DashDatePicker({
   triggerClassName,
   dateFormat = 'dd/MM/yyyy',
   disableFuture,
+  clearable,
 }: DashDatePickerProps) {
   const [open, setOpen] = React.useState(false);
 
   return (
-    <div className={cn('w-full', className)}>
+    <div className={cn('relative w-full', className)}>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger
           disabled={disabled}
@@ -43,6 +46,7 @@ export function DashDatePicker({
             'focus-visible:border-primary focus-visible:ring-1 focus-visible:ring-primary/30',
             'disabled:cursor-not-allowed disabled:opacity-50',
             !value && 'text-muted-foreground',
+            clearable && value && 'pr-9',
             triggerClassName,
           )}
         >
@@ -70,6 +74,16 @@ export function DashDatePicker({
           />
         </PopoverContent>
       </Popover>
+      {clearable && value && (
+        <button
+          type="button"
+          aria-label="Xóa ngày"
+          onClick={() => onValueChange?.(undefined)}
+          className="absolute top-1/2 right-2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded text-on-surface-variant transition-colors hover:text-error"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      )}
     </div>
   );
 }

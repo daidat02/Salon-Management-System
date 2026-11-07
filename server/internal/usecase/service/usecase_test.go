@@ -59,12 +59,12 @@ func TestServiceUsecase_CreateService(t *testing.T) {
 		mockProductsErr     error
 		expectProductsCheck bool
 		// mockProductUnits giả lập đơn vị SP cho validate unit (nil = mặc định unit lớn "chai").
-		mockProductUnits    map[string]domain.ProductUnit
-		expectUnitsCheck    bool
-		mockReturnErr       error
-		callRepo            bool
-		expectedError       bool
-		expectedCode        int
+		mockProductUnits map[string]domain.ProductUnit
+		expectUnitsCheck bool
+		mockReturnErr    error
+		callRepo         bool
+		expectedError    bool
+		expectedCode     int
 	}{
 		{
 			name: "Thành công - Tạo dịch vụ có danh mục", ctx: withOrgCtx("org-123"),
@@ -196,7 +196,7 @@ func TestServiceUsecase_CreateService(t *testing.T) {
 			input: validService(), inputMaterials: nil,
 			mockCategoryExists: true, expectCategoryCheck: true,
 			mockReturnErr: errors.New("db insert failed"),
-			callRepo: true, expectedError: true, expectedCode: 500,
+			callRepo:      true, expectedError: true, expectedCode: 500,
 		},
 	}
 
@@ -263,6 +263,7 @@ func TestServiceUsecase_GetServicesByOrgID(t *testing.T) {
 	tests := []struct {
 		name          string
 		ctx           context.Context
+		categoryID    string
 		page          int
 		pageSize      int
 		mockReturn    []*domain.Service
@@ -280,6 +281,18 @@ func TestServiceUsecase_GetServicesByOrgID(t *testing.T) {
 			name: "Thành công - Lấy danh sách phân trang", ctx: withOrgCtx("org-123"),
 			page: 1, pageSize: 20, mockReturn: serviceList, mockTotal: 2,
 			callRepo: true, callCount: true, expectedError: false, expectedLen: 2, expectedTotal: 2,
+		},
+		{
+			name: "Thành công - Lọc theo danh mục", ctx: withOrgCtx("org-123"),
+			categoryID: "550e8400-e29b-41d4-a716-446655440000",
+			page:       1, pageSize: 20, mockReturn: serviceList, mockTotal: 2,
+			callRepo: true, callCount: true, expectedError: false, expectedLen: 2, expectedTotal: 2,
+		},
+		{
+			name: "Thất bại - category_id không hợp lệ", ctx: withOrgCtx("org-123"),
+			categoryID: "not-a-uuid",
+			page:       1, pageSize: 20, callRepo: false, callCount: false,
+			expectedError: true, expectedCode: 400,
 		},
 		{
 			name: "Thành công - Danh sách rỗng", ctx: withOrgCtx("org-123"),
@@ -307,16 +320,16 @@ func TestServiceUsecase_GetServicesByOrgID(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockRepo := new(MockServiceRepository)
 			if tt.callRepo {
-				mockRepo.On("GetServicesByOrgID", mock.Anything, "org-123", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+				mockRepo.On("GetServicesByOrgID", mock.Anything, "org-123", mock.Anything, mock.Anything, tt.categoryID, mock.Anything, mock.Anything, mock.Anything).
 					Return(tt.mockReturn, tt.mockListErr)
 			}
 			if tt.callCount {
-				mockRepo.On("CountServicesByOrgID", mock.Anything, "org-123", mock.Anything, mock.Anything).
+				mockRepo.On("CountServicesByOrgID", mock.Anything, "org-123", mock.Anything, mock.Anything, tt.categoryID).
 					Return(tt.mockTotal, tt.mockCountErr)
 			}
 
 			uc := NewServiceUsecase(mockRepo)
-			res, err := uc.GetServicesByOrgID(tt.ctx, "", "", "created_at_desc", tt.page, tt.pageSize)
+			res, err := uc.GetServicesByOrgID(tt.ctx, "", "", tt.categoryID, "created_at_desc", tt.page, tt.pageSize)
 
 			if tt.expectedError {
 				assert.Error(t, err)
@@ -499,6 +512,13 @@ func TestServiceUsecase_GetServiceDetails(t *testing.T) {
 		{ID: "sm-1", OrganizationID: "org-123", ServiceID: "svc-1", ProductID: "prod-2", Quantity: 1},
 		{ID: "sm-2", OrganizationID: "org-123", ServiceID: "svc-1", ProductID: "prod-3", Quantity: 0.5},
 	}
+	currentMonth := time.Date(now.UTC().Year(), now.UTC().Month(), 1, 0, 0, 0, 0, time.UTC)
+	mockSales := []domain.ServiceMonthlySales{
+		{MonthStart: currentMonth, Quantity: 12, Revenue: 6000000},
+	}
+	mockBookingStats := &domain.ServiceBookingStats{
+		BookingsThisMonth: 15, CompletedThisMonth: 12, MaterialCostThisMonth: 1100000,
+	}
 
 	tests := []struct {
 		name           string
@@ -507,7 +527,10 @@ func TestServiceUsecase_GetServiceDetails(t *testing.T) {
 		mockService    *domain.ServiceResponse
 		mockMaterials  []*domain.ServiceMaterial
 		mockErr        error
+		salesErr       error
+		bookingErr     error
 		callRepo       bool
+		callStats      bool
 		expectedError  bool
 		expectedCode   int
 		expectedMatLen int
@@ -515,12 +538,12 @@ func TestServiceUsecase_GetServiceDetails(t *testing.T) {
 		{
 			name: "Thành công - Dịch vụ kèm 2 nguyên vật liệu", ctx: withOrgCtx("org-123"),
 			serviceID: "svc-1", mockService: mockService, mockMaterials: mockMaterials,
-			callRepo: true, expectedError: false, expectedMatLen: 2,
+			callRepo: true, callStats: true, expectedError: false, expectedMatLen: 2,
 		},
 		{
 			name: "Thành công - Dịch vụ không có nguyên vật liệu", ctx: withOrgCtx("org-123"),
 			serviceID: "svc-2", mockService: mockService, mockMaterials: []*domain.ServiceMaterial{},
-			callRepo: true, expectedError: false, expectedMatLen: 0,
+			callRepo: true, callStats: true, expectedError: false, expectedMatLen: 0,
 		},
 		{
 			name: "Thất bại - Thiếu organization_id", ctx: context.Background(),
@@ -536,6 +559,18 @@ func TestServiceUsecase_GetServiceDetails(t *testing.T) {
 			serviceID: "svc-missing", mockErr: domain.ErrServiceNotFound,
 			callRepo: true, expectedError: true, expectedCode: 404,
 		},
+		{
+			name: "Thất bại - Lỗi DB khi lấy doanh số", ctx: withOrgCtx("org-123"),
+			serviceID: "svc-1", mockService: mockService, mockMaterials: mockMaterials,
+			salesErr: errors.New("db error"), callRepo: true, callStats: true,
+			expectedError: true, expectedCode: 500,
+		},
+		{
+			name: "Thất bại - Lỗi DB khi lấy thống kê lịch hẹn", ctx: withOrgCtx("org-123"),
+			serviceID: "svc-1", mockService: mockService, mockMaterials: mockMaterials,
+			bookingErr: errors.New("db error"), callRepo: true, callStats: true,
+			expectedError: true, expectedCode: 500,
+		},
 	}
 
 	for _, tt := range tests {
@@ -544,6 +579,14 @@ func TestServiceUsecase_GetServiceDetails(t *testing.T) {
 			if tt.callRepo {
 				mockRepo.On("GetServiceDetails", mock.Anything, "org-123", tt.serviceID).
 					Return(tt.mockService, tt.mockMaterials, tt.mockErr)
+			}
+			if tt.callStats && tt.mockErr == nil {
+				mockRepo.On("GetServiceSalesLastMonths", mock.Anything, "org-123", tt.serviceID, 6).
+					Return(mockSales, tt.salesErr)
+				if tt.salesErr == nil {
+					mockRepo.On("GetServiceBookingStats", mock.Anything, "org-123", tt.serviceID).
+						Return(mockBookingStats, tt.bookingErr)
+				}
 			}
 
 			uc := NewServiceUsecase(mockRepo)
@@ -567,6 +610,12 @@ func TestServiceUsecase_GetServiceDetails(t *testing.T) {
 				assert.Equal(t, "Nhuộm phủ bạc", svc.Name)
 				assert.Equal(t, 120, svc.DurationMinutes)
 				assert.Equal(t, 500000.0, svc.Price)
+				assert.Equal(t, float64(12), svc.SoldThisMonth)
+				assert.Equal(t, float64(6000000), svc.RevenueThisMonth)
+				assert.Equal(t, int64(15), svc.BookingsThisMonth)
+				assert.Equal(t, int64(12), svc.CompletedThisMonth)
+				assert.Equal(t, float64(1100000), svc.MaterialCostThisMonth)
+				assert.Len(t, svc.RevenueLast6Months, 6)
 				assert.NotNil(t, mats)
 				assert.Len(t, mats, tt.expectedMatLen)
 				for _, m := range mats {
@@ -580,3 +629,58 @@ func TestServiceUsecase_GetServiceDetails(t *testing.T) {
 	}
 }
 
+func TestServiceUsecase_GetServiceStats(t *testing.T) {
+	tests := []struct {
+		name          string
+		ctx           context.Context
+		mockStats     *domain.ServiceStatsResponse
+		mockErr       error
+		callRepo      bool
+		expectedError bool
+		expectedCode  int
+	}{
+		{
+			name: "Thành công - Lấy thống kê dịch vụ", ctx: withOrgCtx("org-123"),
+			mockStats: &domain.ServiceStatsResponse{
+				TotalServices: 24, ActiveServices: 21, InactiveServices: 3, ServiceRevenueMonth: 186400000,
+			},
+			callRepo: true,
+		},
+		{
+			name: "Thất bại - Thiếu organization_id", ctx: context.Background(),
+			expectedError: true, expectedCode: 400,
+		},
+		{
+			name: "Thất bại - Lỗi DB", ctx: withOrgCtx("org-123"),
+			mockErr: errors.New("db error"), callRepo: true,
+			expectedError: true, expectedCode: 500,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockRepo := new(MockServiceRepository)
+			if tt.callRepo {
+				mockRepo.On("GetServiceStats", mock.Anything, "org-123").
+					Return(tt.mockStats, tt.mockErr)
+			}
+
+			uc := NewServiceUsecase(mockRepo)
+			stats, err := uc.GetServiceStats(tt.ctx)
+
+			if tt.expectedError {
+				assert.Error(t, err)
+				assert.Nil(t, stats)
+				assertFlatAppError(t, err, tt.expectedCode)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, stats)
+				assert.Equal(t, int64(24), stats.TotalServices)
+				assert.Equal(t, int64(21), stats.ActiveServices)
+				assert.Equal(t, int64(3), stats.InactiveServices)
+				assert.Equal(t, float64(186400000), stats.ServiceRevenueMonth)
+			}
+			mockRepo.AssertExpectations(t)
+		})
+	}
+}

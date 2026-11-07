@@ -65,10 +65,10 @@ type orderItemRow struct {
 	ItemType       string  `db:"item_type"`
 	ServiceID      *string `db:"service_id"`
 	ProductID      *string `db:"product_id"`
-	StaffID        *string  `db:"staff_id"`
-	Quantity       float64  `db:"quantity"`
-	Unit           *string  `db:"unit"`
-	UnitPrice      float64  `db:"unit_price"`
+	StaffID        *string `db:"staff_id"`
+	Quantity       float64 `db:"quantity"`
+	Unit           *string `db:"unit"`
+	UnitPrice      float64 `db:"unit_price"`
 	LineTotal      float64 `db:"line_total"`
 	StaffJSON      string  `db:"staff"`
 }
@@ -172,9 +172,6 @@ func (r *PostgresOrderRepository) AddOrderItems(ctx context.Context, orgID, orde
 	return nil
 }
 
-
-
-
 // bulkInsertOrderItems chèn nhiều dòng đơn trong tx có sẵn (nhận tx, không tự mở).
 func bulkInsertOrderItems(ctx context.Context, tx pgx.Tx, items []*domain.OrderItem) error {
 	if len(items) == 0 {
@@ -191,7 +188,7 @@ func bulkInsertOrderItems(ctx context.Context, tx pgx.Tx, items []*domain.OrderI
 		args = append(args,
 			it.ID, it.OrganizationID, it.OrderID, it.ItemType,
 			nullableStr(it.ServiceID), nullableStr(it.ProductID), nullableStr(it.StaffID),
-			it.Quantity, it.UnitPrice,it.Unit, it.LineTotal,
+			it.Quantity, it.UnitPrice, it.Unit, it.LineTotal,
 		)
 	}
 	_, err := tx.Exec(ctx, bulkInsertOrderItemsQuery+strings.Join(placeholders, ", "), args...)
@@ -263,6 +260,17 @@ func (r *PostgresOrderRepository) GetOrderStats(ctx context.Context, orgID strin
 	return &stats, nil
 }
 
+// GetStaffCommissionStats thống kê hoa hồng dịch vụ của 1 NV trong khoảng ngày
+// (dateFrom/dateTo rỗng = tháng hiện tại).
+func (r *PostgresOrderRepository) GetStaffCommissionStats(ctx context.Context, orgID, staffID, dateFrom, dateTo string) (*domain.StaffCommissionStats, error) {
+	var stats domain.StaffCommissionStats
+	query := getStaffCommissionStatsQuery + filtterByDateRange + staffServiceHistorySearchFilter
+	if err := r.qx.GetContext(ctx, &stats, query, orgID, staffID, dateFrom, dateTo, ""); err != nil {
+		return nil, fmt.Errorf("lỗi khi lấy thống kê hoa hồng nhân viên: %w", err)
+	}
+	return &stats, nil
+}
+
 // ListHistoriesOrderByCustomerId lịch sử đơn hàng của 1 khách (mới nhất trước).
 func (r *PostgresOrderRepository) ListHistoriesOrderByCustomerId(ctx context.Context, orgID, customerID string, limit, offset int) ([]*domain.Order, error) {
 	orders := make([]*domain.Order, 0)
@@ -289,6 +297,19 @@ func (r *PostgresOrderRepository) GetOrderByID(ctx context.Context, orgID, id st
 			return nil, fmt.Errorf("đơn hàng %s: %w", id, domain.ErrOrderNotFound)
 		}
 		return nil, fmt.Errorf("lỗi khi lấy đơn hàng: %w", err)
+	}
+	return &o, nil
+}
+
+// FindActiveOrderByAppointment tìm đơn còn hiệu lực của 1 lịch hẹn.
+// Không có thì trả (nil, nil) để usecase phân biệt "không có" với lỗi DB.
+func (r *PostgresOrderRepository) FindActiveOrderByAppointment(ctx context.Context, orgID, appointmentID string) (*domain.Order, error) {
+	var o domain.Order
+	if err := r.qx.GetContext(ctx, &o, findActiveOrderByAppointmentQuery, orgID, appointmentID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("lỗi khi tìm đơn theo lịch hẹn: %w", err)
 	}
 	return &o, nil
 }
@@ -655,10 +676,11 @@ func (r *PostgresOrderRepository) ApplyCancel(ctx context.Context, orgID, orderI
 
 // CompleteOrderWithSlip chốt đơn (pending/confirm/delivery -> completed):
 // trừ kho thật + nhả giữ chỗ + ghi sổ sale + sinh phiếu bán hàng, tất cả 1 tx.
-// Trả về mã phiếu vừa sinh.
+// appointmentID khác nil/rỗng thì lịch hẹn của đơn cũng chuyển completed
+// trong cùng tx. Trả về mã phiếu vừa sinh.
 // Guard: khóa row đơn + chỉ chốt đơn chưa hoàn tất (chống chốt 2 lần);
 // tồn không đủ ở bất kỳ SP nào thì rollback toàn bộ (ErrInsufficientStock).
-func (r *PostgresOrderRepository) CompleteOrderWithSlip(ctx context.Context, orgID, orderID string, lines []domain.SaleSlipLine) (domain.SaleSlipResult, error) {
+func (r *PostgresOrderRepository) CompleteOrderWithSlip(ctx context.Context, orgID, orderID string, appointmentID *string, lines []domain.SaleSlipLine, fundID string) (domain.SaleSlipResult, error) {
 	var empty domain.SaleSlipResult
 	if len(lines) == 0 {
 		return empty, fmt.Errorf("phiếu bán hàng phải có ít nhất 1 dòng hàng")
@@ -706,6 +728,16 @@ func (r *PostgresOrderRepository) CompleteOrderWithSlip(ctx context.Context, org
 	}
 	if tag.RowsAffected() == 0 {
 		return empty, fmt.Errorf("đơn hàng %s chưa sẵn sàng chốt: %w", orderID, domain.ErrOrderNotReady)
+	}
+
+	// Đơn gắn lịch hẹn thì lịch cũng hoàn thành trong cùng tx: chốt đơn và
+	// đóng lịch sống/chết cùng nhau, không để lịch mắc ở in_progress.
+	if appointmentID != nil {
+		if id := strings.TrimSpace(*appointmentID); id != "" {
+			if _, err := tx.Exec(ctx, completeAppointmentQuery, orgID, id); err != nil {
+				return empty, fmt.Errorf("lỗi khi cập nhật lịch hẹn hoàn thành: %w", err)
+			}
+		}
 	}
 
 	// Gom số lượng theo sản phẩm, trừ theo thứ tự cố định chống deadlock.
@@ -773,7 +805,7 @@ func (r *PostgresOrderRepository) CompleteOrderWithSlip(ctx context.Context, org
 	// cùng tx với chốt đơn nên đơn chốt ↔ tiền vào quỹ cùng sống/chết.
 	// Đơn 0đ không có dòng tiền thật thì bỏ qua.
 	if orderTotal > 0 {
-		if err := insertOrderIncomeVoucherTx(ctx, tx, orgID, orderID, orderCode, orderTotal); err != nil {
+		if err := insertOrderIncomeVoucherTx(ctx, tx, orgID, orderID, orderCode, orderTotal, fundID); err != nil {
 			return empty, err
 		}
 	}

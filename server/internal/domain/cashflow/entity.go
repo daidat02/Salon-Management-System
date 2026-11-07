@@ -35,13 +35,6 @@ const (
 	FundTypeEWallet = "e_wallet"
 )
 
-// Trạng thái bảng lương — khớp CHECK status IN ('draft','approved','paid','cancelled').
-const (
-	PayrollStatusDraft     = "draft"
-	PayrollStatusApproved  = "approved"
-	PayrollStatusPaid      = "paid"
-	PayrollStatusCancelled = "cancelled"
-)
 
 // Fund là nguồn tiền / quỹ: két tiền mặt, TK ngân hàng, ví điện tử.
 // Số dư KHÔNG lưu trực tiếp — tính lúc query:
@@ -130,6 +123,7 @@ type CashFlow struct {
 	Description         *string    `json:"description" db:"description"`
 	OccurredAt          *time.Time `json:"occurred_at" db:"occurred_at"`
 	Status              string     `json:"status" db:"status"`
+	StaffID             *string    `json:"staff_id" db:"staff_id"`
 	OrderID             *string    `json:"order_id" db:"order_id"`
 	InventoryDocumentID *string    `json:"inventory_document_id" db:"inventory_document_id"`
 	CreatedBy           *string    `json:"created_by" db:"created_by"`
@@ -168,57 +162,3 @@ func (v *CashFlow) Validate() error {
 
 // Payroll là bảng lương một nhân viên trong một kỳ tháng.
 // net_pay do app tính: base + commission + bonus - advance - deduction.
-type Payroll struct {
-	ID               string     `json:"id" db:"id"`
-	OrganizationID   string     `json:"organization_id" db:"organization_id"`
-	StaffID          string     `json:"staff_id" db:"staff_id"`
-	PeriodMonth      *time.Time `json:"period_month" db:"period_month"`
-	BaseSalary       float64    `json:"base_salary" db:"base_salary"`
-	CommissionAmount float64    `json:"commission_amount" db:"commission_amount"`
-	BonusAmount      float64    `json:"bonus_amount" db:"bonus_amount"`
-	AdvanceAmount    float64    `json:"advance_amount" db:"advance_amount"`
-	DeductionAmount  float64    `json:"deduction_amount" db:"deduction_amount"`
-	NetPay           float64    `json:"net_pay" db:"net_pay"`
-	Status           string     `json:"status" db:"status"`
-	CashFlowID       *string    `json:"cash_flow_id" db:"cash_flow_id"`
-	PaidAt           *time.Time `json:"paid_at" db:"paid_at"`
-	CreatedBy        *string    `json:"created_by" db:"created_by"`
-	ApprovedBy       *string    `json:"approved_by" db:"approved_by"`
-	CreatedAt        *time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt        *time.Time `json:"updated_at" db:"updated_at"`
-}
-
-func (p *Payroll) Validate() error {
-	switch p.Status {
-	case PayrollStatusDraft, PayrollStatusApproved, PayrollStatusPaid, PayrollStatusCancelled:
-	default:
-		return errors.New("Trạng thái bảng lương không hợp lệ (draft | approved | paid | cancelled)")
-	}
-	if p.StaffID == "" {
-		return errors.New("Thiếu nhân viên của bảng lương")
-	}
-	if p.PeriodMonth == nil {
-		return errors.New("Thiếu kỳ lương (tháng)")
-	}
-	for _, v := range []struct {
-		name  string
-		value float64
-	}{
-		{"Lương cơ bản", p.BaseSalary},
-		{"Hoa hồng", p.CommissionAmount},
-		{"Thưởng", p.BonusAmount},
-		{"Tạm ứng", p.AdvanceAmount},
-		{"Khấu trừ", p.DeductionAmount},
-		{"Thực nhận", p.NetPay},
-	} {
-		if v.value < 0 {
-			return errors.New(v.name + " không được âm")
-		}
-	}
-	return nil
-}
-
-// NetPayOf tính thực nhận chuẩn: base + commission + bonus - advance - deduction.
-func NetPayOf(base, commission, bonus, advance, deduction float64) float64 {
-	return base + commission + bonus - advance - deduction
-}

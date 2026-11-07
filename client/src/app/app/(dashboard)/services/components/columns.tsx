@@ -1,7 +1,6 @@
 import { Tag } from '@/components/ui/tag';
 import type { DashColumn } from '@/components/dashboard/DashTable';
 import type { Service } from '@/types/service';
-import { Pencil, SquarePlus, History } from 'lucide-react';
 
 export const serviceColumns: DashColumn<Service>[] = [
   {
@@ -21,7 +20,7 @@ export const serviceColumns: DashColumn<Service>[] = [
     id: 'category',
     header: 'Danh mục',
     className: 'min-w-[120px] ',
-    cell: (row) => 'Chưa phân loại',
+    cell: (row) => row.category_name || 'Chưa phân loại',
   },
   {
     id: 'duration',
@@ -40,17 +39,17 @@ export const serviceColumns: DashColumn<Service>[] = [
     cell: (row) => `${Number(row.price).toLocaleString('vi-VN')} đ`,
   },
   {
-    id: '',
+    id: 'sold_this_month',
     header: 'Số lượng/Tháng',
     className: 'text-center',
-    cell: (row) => 'Chưa thống kê',
+    cell: (row) => `${Math.round(Number(row.sold_this_month))} lượt`,
   },
 
   {
-    id: 'revenue_moun',
+    id: 'revenue_this_month',
     header: 'Doanh thu tháng',
-    className: 'text-center',
-    cell: (row) => 'Chưa Thống Kê',
+    className: 'text-right font-medium min-w-[100px]',
+    cell: (row) => `${Number(row.revenue_this_month).toLocaleString('vi-VN')} đ`,
   },
   {
     id: 'status',
@@ -68,26 +67,5 @@ export const serviceColumns: DashColumn<Service>[] = [
     className: 'text-center',
     cell: (row) =>
       new Date(row.updated_at).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' }),
-  },
-  {
-    id: 'actions',
-    header: 'Hành động',
-    className: 'text-center',
-    cell: (row) => (
-      <div className="flex items-center justify-center gap-1 text-on-surface-variant">
-        <button
-          className="hover:text-primary hover:bg-surface-container rounded p-1 transition-colors"
-          title="Điều chỉnh kho"
-        >
-          <Pencil className="h-3.5 w-3.5" />
-        </button>
-        <button
-          className="hover:text-primary hover:bg-surface-container rounded p-1 transition-colors"
-          title="Lịch sử thẻ kho"
-        >
-          <History className="h-3.5 w-3.5" />
-        </button>
-      </div>
-    ),
   },
 ];

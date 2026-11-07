@@ -1,24 +1,25 @@
 'use client';
 
 import * as React from 'react';
+import { format } from 'date-fns';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import DashTable, { type DashColumn } from '@/components/dashboard/DashTable';
 import { Tag } from '@/components/ui/tag';
 import { Button } from '@/components/ui/button';
-import { DashInput } from '@/components/dashboard/DashInput';
+import { Textarea } from '@/components/ui/textarea';
+import { DashDatePicker } from '@/components/dashboard/DashDatePicker';
+import { DashOptionPills } from '@/components/dashboard/DashOptionPills';
 import { DashSelect } from '@/components/dashboard/DashSelect';
 import { DashDialog } from '@/components/dashboard/DashDialog';
+import { toast } from '@/components/ui/toast';
+import { useCreateStaffLeave } from '@/hooks/use-create-staff-leave';
+import useStaffLeaves from '@/hooks/use-staff-leaves';
+import { getApiErrorMessage } from '@/services/apiClient';
+import type { StaffLeave, StaffLeaveType } from '@/types/staff';
 import { Field } from '../../components/StaffFormParts';
-import {
-  SHIFT_OPTIONS,
-  mockLeaveBalance,
-  mockLeaves,
-  mockWeek,
-  type LeaveRow,
-  type WeekShift,
-} from './mock';
+import { SHIFT_OPTIONS, mockWeek, type WeekShift } from './mock';
 
-// Tab Ngày nghỉ & Ca: lịch phân ca theo tuần + quản lý ngày phép + dialog thêm ngày nghỉ.
+// Tab Ngày nghỉ & Ca: lịch phân ca theo tuần + quản lý ngày nghỉ + dialog thêm ngày nghỉ.
 
 const WEEK_BASE = new Date(2026, 9, 12);
 const addDays = (d: Date, n: number) => {
@@ -27,12 +28,47 @@ const addDays = (d: Date, n: number) => {
   return c;
 };
 const fmtDay = (d: Date) => `${d.getDate()}/${d.getMonth() + 1}`;
-const fmtInputDate = (iso: string) => {
-  const [y, m, d] = iso.split('-');
-  return `${d}/${m}/${y}`;
+
+const LEAVE_TYPE_OPTIONS: { value: StaffLeaveType; label: string }[] = [
+  { value: 'ANNUAL', label: 'Nghỉ phép năm' },
+  { value: 'EXCUSED', label: 'Phép' },
+  { value: 'LATE', label: 'Đi trễ' },
+];
+
+const LEAVE_TYPE_LABEL: Record<StaffLeaveType, string> = {
+  ANNUAL: 'Nghỉ phép năm',
+  EXCUSED: 'Phép',
+  LATE: 'Đi trễ',
 };
 
-export default function StaffScheduleTab() {
+function parseDateOnly(value: string): Date {
+  const [year, month, day] = value.slice(0, 10).split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function leaveDays(leave: StaffLeave): number {
+  const start = parseDateOnly(leave.start_date).getTime();
+  const end = parseDateOnly(leave.end_date).getTime();
+  return Math.round((end - start) / 86400000) + 1;
+}
+
+function leaveDateLabel(leave: StaffLeave): string {
+  const start = format(parseDateOnly(leave.start_date), 'dd/MM/yyyy');
+  const end = format(parseDateOnly(leave.end_date), 'dd/MM/yyyy');
+  return start === end ? start : `${start} – ${end}`;
+}
+
+type StaffScheduleTabProps = {
+  staffId: string;
+  leaveDialogOpen?: boolean;
+  onLeaveDialogOpenChange?: (open: boolean) => void;
+};
+
+export default function StaffScheduleTab({
+  staffId,
+  leaveDialogOpen = false,
+  onLeaveDialogOpenChange = () => {},
+}: StaffScheduleTabProps) {
   const [weekOffset, setWeekOffset] = React.useState(0);
   const [week, setWeek] = React.useState(mockWeek);
   const [editingWeek, setEditingWeek] = React.useState(false);
@@ -58,102 +94,99 @@ export default function StaffScheduleTab() {
       ),
     );
 
-  const [leaves, setLeaves] = React.useState(mockLeaves);
-  const [leaveOpen, setLeaveOpen] = React.useState(false);
-  const [leaveStart, setLeaveStart] = React.useState('');
-  const [leaveEnd, setLeaveEnd] = React.useState('');
-  const [leaveReason, setLeaveReason] = React.useState('');
+  const { data, isLoading, isError, error, refetch } = useStaffLeaves(staffId);
+  const leaves = React.useMemo(() => data ?? [], [data]);
+  const { mutateAsync, isPending } = useCreateStaffLeave();
+
+  const [leaveStart, setLeaveStart] = React.useState<Date | undefined>(undefined);
+  const [leaveEnd, setLeaveEnd] = React.useState<Date | undefined>(undefined);
+  const [leaveType, setLeaveType] = React.useState<StaffLeaveType | null>(null);
+  const [leaveNote, setLeaveNote] = React.useState('');
   const [leaveError, setLeaveError] = React.useState('');
-  const handleAddLeave = () => {
-    if (!leaveStart || !leaveEnd || !leaveReason.trim()) {
-      setLeaveError('Vui lòng nhập đủ ngày bắt đầu, ngày kết thúc và lý do.');
-      return;
-    }
-    const s = new Date(`${leaveStart}T00:00`);
-    const e = new Date(`${leaveEnd}T00:00`);
-    if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime()) || e < s) {
-      setLeaveError('Khoảng ngày không hợp lệ.');
-      return;
-    }
-    const days = Math.round((e.getTime() - s.getTime()) / 86400000) + 1;
-    const dateLabel =
-      days > 1 ? `${fmtInputDate(leaveStart)} – ${fmtInputDate(leaveEnd)}` : fmtInputDate(leaveStart);
-    setLeaves((prev) => [
-      {
-        id: `l-${Date.now()}`,
-        date: dateLabel,
-        days: `${days} ngày`,
-        type: 'paid',
-        reason: leaveReason.trim(),
-        status: 'approved',
-      },
-      ...prev,
-    ]);
-    setLeaveStart('');
-    setLeaveEnd('');
-    setLeaveReason('');
+
+  const annualUsedDays = React.useMemo(() => {
+    const year = new Date().getFullYear();
+    return leaves
+      .filter((leave) => leave.leave_type === 'ANNUAL')
+      .filter((leave) => parseDateOnly(leave.start_date).getFullYear() === year)
+      .reduce((total, leave) => total + leaveDays(leave), 0);
+  }, [leaves]);
+
+  const resetLeaveForm = () => {
+    setLeaveStart(undefined);
+    setLeaveEnd(undefined);
+    setLeaveType(null);
+    setLeaveNote('');
     setLeaveError('');
-    setLeaveOpen(false);
   };
 
-  const setLeaveStatus = (id: string, status: 'approved') =>
-    setLeaves((prev) => prev.map((l) => (l.id === id ? { ...l, status } : l)));
+  const handleLeaveDialogOpenChange = (open: boolean) => {
+    if (!open) resetLeaveForm();
+    onLeaveDialogOpenChange(open);
+  };
 
-  const leaveColumns: DashColumn<LeaveRow>[] = [
+  const handleAddLeave = async () => {
+    setLeaveError('');
+    if (!leaveStart || !leaveEnd) {
+      setLeaveError('Vui lòng chọn ngày bắt đầu và ngày kết thúc.');
+      return;
+    }
+    if (!leaveType) {
+      setLeaveError('Vui lòng chọn loại ngày nghỉ.');
+      return;
+    }
+    if (leaveEnd < leaveStart) {
+      setLeaveError('Ngày kết thúc phải sau hoặc bằng ngày bắt đầu.');
+      return;
+    }
+
+    try {
+      await mutateAsync({
+        id: staffId,
+        payload: {
+          leave_type: leaveType,
+          start_date: format(leaveStart, 'yyyy-MM-dd'),
+          end_date: format(leaveEnd, 'yyyy-MM-dd'),
+          note: leaveNote.trim() || undefined,
+        },
+      });
+      toast.add({ title: 'Đã thêm ngày nghỉ', type: 'success' });
+      resetLeaveForm();
+      onLeaveDialogOpenChange(false);
+    } catch (err) {
+      setLeaveError(getApiErrorMessage(err));
+    }
+  };
+
+  const leaveColumns: DashColumn<StaffLeave>[] = [
     {
       id: 'date',
       header: 'Ngày nghỉ',
-      cell: (row) => <span className="font-bold">{row.date}</span>,
+      cell: (row) => <span className="font-bold">{leaveDateLabel(row)}</span>,
+    },
+    {
+      id: 'days',
+      header: 'Số ngày',
+      cell: (row) => <span className="text-on-surface-variant">{leaveDays(row)} ngày</span>,
     },
     {
       id: 'type',
       header: 'Loại',
       cell: (row) => (
-        <Tag variant={row.type === 'paid' ? 'error' : 'warning'} shape="rounded" size="md">
-          {row.type === 'paid' ? 'Phép năm' : 'Nghỉ ốm'}
+        <Tag
+          variant={row.leave_type === 'ANNUAL' ? 'success' : row.leave_type === 'LATE' ? 'error' : 'warning'}
+          shape="rounded"
+          size="md"
+        >
+          {LEAVE_TYPE_LABEL[row.leave_type]}
         </Tag>
       ),
     },
-    { id: 'reason', header: 'Lý do', className: 'text-on-surface-variant' },
     {
-      id: 'status',
-      header: 'Trạng thái',
-      cell: (row) =>
-        row.status === 'approved' ? (
-          <Tag variant="success" shape="pill" size="md">
-            Đã duyệt
-          </Tag>
-        ) : (
-          <Tag variant="warning" shape="pill" size="md">
-            Chờ duyệt
-          </Tag>
-        ),
-    },
-    {
-      id: 'action',
-      header: 'Thao tác',
-      className: 'text-right',
-      cell: (row) =>
-        row.status === 'pending' ? (
-          <span className="inline-flex gap-2">
-            <button
-              type="button"
-              onClick={() => setLeaveStatus(row.id, 'approved')}
-              className="text-[11px] font-bold text-emerald-600 hover:underline"
-            >
-              Duyệt
-            </button>
-            <button
-              type="button"
-              onClick={() => setLeaves((prev) => prev.filter((l) => l.id !== row.id))}
-              className="text-[11px] font-bold text-error hover:underline"
-            >
-              Từ chối
-            </button>
-          </span>
-        ) : (
-          <span className="text-outline">—</span>
-        ),
+      id: 'note',
+      header: 'Ghi chú',
+      className: 'text-on-surface-variant',
+      cell: (row) => row.note || '—',
     },
   ];
 
@@ -225,58 +258,85 @@ export default function StaffScheduleTab() {
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-bold">Quản lý ngày phép & nghỉ</h3>
             <span className="text-[11px] font-medium text-on-surface-variant">
-              Còn lại:{' '}
-              <b className="text-primary">
-                {mockLeaveBalance.used} / {mockLeaveBalance.total}
-              </b>{' '}
-              ngày phép năm
+              Đã dùng:{' '}
+              <b className="text-primary">{annualUsedDays}</b> / 12 ngày phép năm
             </span>
           </div>
-          <Button size="sm" variant="outline" onClick={() => setLeaveOpen(true)}>
+          <Button size="sm" variant="outline" onClick={() => onLeaveDialogOpenChange(true)}>
             Thêm ngày nghỉ
           </Button>
         </div>
-        <DashTable columns={leaveColumns} data={leaves} getRowId={(r) => r.id} />
+
+        {isError && (
+          <div className="flex items-center justify-between gap-2 rounded-lg border border-error/30 bg-error/5 px-3 py-2 text-xs font-medium text-error">
+            <span>Không tải được ngày nghỉ: {getApiErrorMessage(error)}</span>
+            <button type="button" onClick={() => refetch()} className="font-bold hover:underline">
+              Thử lại
+            </button>
+          </div>
+        )}
+
+        <DashTable
+          columns={leaveColumns}
+          data={leaves}
+          getRowId={(r) => r.id}
+          selectable={false}
+          emptyText={isLoading ? 'Đang tải ngày nghỉ…' : 'Chưa có ngày nghỉ nào.'}
+        />
       </div>
 
       <DashDialog
-        open={leaveOpen}
-        onOpenChange={setLeaveOpen}
+        open={leaveDialogOpen}
+        onOpenChange={handleLeaveDialogOpenChange}
         title="Thêm ngày nghỉ"
-        maxWidth="max-w-md"
+        maxWidth="max-w-lg"
         footer={
           <>
-            <Button variant="outline" size="sm" onClick={() => setLeaveOpen(false)}>
+            <Button variant="outline" size="sm" onClick={() => handleLeaveDialogOpenChange(false)}>
               Hủy
             </Button>
-            <Button size="sm" onClick={handleAddLeave}>
-              Lưu ngày nghỉ
+            <Button size="sm" onClick={handleAddLeave} disabled={isPending}>
+              {isPending ? 'Đang lưu…' : 'Lưu ngày nghỉ'}
             </Button>
           </>
         }
       >
         <div className="space-y-4 py-4">
-          <Field label="Từ ngày">
-            <DashInput
-              type="date"
-              value={leaveStart}
-              onChange={(e) => setLeaveStart(e.target.value)}
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Từ ngày">
+              <DashDatePicker
+                value={leaveStart}
+                onValueChange={setLeaveStart}
+                placeholder="Chọn ngày bắt đầu"
+              />
+            </Field>
+            <Field label="Đến ngày">
+              <DashDatePicker
+                value={leaveEnd}
+                onValueChange={setLeaveEnd}
+                placeholder="Chọn ngày kết thúc"
+              />
+            </Field>
+          </div>
+
+          <Field label="Loại nghỉ">
+            <DashOptionPills
+              value={leaveType ?? undefined}
+              onChange={(value) => setLeaveType(value as StaffLeaveType)}
+              options={LEAVE_TYPE_OPTIONS}
             />
           </Field>
-          <Field label="Đến ngày">
-            <DashInput
-              type="date"
-              value={leaveEnd}
-              onChange={(e) => setLeaveEnd(e.target.value)}
-            />
-          </Field>
-          <Field label="Lý do">
-            <DashInput
-              value={leaveReason}
-              onChange={(e) => setLeaveReason(e.target.value)}
+
+          <Field label="Ghi chú">
+            <Textarea
+              value={leaveNote}
+              onChange={(e) => setLeaveNote(e.target.value)}
               placeholder="Ví dụ: Việc gia đình"
+              rows={3}
+              className="min-h-20 resize-none text-sm"
             />
           </Field>
+
           {leaveError && <p className="text-xs font-medium text-error">{leaveError}</p>}
         </div>
       </DashDialog>

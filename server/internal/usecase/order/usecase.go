@@ -26,6 +26,7 @@ type OrderUsecase struct {
 	customers    domain.CustomerStore
 	appointments domain.AppointmentStore
 	staff        domain.StaffStore
+	settings     domain.SettingStore
 }
 
 // CatalogChecker kiểm tra service/product của dòng đơn có thuộc đúng organization không.
@@ -35,7 +36,7 @@ type CatalogChecker interface {
 	ProductsExistInOrg(ctx context.Context, orgID string, productIDs []string) ([]string, error)
 }
 
-func NewOrderUsecase(repo domain.OrderRepository, catalog CatalogChecker, products domain.ProductStore, services domain.ServiceStore, customers domain.CustomerStore, appointments domain.AppointmentStore, staff domain.StaffStore) *OrderUsecase {
+func NewOrderUsecase(repo domain.OrderRepository, catalog CatalogChecker, products domain.ProductStore, services domain.ServiceStore, customers domain.CustomerStore, appointments domain.AppointmentStore, staff domain.StaffStore, settings domain.SettingStore) *OrderUsecase {
 	return &OrderUsecase{
 		repo:         repo,
 		catalog:      catalog,
@@ -44,6 +45,7 @@ func NewOrderUsecase(repo domain.OrderRepository, catalog CatalogChecker, produc
 		customers:    customers,
 		appointments: appointments,
 		staff:        staff,
+		settings:     settings,
 	}
 }
 
@@ -56,6 +58,13 @@ func isUniqueViolation(err error) bool {
 	return errors.As(err, &pgErr) && pgErr.Code == "23505"
 }
 
+// isUniqueViolationOn nhận diện unique violation theo tên constraint/index,
+// dùng cho partial index chống trùng đơn theo lịch hẹn.
+func isUniqueViolationOn(err error, constraint string) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == constraint
+}
+
 // ---------- 1. Tạo đơn ----------
 
 // CreateOrder tạo đơn từ POS: validate dòng hàng, resolve khách (cũ/mới/walk-in),
@@ -63,6 +72,10 @@ func isUniqueViolation(err error) bool {
 // Đơn tổng 0đ thì paid luôn, ngược lại pending_payment.
 func (u *OrderUsecase) CreateOrder(ctx context.Context, req *domain.CreateOrderRequest) (*domain.OrderResponse, error) {
 	orgID, err := shared.RequireOrgID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	createdBy, err := shared.RequireUserID(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -79,6 +92,16 @@ func (u *OrderUsecase) CreateOrder(ctx context.Context, req *domain.CreateOrderR
 	}
 	if err := u.checkReferencesInOrg(ctx, orgID, req); err != nil {
 		return nil, err
+	}
+
+	// Tạo đơn từ lịch hẹn: chặn lịch không hợp lệ / đã có đơn còn hiệu lực.
+	appointmentID := strings.TrimSpace(utils.StrVal(req.AppointmentID))
+	appointmentStatus := ""
+	if appointmentID != "" {
+		appointmentStatus, err = u.validateAppointmentForOrder(ctx, orgID, appointmentID)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	var serviceIDs, productIDs []string
@@ -115,6 +138,7 @@ func (u *OrderUsecase) CreateOrder(ctx context.Context, req *domain.CreateOrderR
 		DiscountAmount: req.DiscountAmount,
 		TotalAmount:    total,
 		Status:         status,
+		CreatedBy:      &createdBy,
 	}
 	if err := order.Validate(); err != nil {
 		return nil, apperror.New(400, err.Error(), err)
@@ -132,6 +156,9 @@ func (u *OrderUsecase) CreateOrder(ctx context.Context, req *domain.CreateOrderR
 
 	if err := u.repo.CreateOrder(ctx, order, items, materials, deductList); err != nil {
 		log.Println("Error creating order:", err)
+		if isUniqueViolationOn(err, "uq_orders_appointment_active") {
+			return nil, apperror.New(400, "Lịch hẹn này đã có đơn hàng còn hiệu lực", err)
+		}
 		if errors.Is(err, domain.ErrInsufficientStock) {
 			return nil, apperror.New(400, "Tồn kho không đủ cho đơn hàng này", err)
 		}
@@ -140,34 +167,18 @@ func (u *OrderUsecase) CreateOrder(ctx context.Context, req *domain.CreateOrderR
 		}
 		return nil, apperror.New(500, "Lỗi khi tạo đơn hàng", err)
 	}
-
-	if total == 0 {
-		// Đơn 0đ (khuyến mãi 100%) chốt luôn: trừ kho + sinh phiếu bán hàng ngay.
-		// Đơn thuần dịch vụ không có dòng kho thì chỉ flip trạng thái.
-		var zeroLines []domain.SaleSlipLine
-		for _, it := range items {
-			if it.ItemType == domain.ItemTypeProduct && it.ProductID != nil {
-				zeroLines = append(zeroLines, domain.SaleSlipLine{
-					ProductID: *it.ProductID, Quantity: it.Quantity, UnitPrice: it.UnitPrice,
-				})
-			}
+	// Đơn tạo xong coi như bắt đầu phục vụ: best-effort đưa lịch sang
+	// in_progress (đơn 0đ chốt ngay thì sang completed). Lỗi chỉ log để không
+	// khiến client retry (đơn đã tồn tại).
+	if appointmentID != "" {
+		targetStatus := "in_progress"
+		if order.Status == domain.StatusCompleted {
+			targetStatus = "completed"
 		}
-		for _, m := range materials {
-			zeroLines = append(zeroLines, domain.SaleSlipLine{
-				ProductID: m.ProductID, Quantity: m.Quantity, UnitPrice: m.UnitCostAtTime,
-			})
-		}
-		if len(zeroLines) == 0 {
-			if err := u.repo.UpdateOrderStatus(ctx, orgID, orderID, domain.StatusCompleted); err != nil {
-				log.Println("Error auto-completing zero-total order:", err)
-				return nil, apperror.New(500, "Lỗi khi chốt đơn 0đ", err)
+		if appointmentStatus != targetStatus {
+			if err := u.appointments.UpdateAppointmentStatus(ctx, orgID, appointmentID, targetStatus, ""); err != nil {
+				log.Println("Error updating appointment status after creating order:", err)
 			}
-			order.Status = domain.StatusCompleted
-		} else if _, err := u.repo.CompleteOrderWithSlip(ctx, orgID, orderID, zeroLines); err != nil {
-			log.Println("Error auto-completing zero-total order:", err)
-			return nil, apperror.New(500, "Lỗi khi chốt đơn 0đ", err)
-		} else {
-			order.Status = domain.StatusCompleted
 		}
 	}
 
@@ -175,6 +186,28 @@ func (u *OrderUsecase) CreateOrder(ctx context.Context, req *domain.CreateOrderR
 	resp.CustomerName = customerName
 	resp.CustomerReused = customerReused
 	return resp, nil
+}
+
+// validateAppointmentForOrder chặn lịch đã kết thúc/hủy/không đến và chặn
+// tạo trùng đơn cho cùng lịch hẹn. Trả về trạng thái hiện tại của lịch.
+func (u *OrderUsecase) validateAppointmentForOrder(ctx context.Context, orgID, appointmentID string) (string, error) {
+	status, err := u.appointments.GetAppointmentStatus(ctx, orgID, appointmentID)
+	if err != nil {
+		return "", apperror.New(500, "Lỗi khi lấy trạng thái lịch hẹn", err)
+	}
+	switch status {
+	case "completed", "cancelled", "no_show":
+		return "", apperror.New(400, fmt.Sprintf("Lịch hẹn ở trạng thái %s không thể tạo đơn", status), nil)
+	}
+
+	existing, err := u.repo.FindActiveOrderByAppointment(ctx, orgID, appointmentID)
+	if err != nil {
+		return "", apperror.New(500, "Lỗi khi kiểm tra đơn của lịch hẹn", err)
+	}
+	if existing != nil {
+		return "", apperror.New(400, fmt.Sprintf("Lịch hẹn đã có đơn %s", existing.Code), nil)
+	}
+	return status, nil
 }
 
 // AddOrderItems thêm dòng hàng vào đơn (chỉ pending/confirm).
@@ -441,7 +474,7 @@ func (u *OrderUsecase) GetOrderDetail(ctx context.Context, id string) (*domain.O
 // completeWithSlip chốt 1 đơn đã load sẵn: gom lines SP + vật tư rồi gọi
 // repo chạy 1 tx (flip completed + trừ kho + nhả giữ chỗ + sổ sale + phiếu).
 // Dùng chung cho nút chốt tay và auto-chốt khi thu đủ tiền.
-func (u *OrderUsecase) completeWithSlip(ctx context.Context, orgID string, order *domain.Order) (*domain.OrderCompleteResponse, error) {
+func (u *OrderUsecase) completeWithSlip(ctx context.Context, orgID string, order *domain.Order, fundID string) (*domain.OrderCompleteResponse, error) {
 	items, materials, err := u.loadItemsAndMaterials(ctx, orgID, order.ID)
 	if err != nil {
 		return nil, err
@@ -470,7 +503,7 @@ func (u *OrderUsecase) completeWithSlip(ctx context.Context, orgID string, order
 		return nil, err
 	}
 
-	slip, err := u.repo.CompleteOrderWithSlip(ctx, orgID, order.ID, lines)
+	slip, err := u.repo.CompleteOrderWithSlip(ctx, orgID, order.ID, order.AppointmentID, lines, fundID)
 	if err != nil {
 		log.Println("Error completing order:", err)
 		if errors.Is(err, domain.ErrOrderNotFound) {
@@ -496,6 +529,7 @@ func (u *OrderUsecase) completeWithSlip(ctx context.Context, orgID string, order
 
 // CompleteOrder chốt tay đơn pending/confirm/delivery: trừ kho thật +
 // nhả giữ chỗ + ghi sổ sale + sinh phiếu bán hàng. Tồn không đủ thì 400.
+/* xóa  */
 func (u *OrderUsecase) CompleteOrder(ctx context.Context, id string) (*domain.OrderCompleteResponse, error) {
 	id, err := shared.RequireID(id, "Thiếu id đơn hàng")
 	if err != nil {
@@ -516,9 +550,10 @@ func (u *OrderUsecase) CompleteOrder(ctx context.Context, id string) (*domain.Or
 		"Chỉ chốt đơn ở trạng thái chờ/xác nhận/giao hàng"); err != nil {
 		return nil, err
 	}
-
-	return u.completeWithSlip(ctx, orgID, order)
+	return nil, nil
+	// return u.completeWithSlip(ctx, orgID, order)
 }
+
 
 // CancelOrder hủy đơn chưa chốt (pending/confirm/delivery), chỉ nhả giữ chỗ kho.
 func (u *OrderUsecase) CancelOrder(ctx context.Context, id string) (*domain.OrderResponse, error) {
@@ -891,6 +926,11 @@ func (u *OrderUsecase) CreatePayment(ctx context.Context, orderID string, req *d
 		return nil, err
 	}
 
+	method, err := u.settings.GetPaymentMethodByID(ctx, orgID, req.MethodPaymentID)
+	if err != nil {
+		return nil, err
+	}
+
 	payment := &domain.Payment{
 		ID:             utils.NewID(),
 		OrganizationID: orgID,
@@ -955,7 +995,7 @@ func (u *OrderUsecase) CreatePayment(ctx context.Context, orderID string, req *d
 		// Thu đủ thì chốt đơn luôn: trừ kho + nhả giữ chỗ + sổ sale + phiếu bán hàng.
 		// NOTE: thanh toán ở trên đã ghi nhận; nếu chốt lỗi (vd hết kho) thì đơn
 		// ở lại trạng thái cũ để nhân viên xử lý, tiền đã thu không mất.
-		if _, err := u.completeWithSlip(ctx, orgID, order); err != nil {
+		if _, err := u.completeWithSlip(ctx, orgID, order, method.FundID); err != nil {
 			log.Println("Error auto-completing paid order:", err)
 			return nil, err
 		}

@@ -5,6 +5,7 @@ import (
 
 	customerdomain "github.com/daidat02/server/internal/domain/customer"
 	domain "github.com/daidat02/server/internal/domain/order"
+	settingDomain "github.com/daidat02/server/internal/domain/setting"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -39,8 +40,24 @@ func (m *MockOrderRepository) GetOrderStats(ctx context.Context, orgID string) (
 	return args.Get(0).(*domain.OrderStatsResponse), args.Error(1)
 }
 
+func (m *MockOrderRepository) GetStaffCommissionStats(ctx context.Context, orgID, staffID, dateFrom, dateTo string) (*domain.StaffCommissionStats, error) {
+	args := m.Called(ctx, orgID, staffID, dateFrom, dateTo)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*domain.StaffCommissionStats), args.Error(1)
+}
+
 func (m *MockOrderRepository) GetOrderByID(ctx context.Context, orgID, id string) (*domain.Order, error) {
 	args := m.Called(ctx, orgID, id)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*domain.Order), args.Error(1)
+}
+
+func (m *MockOrderRepository) FindActiveOrderByAppointment(ctx context.Context, orgID, appointmentID string) (*domain.Order, error) {
+	args := m.Called(ctx, orgID, appointmentID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
@@ -127,8 +144,8 @@ func (m *MockOrderRepository) ApplyCancel(ctx context.Context, orgID, orderID, n
 	return args.Error(0)
 }
 
-func (m *MockOrderRepository) CompleteOrderWithSlip(ctx context.Context, orgID, orderID string, lines []domain.SaleSlipLine) (domain.SaleSlipResult, error) {
-	args := m.Called(ctx, orgID, orderID, lines)
+func (m *MockOrderRepository) CompleteOrderWithSlip(ctx context.Context, orgID, orderID string, appointmentID *string, lines []domain.SaleSlipLine, fundID string) (domain.SaleSlipResult, error) {
+	args := m.Called(ctx, orgID, orderID, appointmentID, lines, fundID)
 	if args.Get(0) == nil {
 		return domain.SaleSlipResult{}, args.Error(1)
 	}
@@ -267,6 +284,16 @@ func (m *MockAppointmentStore) AppointmentExistsInOrg(ctx context.Context, orgID
 	return args.Bool(0), args.Error(1)
 }
 
+func (m *MockAppointmentStore) GetAppointmentStatus(ctx context.Context, orgID, appointmentID string) (string, error) {
+	args := m.Called(ctx, orgID, appointmentID)
+	return args.String(0), args.Error(1)
+}
+
+func (m *MockAppointmentStore) UpdateAppointmentStatus(ctx context.Context, orgID, id, status, cancelReason string) error {
+	args := m.Called(ctx, orgID, id, status, cancelReason)
+	return args.Error(0)
+}
+
 // MockCatalogChecker giả lập CatalogChecker
 type MockCatalogChecker struct {
 	mock.Mock
@@ -286,4 +313,16 @@ func (m *MockCatalogChecker) ProductsExistInOrg(ctx context.Context, orgID strin
 		return nil, args.Error(1)
 	}
 	return args.Get(0).([]string), args.Error(1)
+}
+
+type MockSettingStore struct {
+	mock.Mock
+}
+
+func (m *MockSettingStore) GetPaymentMethodByID(ctx context.Context, orgID string, code *string) (*settingDomain.PaymentMethod, error) {
+	args := m.Called(ctx, orgID, code)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*settingDomain.PaymentMethod), args.Error(1)
 }

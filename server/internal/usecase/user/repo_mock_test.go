@@ -12,8 +12,8 @@ type MockUserRepository struct {
 	mock.Mock
 }
 
-func (m *MockUserRepository) CreateUser(ctx context.Context, user *userdomain.User) error {
-	args := m.Called(ctx, user)
+func (m *MockUserRepository) CreateUser(ctx context.Context, orgID string, user *userdomain.User) error {
+	args := m.Called(ctx, orgID, user)
 	return args.Error(0)
 }
 

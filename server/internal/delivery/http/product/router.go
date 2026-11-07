@@ -11,6 +11,7 @@ func RegisterProductRoutes(r *gin.Engine, h *ProductHandler, basePath string) {
 	{
 		group.GET("", h.GetProductsByOrgID)
 		group.GET("/stats", h.GetProductStats)
+		group.GET("/:id", h.GetProductByID)
 		group.POST("", h.CreateProduct)
 		group.PUT("/:id", h.UpdateProduct)
 		group.DELETE("/:id", h.DeleteProduct)

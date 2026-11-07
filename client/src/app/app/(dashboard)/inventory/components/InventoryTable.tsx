@@ -15,6 +15,7 @@ export default function InventoryTable() {
   const searchParams = useSearchParams();
   const search = searchParams.get('search') || '';
   const status = searchParams.get('status') || '';
+  const categoryId = searchParams.get('category_id') || '';
   const sort = searchParams.get('sort') || '';
   const pageFromUrl = parseInt(searchParams.get('page') || '1', 10) || 1;
 
@@ -26,6 +27,7 @@ export default function InventoryTable() {
     pageSize,
     search,
     status,
+    categoryId,
     sort,
   });
 
