@@ -191,32 +191,45 @@ func applyDocumentLedger(ctx context.Context, tx pgx.Tx, orgID string, doc *doma
 // insertInventoryExpenseVoucherTx sinh phiếu chi đã duyệt cho tiền đã trả khi
 // nhập hàng, chạy trong cùng tx tạo phiếu nên rollback nếu quỹ không đủ.
 func insertInventoryExpenseVoucherTx(ctx context.Context, tx pgx.Tx, doc *domain.InventoryDocument) error {
-	if doc == nil || doc.FundID == nil || *doc.FundID == "" || doc.PaidAmount <= 0 {
+	if doc == nil || doc.FundID == nil {
+		return nil
+	}
+	return createInventoryExpenseVoucherTx(ctx, tx, doc.OrganizationID, doc.ID, doc.DocumentCode, *doc.FundID, doc.PaidAmount, nil, doc.CreatedBy)
+}
+
+func createInventoryExpenseVoucherTx(
+	ctx context.Context, tx pgx.Tx, orgID, documentID, documentCode, fundID string,
+	amount float64, note *string, createdBy *string,
+) error {
+	if fundID == "" || amount <= 0 {
 		return nil
 	}
 
 	var categoryID *string
 	var resolvedCategory string
-	if err := tx.QueryRow(ctx, findActiveCategoryIDByCodeQuery, doc.OrganizationID, "GOODS_IMPORT", cashflowdomain.KindExpense).Scan(&resolvedCategory); err == nil {
+	if err := tx.QueryRow(ctx, findActiveCategoryIDByCodeQuery, orgID, "GOODS_IMPORT", cashflowdomain.KindExpense).Scan(&resolvedCategory); err == nil {
 		categoryID = &resolvedCategory
 	} else if err != pgx.ErrNoRows {
 		return fmt.Errorf("lỗi khi tìm danh mục chi phí nhập hàng: %w", err)
 	}
 
 	now := time.Now()
-	desc := "Chi tiền nhập hàng phiếu " + doc.DocumentCode
+	desc := "Chi tiền nhập hàng phiếu " + documentCode
+	if note != nil && strings.TrimSpace(*note) != "" {
+		desc += " - " + strings.TrimSpace(*note)
+	}
 	voucher := &cashflowdomain.CashFlow{
 		ID:                  utils.NewID(),
-		OrganizationID:      doc.OrganizationID,
+		OrganizationID:      orgID,
 		Kind:                cashflowdomain.KindExpense,
 		CategoryID:          categoryID,
-		FundID:              *doc.FundID,
-		Amount:              doc.PaidAmount,
+		FundID:              fundID,
+		Amount:              amount,
 		Description:         &desc,
 		OccurredAt:          &now,
 		Status:              cashflowdomain.VoucherStatusApproved,
-		InventoryDocumentID: &doc.ID,
-		CreatedBy:           doc.CreatedBy,
+		InventoryDocumentID: &documentID,
+		CreatedBy:           createdBy,
 	}
 
 	for attempts := 0; ; attempts++ {
@@ -339,6 +352,63 @@ func (r *PostgresInventoryRepository) CreateDocument(ctx context.Context, doc *d
 	return nil
 }
 
+// AddPayment ghi nhận trả nợ sau: khóa phiếu, validate số còn nợ, tạo phiếu
+// chi approved (trừ quỹ) và cộng paid_amount trong cùng transaction.
+func (r *PostgresInventoryRepository) AddPayment(
+	ctx context.Context, orgID, documentID, fundID string,
+	amount float64, note *string, createdBy *string,
+) error {
+	if amount <= 0 {
+		return domain.ErrInvalidPaymentAmount
+	}
+
+	dbTx, err := r.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("lỗi khi bắt đầu transaction: %w", err)
+	}
+	defer dbTx.Rollback(ctx)
+
+	var tracked bool
+	var totalAmount, paidAmount float64
+	var documentCode string
+	if err := dbTx.QueryRow(ctx, lockInventoryDocumentForPaymentQuery, documentID, orgID).
+		Scan(&tracked, &totalAmount, &paidAmount, &documentCode); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.ErrInventoryNotFound
+		}
+		return fmt.Errorf("lỗi khi khóa phiếu nhập: %w", err)
+	}
+	if !tracked {
+		return domain.ErrPaymentNotTracked
+	}
+	remaining := totalAmount - paidAmount
+	if amount > remaining {
+		return domain.ErrPaymentExceedsRemaining
+	}
+
+	if _, err := dbTx.Exec(ctx, increaseInventoryDocumentPaidAmountQuery, documentID, orgID, amount); err != nil {
+		return fmt.Errorf("lỗi khi cập nhật số đã trả của phiếu nhập: %w", err)
+	}
+
+	if err := createInventoryExpenseVoucherTx(ctx, dbTx, orgID, documentID, documentCode, fundID, amount, note, createdBy); err != nil {
+		return err
+	}
+
+	if err := dbTx.Commit(ctx); err != nil {
+		return fmt.Errorf("lỗi khi commit thanh toán phiếu nhập: %w", err)
+	}
+	return nil
+}
+
+// GetDocumentPayments trả lịch sử các phiếu chi gắn với phiếu nhập.
+func (r *PostgresInventoryRepository) GetDocumentPayments(ctx context.Context, orgID, documentID string) ([]*domain.InventoryPaymentResponse, error) {
+	payments := make([]*domain.InventoryPaymentResponse, 0)
+	if err := r.qx.SelectContext(ctx, &payments, listInventoryPaymentsQuery, orgID, documentID); err != nil {
+		return nil, fmt.Errorf("lỗi khi lấy lịch sử thanh toán phiếu nhập: %w", err)
+	}
+	return payments, nil
+}
+
 func (r *PostgresInventoryRepository) GetDocumentsByOrgID(ctx context.Context, orgID string, search string, sort string, filter string, limit, offset int) ([]*domain.DocumentResponse, error) {
 	query := listInventoryDocumentsQuery + searchInventoryFilter + filterInventoryType + sortInventoryFilter
 	var formatSearch = ""
@@ -455,9 +525,15 @@ func (r *PostgresInventoryRepository) GetDocumentByID(ctx context.Context, orgID
 		}
 	}
 
+	payments, err := r.GetDocumentPayments(ctx, orgID, documentID)
+	if err != nil {
+		return nil, err
+	}
+
 	response := &domain.DocumentDetailResponse{
 		Document: &rawQueryResult.DocumentResponse,
 		Items:    items,
+		Payments: payments,
 	}
 	return response, nil
 }

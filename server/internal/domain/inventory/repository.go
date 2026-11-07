@@ -11,6 +11,15 @@ var ErrInventoryNotFound = errors.New("inventory transaction not found")
 // ErrInsufficientStock dùng để usecase map 400 khi phiếu làm âm kho.
 var ErrInsufficientStock = errors.New("insufficient stock")
 
+// ErrPaymentNotTracked: phiếu cũ không theo dõi công nợ, không được trả nợ.
+var ErrPaymentNotTracked = errors.New("inventory payment is not tracked")
+
+// ErrPaymentExceedsRemaining: số tiền trả vượt quá số còn nợ.
+var ErrPaymentExceedsRemaining = errors.New("payment exceeds remaining amount")
+
+// ErrInvalidPaymentAmount: số tiền thanh toán không hợp lệ.
+var ErrInvalidPaymentAmount = errors.New("invalid payment amount")
+
 type InventoryRepository interface {
 	CreateTransaction(ctx context.Context, tx *InventoryTransaction) error
 	CreateDocument(ctx context.Context, doc *InventoryDocument, items []*DocumentItemInput) error
@@ -23,6 +32,7 @@ type InventoryRepository interface {
 	CountLowStockProducts(ctx context.Context, orgID string) (int64, error)
 	GetInventoryStats(ctx context.Context, orgID string) (*InventoryStatsResponse, error)
 	GetDocumentByID(ctx context.Context, orgID string, documentID string) (*DocumentDetailResponse, error)
+	AddPayment(ctx context.Context, orgID, documentID, fundID string, amount float64, note *string, createdBy *string) error
 	GetInventoryTransactionsByProdID(ctx context.Context, orgID string, productID string, limit int, offset int, sort string, inventory_type string, date string) ([]*InventoryTransactionResponse, error)
 	CountInventoryTransactionsByProdID(ctx context.Context, orgID string, productID string) (int64, error)
 }

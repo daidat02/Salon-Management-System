@@ -124,3 +124,8 @@ func (m *MockInventoryRepository) CountInventoryTransactionsByProdID(ctx context
 	args := m.Called(ctx, orgID, productID)
 	return args.Get(0).(int64), args.Error(1)
 }
+
+func (m *MockInventoryRepository) AddPayment(ctx context.Context, orgID, documentID, fundID string, amount float64, note *string, createdBy *string) error {
+	args := m.Called(ctx, orgID, documentID, fundID, amount, note, createdBy)
+	return args.Error(0)
+}

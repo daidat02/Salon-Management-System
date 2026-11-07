@@ -15,6 +15,7 @@ func RegisterInventoryRoutes(r *gin.Engine, h *InventoryHandler, basePath string
 		group.GET("/low-stock", h.GetLowStockProducts)
 		group.GET("/stats", h.GetInventoryStats)
 		group.GET("/:document_id", h.GetDocumentByID)
+		group.POST("/:document_id/payments", h.AddPayment)
 		group.GET("/transactions/:product_id", h.GetTransactionsByProductID)
 	}
 }

@@ -109,8 +109,27 @@ type DocumentResponse struct {
 }
 
 type DocumentDetailResponse struct {
-	Document *DocumentResponse       `json:"document"`
-	Items    []*DocumentItemResponse `json:"items"`
+	Document *DocumentResponse           `json:"document"`
+	Items    []*DocumentItemResponse     `json:"items"`
+	Payments []*InventoryPaymentResponse `json:"payments"`
+}
+
+type CreateInventoryPaymentRequest struct {
+	FundID string  `json:"fund_id"`
+	Amount float64 `json:"amount"`
+	Note   *string `json:"note"`
+}
+
+type InventoryPaymentResponse struct {
+	ID          string     `json:"id" db:"id"`
+	Code        string     `json:"code" db:"code"`
+	Amount      float64    `json:"amount" db:"amount"`
+	FundID      string     `json:"fund_id" db:"fund_id"`
+	FundName    string     `json:"fund_name" db:"fund_name"`
+	Description *string    `json:"description" db:"description"`
+	OccurredAt  *time.Time `json:"occurred_at" db:"occurred_at"`
+	Status      string     `json:"status" db:"status"`
+	CreatedAt   *time.Time `json:"created_at" db:"created_at"`
 }
 type DocumentQueryResult struct {
 	DocumentResponse

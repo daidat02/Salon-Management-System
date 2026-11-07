@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import useInventoryDocument from '@/hooks/use-inventory-document';
 import { getApiErrorMessage } from '@/services/apiClient';
@@ -11,6 +12,7 @@ import VoucherDetailInfoCard from './VoucherDetailInfoCard';
 import VoucherDetailItemsCard from './VoucherDetailItemsCard';
 import VoucherDetailFinanceCard from './VoucherDetailFinanceCard';
 import VoucherDebtCard from './VoucherDebtCard';
+import VoucherPaymentDialog from './VoucherPaymentDialog';
 
 function toVoucherType(type: string): VoucherType {
   return type === 'export' || type === 'sale' ? 'outbound' : 'inbound';
@@ -20,6 +22,7 @@ function toVoucherType(type: string): VoucherType {
 export default function VoucherDetailView() {
   const params = useParams<{ id: string }>();
   const id = params?.id;
+  const [paymentOpen, setPaymentOpen] = useState(false);
   const { data, isLoading, isError, error } = useInventoryDocument(id);
 
   if (isLoading) {
@@ -41,7 +44,7 @@ export default function VoucherDetailView() {
     );
   }
 
-  const { document, items } = data;
+  const { document, items, payments } = data;
 
   return (
     <div className="space-y-4">
@@ -56,9 +59,21 @@ export default function VoucherDetailView() {
 
         <div className="space-y-6 lg:col-span-4">
           <VoucherDetailFinanceCard document={document} items={items} />
-          <VoucherDebtCard document={document} />
+          <VoucherDebtCard
+            document={document}
+            payments={payments}
+            onPay={() => setPaymentOpen(true)}
+          />
         </div>
       </div>
+
+      {paymentOpen && (
+        <VoucherPaymentDialog
+          document={document}
+          onOpenChange={setPaymentOpen}
+          onSuccess={() => setPaymentOpen(false)}
+        />
+      )}
     </div>
   );
 }

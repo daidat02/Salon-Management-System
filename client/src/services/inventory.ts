@@ -76,6 +76,20 @@ export const createInventoryDocument = async (payload: CreateDocumentPayload) =>
   return res.data.data;
 };
 
+export type AddInventoryPaymentPayload = {
+  fund_id: string;
+  amount: number;
+  note?: string | null;
+};
+
+export const addInventoryPayment = async (id: string, payload: AddInventoryPaymentPayload) => {
+  const res = await apiClient.post<ApiResponse<InventoryDocumentDetail>>(
+    API_ENDPOINTS.INVENTORY.ADD_PAYMENT(id),
+    payload,
+  );
+  return res.data.data;
+};
+
 export const getInventoryDocument = async (id: string) => {
   const res = await apiClient.get<ApiResponse<InventoryDocumentDetail>>(
     `${INVENTORY_ENDPOINT.GET_DOCUMENT_DETAIL(id)}`,

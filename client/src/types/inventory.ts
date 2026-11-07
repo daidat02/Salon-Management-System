@@ -76,7 +76,20 @@ export interface InventoryStats {
   import_documents_month: number;
 }
 
+export interface InventoryPayment {
+  id: string;
+  code: string;
+  amount: number;
+  fund_id: string;
+  fund_name: string;
+  description: string | null;
+  occurred_at: string | null;
+  status: string;
+  created_at: string | null;
+}
+
 export interface InventoryDocumentDetail {
   document: InventoryDocument;
   items: InventoryDocumentItem[];
+  payments: InventoryPayment[];
 }

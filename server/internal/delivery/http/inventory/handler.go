@@ -205,3 +205,33 @@ func (h *InventoryHandler) GetTransactionsByProductID(c *gin.Context) {
 	}
 	response.Success(c, 200, "Lịch sử kho theo sản phẩm", result)
 }
+
+// AddPayment godoc
+// @Summary      Ghi nhận trả nợ sau cho phiếu nhập
+// @Tags         Inventory
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        document_id  path      string  true  "ID phiếu nhập"
+// @Param        body         body      domain.CreateInventoryPaymentRequest  true  "Quỹ, số tiền và ghi chú thanh toán"
+// @Success      200          {object}  response.SuccessResponse  "Chi tiết phiếu nhập sau khi thanh toán"
+// @Failure      400          {object}  response.ErrorResponse    "Số tiền/quỹ không hợp lệ hoặc vượt số còn nợ"
+// @Failure      401          {object}  response.ErrorResponse    "Thiếu token / token không hợp lệ"
+// @Failure      404          {object}  response.ErrorResponse    "Phiếu kho không tồn tại"
+// @Router       /inventory/{document_id}/payments [post]
+func (h *InventoryHandler) AddPayment(c *gin.Context) {
+	documentID := c.Param("document_id")
+	var req domain.CreateInventoryPaymentRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, apperror.New(400, "Dữ liệu không hợp lệ", err))
+		c.Abort()
+		return
+	}
+	result, err := h.uc.AddPayment(c.Request.Context(), documentID, &req)
+	if err != nil {
+		response.Error(c, err)
+		c.Abort()
+		return
+	}
+	response.Success(c, 200, "Đã ghi nhận thanh toán phiếu nhập", result)
+}

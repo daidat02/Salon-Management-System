@@ -48,6 +48,7 @@ export const API_ENDPOINTS = {
     GET_DOCUMENTS: `${API_BASE}/inventory/`,
     CREATE_DOCUMENT: `${API_BASE}/inventory/`,
     GET_DOCUMENT_DETAIL: (documentId: string) => `${API_BASE}/inventory/${documentId}`,
+    ADD_PAYMENT: (documentId: string) => `${API_BASE}/inventory/${documentId}/payments`,
     GET_STATS: `${API_BASE}/inventory/stats`,
     GET_TRANSACTIONS: `${API_BASE}/inventory/transactions`,
     GET_TRANSACTION_DETAIL: (transactionId: string) =>

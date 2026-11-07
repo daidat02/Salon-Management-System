@@ -304,3 +304,35 @@ const (
 		WHERE it.organization_id = $1 AND it.product_id = $2
 	`
 )
+
+const (
+	lockInventoryDocumentForPaymentQuery = `
+		SELECT payment_tracked, total_amount, paid_amount, document_code
+		FROM inventory_documents
+		WHERE id = $1 AND organization_id = $2
+		FOR UPDATE
+	`
+	increaseInventoryDocumentPaidAmountQuery = `
+		UPDATE inventory_documents
+		SET paid_amount = paid_amount + $3
+		WHERE id = $1 AND organization_id = $2
+	`
+	listInventoryPaymentsQuery = `
+		SELECT
+			cf.id,
+			cf.code,
+			cf.amount,
+			cf.fund_id,
+			f.name AS fund_name,
+			cf.description,
+			cf.occurred_at,
+			cf.status,
+			cf.created_at
+		FROM cash_flows cf
+		JOIN funds f ON f.id = cf.fund_id
+		WHERE cf.organization_id = $1
+			AND cf.inventory_document_id = $2
+			AND cf.deleted_at IS NULL
+		ORDER BY cf.occurred_at DESC, cf.created_at DESC
+	`
+)

@@ -2259,6 +2259,69 @@ const docTemplate = `{
                 }
             }
         },
+        "/inventory/{document_id}/payments": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Inventory"
+                ],
+                "summary": "Ghi nhận trả nợ sau cho phiếu nhập",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID phiếu nhập",
+                        "name": "document_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Quỹ, số tiền và ghi chú thanh toán",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_internal_domain_inventory.CreateInventoryPaymentRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Chi tiết phiếu nhập sau khi thanh toán",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Số tiền/quỹ không hợp lệ hoặc vượt số còn nợ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Thiếu token / token không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Phiếu kho không tồn tại",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/login": {
             "post": {
                 "consumes": [
@@ -5643,6 +5706,20 @@ const docTemplate = `{
                 },
                 "vat_rate": {
                     "type": "number"
+                }
+            }
+        },
+        "github_com_daidat02_server_internal_domain_inventory.CreateInventoryPaymentRequest": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "number"
+                },
+                "fund_id": {
+                    "type": "string"
+                },
+                "note": {
+                    "type": "string"
                 }
             }
         },

@@ -1,8 +1,12 @@
 'use client';
 
-import { AlertTriangle, CheckCircle2, Clock3, HandCoins } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Clock3, HandCoins, Plus } from 'lucide-react';
 import { formatPlain as formatVND } from '@/lib/format';
-import type { InventoryDocument, InventoryPaymentStatus } from '@/types/inventory';
+import type {
+  InventoryDocument,
+  InventoryPayment,
+  InventoryPaymentStatus,
+} from '@/types/inventory';
 
 const statusMeta: Record<
   InventoryPaymentStatus,
@@ -32,9 +36,11 @@ const statusMeta: Record<
 
 type VoucherDebtCardProps = {
   document: InventoryDocument;
+  payments: InventoryPayment[];
+  onPay?: () => void;
 };
 
-export default function VoucherDebtCard({ document }: VoucherDebtCardProps) {
+export default function VoucherDebtCard({ document, payments, onPay }: VoucherDebtCardProps) {
   if (!document.payment_tracked) return null;
 
   const meta = statusMeta[document.payment_status];
@@ -89,6 +95,54 @@ export default function VoucherDebtCard({ document }: VoucherDebtCardProps) {
           </div>
         )}
       </div>
+
+      {document.payment_status !== 'paid' && onPay && (
+        <button
+          type="button"
+          onClick={onPay}
+          className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary py-2 text-xs font-semibold text-on-primary shadow-sm transition-colors hover:bg-primary/95"
+        >
+          <Plus className="h-4 w-4" />
+          Thanh toán công nợ
+        </button>
+      )}
+
+      {payments.length > 0 && (
+        <div className="space-y-2 border-t border-outline pt-3">
+          <div className="text-[11px] font-semibold tracking-wider text-on-surface-variant uppercase">
+            Lịch sử thanh toán
+          </div>
+          {payments.map((payment) => (
+            <div
+              key={payment.id}
+              className="rounded-md bg-surface-container px-2.5 py-2 text-[11px]"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-semibold text-on-surface">{payment.code}</span>
+                <span className="font-semibold text-success">
+                  {formatVND(payment.amount)} đ
+                </span>
+              </div>
+              <div className="mt-0.5 flex items-center justify-between text-on-surface-variant">
+                <span className="truncate">{payment.fund_name}</span>
+                <span>
+                  {payment.occurred_at
+                    ? new Date(payment.occurred_at).toLocaleString('vi-VN', {
+                        dateStyle: 'short',
+                        timeStyle: 'short',
+                      })
+                    : '—'}
+                </span>
+              </div>
+              {payment.description && (
+                <div className="mt-0.5 truncate text-on-surface-variant">
+                  {payment.description}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </section>
   );
 }

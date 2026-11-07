@@ -219,6 +219,15 @@ definitions:
       vat_rate:
         type: number
     type: object
+  github_com_daidat02_server_internal_domain_inventory.CreateInventoryPaymentRequest:
+    properties:
+      amount:
+        type: number
+      fund_id:
+        type: string
+      note:
+        type: string
+    type: object
   github_com_daidat02_server_internal_domain_inventory.DocumentItemInput:
     properties:
       discount_amount:
@@ -2115,6 +2124,46 @@ paths:
       security:
       - BearerAuth: []
       summary: Lấy chi tiết phiếu kho theo ID (kèm danh sách dòng sản phẩm)
+      tags:
+      - Inventory
+  /inventory/{document_id}/payments:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: ID phiếu nhập
+        in: path
+        name: document_id
+        required: true
+        type: string
+      - description: Quỹ, số tiền và ghi chú thanh toán
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_daidat02_server_internal_domain_inventory.CreateInventoryPaymentRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Chi tiết phiếu nhập sau khi thanh toán
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+        "400":
+          description: Số tiền/quỹ không hợp lệ hoặc vượt số còn nợ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "401":
+          description: Thiếu token / token không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "404":
+          description: Phiếu kho không tồn tại
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Ghi nhận trả nợ sau cho phiếu nhập
       tags:
       - Inventory
   /inventory/low-stock:

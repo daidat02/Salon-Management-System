@@ -379,6 +379,48 @@ func (u *InventoryUsecase) GetDocumentByID(ctx context.Context, documentID strin
 	return document, nil
 }
 
+// AddPayment ghi nhận trả nợ sau cho phiếu nhập và trả lại chi tiết mới nhất.
+func (u *InventoryUsecase) AddPayment(ctx context.Context, documentID string, req *domain.CreateInventoryPaymentRequest) (*domain.DocumentDetailResponse, error) {
+	orgID, err := shared.RequireOrgID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	userID, err := shared.RequireUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if req == nil {
+		return nil, apperror.New(400, "Thiếu thông tin thanh toán", nil)
+	}
+	fundID := strings.TrimSpace(req.FundID)
+	if fundID == "" {
+		return nil, apperror.New(400, "Vui lòng chọn quỹ thanh toán", nil)
+	}
+	if req.Amount <= 0 {
+		return nil, apperror.New(400, "Số tiền thanh toán phải lớn hơn 0", nil)
+	}
+
+	if err := u.repo.AddPayment(ctx, orgID, documentID, fundID, req.Amount, req.Note, &userID); err != nil {
+		switch {
+		case errors.Is(err, domain.ErrInventoryNotFound):
+			return nil, apperror.New(404, "Phiếu kho không tồn tại", err)
+		case errors.Is(err, domain.ErrPaymentNotTracked):
+			return nil, apperror.New(400, "Phiếu này không theo dõi công nợ", err)
+		case errors.Is(err, domain.ErrPaymentExceedsRemaining):
+			return nil, apperror.New(400, "Số tiền trả vượt quá số còn nợ", err)
+		case errors.Is(err, domain.ErrInvalidPaymentAmount):
+			return nil, apperror.New(400, "Số tiền thanh toán không hợp lệ", err)
+		case errors.Is(err, cashflowdomain.ErrFundNotFound):
+			return nil, apperror.New(400, "Quỹ thanh toán không tồn tại hoặc đã ngừng hoạt động", err)
+		case errors.Is(err, cashflowdomain.ErrInsufficientFundBalance):
+			return nil, apperror.New(400, "Số dư quỹ không đủ để thanh toán", err)
+		}
+		return nil, apperror.New(500, "Lỗi khi ghi nhận thanh toán phiếu nhập", err)
+	}
+
+	return u.GetDocumentByID(ctx, documentID)
+}
+
 func (u *InventoryUsecase) GetTransactionsByProductID(ctx context.Context, productID string, page, pageSize int, sort, inventory_type, date string) (*pagination.Result[*domain.InventoryTransactionResponse], error) {
 	orgID, err := shared.RequireOrgID(ctx)
 	if err != nil {

@@ -407,3 +407,94 @@ func TestInventoryUsecase_CreateDocument_PaymentTerms(t *testing.T) {
 		assert.Equal(t, "not_tracked", res.PaymentStatus)
 	})
 }
+
+func withUserCtx(orgID, userID string) context.Context {
+	ctx := context.WithValue(context.Background(), middlewares.OrgIdKey, orgID)
+	return context.WithValue(ctx, middlewares.UserIdKey, userID)
+}
+
+func TestInventoryUsecase_AddPayment(t *testing.T) {
+	newReq := func() *domain.CreateInventoryPaymentRequest {
+		return &domain.CreateInventoryPaymentRequest{FundID: "fund-1", Amount: 50000, Note: strPtr("trả đợt 1")}
+	}
+	detail := &domain.DocumentDetailResponse{
+		Document: &domain.DocumentResponse{ID: "doc-1", PaymentTracked: true},
+	}
+
+	t.Run("Thành công - trả nợ một phần", func(t *testing.T) {
+		repo := new(MockInventoryRepository)
+		repo.On("AddPayment", mock.Anything, "org-123", "doc-1", "fund-1", 50000.0, mock.Anything, mock.Anything).Return(nil)
+		repo.On("GetDocumentByID", mock.Anything, "org-123", "doc-1").Return(detail, nil)
+
+		uc := NewInventoryUsecase(repo, productsOK())
+		res, err := uc.AddPayment(withUserCtx("org-123", "user-1"), "doc-1", newReq())
+
+		assert.NoError(t, err)
+		assert.NotNil(t, res)
+		assert.Equal(t, "doc-1", res.Document.ID)
+		repo.AssertExpectations(t)
+	})
+
+	t.Run("Thất bại - trả vượt số còn nợ", func(t *testing.T) {
+		repo := new(MockInventoryRepository)
+		repo.On("AddPayment", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			Return(domain.ErrPaymentExceedsRemaining)
+
+		uc := NewInventoryUsecase(repo, productsOK())
+		res, err := uc.AddPayment(withUserCtx("org-123", "user-1"), "doc-1", newReq())
+
+		assert.Error(t, err)
+		assert.Nil(t, res)
+		assertFlatAppError(t, err, 400)
+	})
+
+	t.Run("Thất bại - phiếu không theo dõi công nợ", func(t *testing.T) {
+		repo := new(MockInventoryRepository)
+		repo.On("AddPayment", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			Return(domain.ErrPaymentNotTracked)
+
+		uc := NewInventoryUsecase(repo, productsOK())
+		res, err := uc.AddPayment(withUserCtx("org-123", "user-1"), "doc-1", newReq())
+
+		assert.Error(t, err)
+		assert.Nil(t, res)
+		assertFlatAppError(t, err, 400)
+	})
+
+	t.Run("Thất bại - quỹ không đủ số dư", func(t *testing.T) {
+		repo := new(MockInventoryRepository)
+		repo.On("AddPayment", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			Return(cashflowdomain.ErrInsufficientFundBalance)
+
+		uc := NewInventoryUsecase(repo, productsOK())
+		res, err := uc.AddPayment(withUserCtx("org-123", "user-1"), "doc-1", newReq())
+
+		assert.Error(t, err)
+		assert.Nil(t, res)
+		assertFlatAppError(t, err, 400)
+	})
+
+	t.Run("Thất bại - thiếu quỹ", func(t *testing.T) {
+		req := newReq()
+		req.FundID = " "
+		uc := NewInventoryUsecase(new(MockInventoryRepository), productsOK())
+		res, err := uc.AddPayment(withUserCtx("org-123", "user-1"), "doc-1", req)
+
+		assert.Error(t, err)
+		assert.Nil(t, res)
+		assertFlatAppError(t, err, 400)
+	})
+
+	t.Run("Thất bại - phiếu không tồn tại", func(t *testing.T) {
+		repo := new(MockInventoryRepository)
+		repo.On("AddPayment", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			Return(domain.ErrInventoryNotFound)
+
+		uc := NewInventoryUsecase(repo, productsOK())
+		res, err := uc.AddPayment(withUserCtx("org-123", "user-1"), "doc-x", newReq())
+
+		assert.Error(t, err)
+		assert.Nil(t, res)
+		assertFlatAppError(t, err, 404)
+	})
+}
