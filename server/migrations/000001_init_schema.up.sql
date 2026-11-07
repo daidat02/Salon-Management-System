@@ -310,11 +310,23 @@ CREATE TABLE inventory_documents (
     type VARCHAR(20) NOT NULL CHECK (type IN ('import', 'export', 'adjust', 'sale', 'return')),
     status VARCHAR(20) NOT NULL DEFAULT 'completed' CHECK (status IN ('completed', 'cancelled')),
     
-    total_amount NUMERIC(14,2) NOT NULL DEFAULT 0,   -- Tổng tiền của chứng từ
+    total_amount NUMERIC(14,2) NOT NULL DEFAULT 0,   -- Tổng tiền cuối cùng của chứng từ
     note TEXT,                       
     reason TEXT,               
     created_by UUID REFERENCES users(id),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+    -- Thanh toán / công nợ nhà cung cấp (chỉ áp dụng phiếu nhập mới)
+    payment_tracked BOOLEAN NOT NULL DEFAULT false,
+    due_date DATE,
+    gross_amount NUMERIC(14,2) NOT NULL DEFAULT 0,
+    discount_amount NUMERIC(14,2) NOT NULL DEFAULT 0,
+    vat_rate NUMERIC(5,2) NOT NULL DEFAULT 0 CHECK (vat_rate >= 0 AND vat_rate <= 100),
+    vat_amount NUMERIC(14,2) NOT NULL DEFAULT 0,
+    shipping_fee NUMERIC(14,2) NOT NULL DEFAULT 0,
+    paid_amount NUMERIC(14,2) NOT NULL DEFAULT 0,
+    invoice_code VARCHAR(50),
+
     UNIQUE (organization_id, document_code),
     UNIQUE (order_id)
 );
@@ -322,6 +334,7 @@ CREATE TABLE inventory_documents (
 -- Index tối ưu tìm kiếm theo tổ chức và loại phiếu
 CREATE INDEX idx_inventory_docs_org_type ON inventory_documents(organization_id, type);
 CREATE INDEX idx_inventory_docs_order_id ON inventory_documents(order_id);
+CREATE INDEX idx_inventory_docs_due_date ON inventory_documents(organization_id, due_date);
 
 CREATE TABLE inventory_document_items (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -337,7 +350,9 @@ CREATE TABLE inventory_document_items (
     
     quantity NUMERIC(12,2) NOT NULL,                  -- Số lượng theo đơn vị lớn
     unit_price NUMERIC(14,2) NOT NULL,                -- Đơn giá tại thời điểm đó
-    total_price NUMERIC(14,2) NOT NULL                -- Thành tiền (quantity * unit_price)
+    total_price NUMERIC(14,2) NOT NULL,               -- Thành tiền gốc (quantity * unit_price)
+    discount_percent NUMERIC(5,2) NOT NULL DEFAULT 0 CHECK (discount_percent >= 0 AND discount_percent <= 100),
+    discount_amount NUMERIC(14,2) NOT NULL DEFAULT 0
 );
 
 -- Index tối ưu tìm kiếm chi tiết theo chứng từ
@@ -548,6 +563,7 @@ CREATE TABLE cash_flows (
 CREATE TRIGGER trg_cash_flows_updated_at
     BEFORE UPDATE ON cash_flows
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE INDEX idx_cash_flows_inventory_document_id ON cash_flows(inventory_document_id);
 
 -- ==========================================
 -- 20. PAYROLLS (Bảng lương theo kỳ tháng)
