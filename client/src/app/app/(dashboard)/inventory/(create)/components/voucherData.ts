@@ -156,7 +156,7 @@ export type VoucherFormState = {
   date: string;
   warehouse: string;
   reason: string;
-  supplier: string;
+  supplierId: string;
   /** Người nhận hàng — chỉ dùng cho phiếu xuất. */
   recipient: string;
   keeper: string;
@@ -193,13 +193,6 @@ export const outboundReasons = [
   'Xuất tiêu hủy / hết hạn',
 ];
 
-export const suppliers = [
-  "L'Oréal Professionnel VN (MST: 0309988771)",
-  'Kérastase Paris Flagship VN',
-  'Olaplex Vietnam Official',
-  'Công ty TNHH Mỹ Phẩm Tóc Châu Âu',
-];
-
 export const keepers = ['Lê Tuấn (Thủ kho chính)', 'Trần Hoàng (Kho phụ)', 'Thu Hà (Thu ngân)'];
 
 export const paymentMethods = [
@@ -216,7 +209,7 @@ export function makeInitialFormState(type: VoucherType): VoucherFormState {
     date: new Date().toISOString().split('T')[0],
     warehouse: '',
     reason: type === 'inbound' ? inboundReasons[0] : outboundReasons[0],
-    supplier: '',
+    supplierId: '',
     recipient: '',
     keeper: keepers[0],
     note: '',

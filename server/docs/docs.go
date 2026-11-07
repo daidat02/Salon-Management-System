@@ -5204,6 +5204,110 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/suppliers": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Suppliers"
+                ],
+                "summary": "Lấy danh sách nhà cung cấp (tìm kiếm + phân trang)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Tìm theo tên hoặc số điện thoại",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Trang (mặc định 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Số dòng/trang (mặc định 20, tối đa 100)",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Danh sách nhà cung cấp kèm phân trang",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Thiếu organization",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Thiếu token / token không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Suppliers"
+                ],
+                "summary": "Tạo nhà cung cấp",
+                "parameters": [
+                    {
+                        "description": "Thông tin nhà cung cấp",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_internal_domain_supplier.CreateSupplierRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Tạo nhà cung cấp thành công",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Dữ liệu không hợp lệ / thiếu organization",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Thiếu token / token không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -6346,6 +6450,23 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_daidat02_server_internal_domain_supplier.CreateSupplierRequest": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "note": {
+                    "type": "string"
+                },
+                "phone": {
                     "type": "string"
                 }
             }

@@ -18,6 +18,7 @@ import (
 	servicehttp "github.com/daidat02/server/internal/delivery/http/service"
 	settinghttp "github.com/daidat02/server/internal/delivery/http/setting"
 	staffhttp "github.com/daidat02/server/internal/delivery/http/staff"
+	supplierhttp "github.com/daidat02/server/internal/delivery/http/supplier"
 	userhttp "github.com/daidat02/server/internal/delivery/http/user"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
@@ -72,6 +73,9 @@ func NewRouter(cfg *config.Config, dbPool *pgxpool.Pool) *gin.Engine {
 
 	appointmentDeps := appointmenthttp.NewDependencies(dbPool)
 	appointmenthttp.RegisterAppointmentRoutes(r, appointmentDeps.Handler, basePath)
+
+	supplierDeps := supplierhttp.NewDependencies(dbPool)
+	supplierhttp.RegisterSupplierRoutes(r, supplierDeps.Handler, basePath)
 
 	inventoryDeps := inventoryhttp.NewDependencies(dbPool)
 	inventoryhttp.RegisterInventoryRoutes(r, inventoryDeps.Handler, basePath)

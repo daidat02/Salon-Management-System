@@ -7,6 +7,7 @@ import { toast } from '@/components/ui/toast';
 import { getApiErrorMessage } from '@/services/apiClient';
 import useCategory from '@/hooks/use-category';
 import useProduct from '@/hooks/use-product';
+import useSuppliers from '@/hooks/use-suppliers';
 import { useCreateDocument } from '@/hooks/use-create-document';
 import type { Product } from '@/types/product';
 import VoucherHeading from './VoucherHeading';
@@ -16,6 +17,7 @@ import VoucherItemsCard from './VoucherItemsCard';
 import VoucherFinanceCard from './VoucherFinanceCard';
 import VoucherPaymentCard from './VoucherPaymentCard';
 import VoucherAutomationCard from './VoucherAutomationCard';
+import SupplierCreateDialog from './SupplierCreateDialog';
 import {
   VOUCHER_META,
   VOUCHER_TYPE_MAP,
@@ -34,8 +36,11 @@ export default function VoucherCreateForm({ initialType }: { initialType: Vouche
   const [debouncedQuery, setDebouncedQuery] = React.useState('');
   const [categoryFilter, setCategoryFilter] = React.useState('');
   const [submitError, setSubmitError] = React.useState<string | null>(null);
+  const [supplierDialogOpen, setSupplierDialogOpen] = React.useState(false);
 
   const { mutate: createDocument, isPending: isSubmitting } = useCreateDocument();
+  const { data: supplierData } = useSuppliers();
+  const suppliers = React.useMemo(() => supplierData?.data ?? [], [supplierData]);
 
   // Danh mục loại product để lọc gợi ý thêm dòng.
   const { data: categoryData } = useCategory({ page: 1, pageSize: 100 });
@@ -163,6 +168,7 @@ export default function VoucherCreateForm({ initialType }: { initialType: Vouche
 
     createDocument(
       {
+        supplier_id: form.supplierId || null,
         document_code: form.code.trim(),
         type: VOUCHER_TYPE_MAP[form.type],
         note: form.note.trim() || null,
@@ -206,7 +212,12 @@ export default function VoucherCreateForm({ initialType }: { initialType: Vouche
 
       <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
         <div className="space-y-6 lg:col-span-8">
-          <VoucherInfoCard form={form} onChange={patch} />
+          <VoucherInfoCard
+            form={form}
+            onChange={patch}
+            suppliers={suppliers}
+            onAddSupplier={() => setSupplierDialogOpen(true)}
+          />
           <VoucherItemsCard
             lines={lines}
             voucherType={form.type}
@@ -265,6 +276,12 @@ export default function VoucherCreateForm({ initialType }: { initialType: Vouche
           />
         </div>
       </div>
+
+      <SupplierCreateDialog
+        open={supplierDialogOpen}
+        onOpenChange={setSupplierDialogOpen}
+        onCreated={(supplier) => patch({ supplierId: supplier.id })}
+      />
     </div>
   );
 }

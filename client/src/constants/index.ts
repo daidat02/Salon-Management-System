@@ -39,6 +39,11 @@ export const API_ENDPOINTS = {
     DELETE: (id: string) => `${API_BASE}/categories/${id}`,
   },
 
+  SUPPLIERS: {
+    GET_ALL: `${API_BASE}/suppliers`,
+    CREATE: `${API_BASE}/suppliers`,
+  },
+
   INVENTORY: {
     GET_DOCUMENTS: `${API_BASE}/inventory/`,
     CREATE_DOCUMENT: `${API_BASE}/inventory/`,

@@ -757,6 +757,17 @@ definitions:
       status:
         type: string
     type: object
+  github_com_daidat02_server_internal_domain_supplier.CreateSupplierRequest:
+    properties:
+      address:
+        type: string
+      name:
+        type: string
+      note:
+        type: string
+      phone:
+        type: string
+    type: object
   github_com_daidat02_server_internal_domain_user.CreateUserRequest:
     properties:
       created_at:
@@ -4116,6 +4127,71 @@ paths:
       summary: Xóa điều chỉnh lương nhân viên
       tags:
       - Staff
+  /suppliers:
+    get:
+      parameters:
+      - description: Tìm theo tên hoặc số điện thoại
+        in: query
+        name: search
+        type: string
+      - description: Trang (mặc định 1)
+        in: query
+        name: page
+        type: integer
+      - description: Số dòng/trang (mặc định 20, tối đa 100)
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Danh sách nhà cung cấp kèm phân trang
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+        "400":
+          description: Thiếu organization
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "401":
+          description: Thiếu token / token không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Lấy danh sách nhà cung cấp (tìm kiếm + phân trang)
+      tags:
+      - Suppliers
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Thông tin nhà cung cấp
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_daidat02_server_internal_domain_supplier.CreateSupplierRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Tạo nhà cung cấp thành công
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+        "400":
+          description: Dữ liệu không hợp lệ / thiếu organization
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "401":
+          description: Thiếu token / token không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Tạo nhà cung cấp
+      tags:
+      - Suppliers
 securityDefinitions:
   BearerAuth:
     description: '"Bearer {access_token}"'

@@ -11,17 +11,17 @@ import { DashDatePicker } from '@/components/dashboard/DashDatePicker';
 import {
   VOUCHER_META,
   inboundReasons,
-  keepers,
   outboundReasons,
   randomVoucherCode,
-  suppliers,
-  warehouses,
   type VoucherFormState,
 } from './voucherData';
+import type { Supplier } from '@/types/supplier';
 
 type VoucherInfoCardProps = {
   form: VoucherFormState;
   onChange: (patch: Partial<VoucherFormState>) => void;
+  suppliers: Supplier[];
+  onAddSupplier: () => void;
 };
 
 function SectionTitle({ children }: { children: string }) {
@@ -54,7 +54,12 @@ function SystemClock() {
   );
 }
 
-export default function VoucherInfoCard({ form, onChange }: VoucherInfoCardProps) {
+export default function VoucherInfoCard({
+  form,
+  onChange,
+  suppliers,
+  onAddSupplier,
+}: VoucherInfoCardProps) {
   const isInbound = form.type === 'inbound';
   const reasons = isInbound ? inboundReasons : outboundReasons;
   const meta = VOUCHER_META[form.type];
@@ -149,6 +154,7 @@ export default function VoucherInfoCard({ form, onChange }: VoucherInfoCardProps
               </Label>
               <button
                 type="button"
+                onClick={onAddSupplier}
                 className="flex items-center gap-0.5 text-[11px] font-semibold text-primary hover:underline"
               >
                 <Plus className="h-[13px] w-[13px]" />
@@ -156,9 +162,12 @@ export default function VoucherInfoCard({ form, onChange }: VoucherInfoCardProps
               </button>
             </div>
             <DashSelect
-              value={form.supplier}
-              onValueChange={(v) => onChange({ supplier: v })}
-              options={suppliers}
+              value={form.supplierId}
+              onValueChange={(v) => onChange({ supplierId: v })}
+              options={suppliers.map((supplier) => ({
+                label: supplier.name,
+                value: supplier.id,
+              }))}
               placeholder="Chọn nhà cung cấp / nhãn hàng"
               triggerClassName="bg-surface-container"
             />
