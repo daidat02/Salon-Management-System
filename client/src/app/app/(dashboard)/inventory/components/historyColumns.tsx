@@ -1,7 +1,11 @@
 import Link from 'next/link';
 import { Tag } from '@/components/ui/tag';
 import type { DashColumn } from '@/components/dashboard/DashTable';
-import type { InventoryDocument, InventoryDocumentType } from '@/types/inventory';
+import type {
+  InventoryDocument,
+  InventoryDocumentType,
+  InventoryPaymentStatus,
+} from '@/types/inventory';
 import { formatVND } from '@/lib/format';
 
 const typeMeta: Record<
@@ -13,6 +17,16 @@ const typeMeta: Record<
   adjust: { label: 'Điều chỉnh', variant: 'blue' },
   sale: { label: 'Bán hàng', variant: 'purple' },
   return: { label: 'Trả hàng', variant: 'teal' },
+};
+
+const paymentMeta: Record<
+  InventoryPaymentStatus,
+  { label: string; variant: 'success' | 'warning' | 'error' | 'slate' }
+> = {
+  paid: { label: 'Đã trả hết', variant: 'success' },
+  partial: { label: 'Trả một phần', variant: 'warning' },
+  unpaid: { label: 'Chưa thanh toán', variant: 'error' },
+  not_tracked: { label: 'Không theo dõi', variant: 'slate' },
 };
 
 function formatPartner(row: InventoryDocument): string {
@@ -61,6 +75,32 @@ export const historyColumns: DashColumn<InventoryDocument>[] = [
     cell: (row) => (
       <div className="line-clamp-1 text-[11px] text-on-surface-variant">{row.reason || '—'}</div>
     ),
+  },
+  {
+    id: 'payment_status',
+    header: 'Công nợ',
+    className: 'min-w-[140px]',
+    cell: (row) => {
+      if (!row.payment_tracked) {
+        return <span className="text-[11px] text-on-surface-variant">—</span>;
+      }
+      const meta = paymentMeta[row.payment_status] ?? paymentMeta.not_tracked;
+      return (
+        <div className="space-y-1">
+          <Tag variant={meta.variant} size="sm" shape="rounded">
+            {meta.label}
+          </Tag>
+          {row.remaining_amount > 0 && (
+            <div className="text-[11px] font-medium text-error">
+              Còn {formatVND(row.remaining_amount)} đ
+            </div>
+          )}
+          {row.is_overdue && (
+            <div className="text-[10px] font-semibold text-error">Quá hạn</div>
+          )}
+        </div>
+      );
+    },
   },
   {
     id: 'total_amount',

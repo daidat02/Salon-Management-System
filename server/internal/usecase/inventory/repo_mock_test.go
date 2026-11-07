@@ -62,16 +62,16 @@ func (m *MockInventoryRepository) GetInventoryStats(ctx context.Context, orgID s
 	return args.Get(0).(*domain.InventoryStatsResponse), args.Error(1)
 }
 
-func (m *MockInventoryRepository) GetDocumentsByOrgID(ctx context.Context, orgID, search string, sort string, filter string, limit, offset int) ([]*domain.DocumentResponse, error) {
-	args := m.Called(ctx, orgID, search, sort, filter, limit, offset)
+func (m *MockInventoryRepository) GetDocumentsByOrgID(ctx context.Context, orgID, search string, sort string, filter string, paymentStatus string, limit, offset int) ([]*domain.DocumentResponse, error) {
+	args := m.Called(ctx, orgID, search, sort, filter, paymentStatus, limit, offset)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
 	return args.Get(0).([]*domain.DocumentResponse), args.Error(1)
 }
 
-func (m *MockInventoryRepository) CountDocumentsByOrgID(ctx context.Context, orgID string) (int64, error) {
-	args := m.Called(ctx, orgID)
+func (m *MockInventoryRepository) CountDocumentsByOrgID(ctx context.Context, orgID string, search string, filter string, paymentStatus string) (int64, error) {
+	args := m.Called(ctx, orgID, search, filter, paymentStatus)
 	return args.Get(0).(int64), args.Error(1)
 }
 

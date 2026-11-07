@@ -105,19 +105,32 @@ const (
 		AND ($3 = '' OR id.type = $3)
 	`
 
-	// 4. Phần sắp xếp (Sort theo yêu cầu)
+	// 4. Lọc theo trạng thái công nợ. Phiếu không theo dõi không thuộc nhóm nợ.
+	filterInventoryPaymentStatus = `
+		AND ($4 = '' OR
+			($4 = 'unpaid' AND id.payment_tracked AND id.paid_amount = 0 AND id.paid_amount < id.total_amount) OR
+			($4 = 'partial' AND id.payment_tracked AND id.paid_amount > 0 AND id.paid_amount < id.total_amount) OR
+			($4 = 'paid' AND id.payment_tracked AND id.paid_amount >= id.total_amount) OR
+			($4 = 'overdue' AND id.payment_tracked AND id.due_date IS NOT NULL AND id.due_date < CURRENT_DATE AND id.paid_amount < id.total_amount)
+		)
+	`
+
+	// 5. Phần sắp xếp (Sort theo yêu cầu)
 	sortInventoryFilter = `
 		ORDER BY 
-			CASE WHEN $4 = 'total_amount_asc' THEN id.total_amount END ASC,
-			CASE WHEN $4 = 'total_amount_desc' THEN id.total_amount END DESC,
-			CASE WHEN $4 = 'created_at_asc' THEN id.created_at END ASC,
-			CASE WHEN $4 = 'created_at_desc' THEN id.created_at END DESC,
+			CASE WHEN $5 = 'total_amount_asc' THEN id.total_amount END ASC,
+			CASE WHEN $5 = 'total_amount_desc' THEN id.total_amount END DESC,
+			CASE WHEN $5 = 'created_at_asc' THEN id.created_at END ASC,
+			CASE WHEN $5 = 'created_at_desc' THEN id.created_at END DESC,
 			id.created_at DESC
 	`
 	countInventoryDocumentsQuery = `
 		SELECT COUNT(*)
-		FROM inventory_documents
-		WHERE organization_id = $1
+		FROM inventory_documents id
+		LEFT JOIN suppliers s ON s.id = id.supplier_id
+		LEFT JOIN orders o ON o.id = id.order_id
+		LEFT JOIN users u ON u.id = id.created_by
+		WHERE id.organization_id = $1
 	`
 	countInventoryTransactionsQuery = `
 		SELECT COUNT(*)

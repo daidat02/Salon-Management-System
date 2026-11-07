@@ -409,13 +409,13 @@ func (r *PostgresInventoryRepository) GetDocumentPayments(ctx context.Context, o
 	return payments, nil
 }
 
-func (r *PostgresInventoryRepository) GetDocumentsByOrgID(ctx context.Context, orgID string, search string, sort string, filter string, limit, offset int) ([]*domain.DocumentResponse, error) {
-	query := listInventoryDocumentsQuery + searchInventoryFilter + filterInventoryType + sortInventoryFilter
+func (r *PostgresInventoryRepository) GetDocumentsByOrgID(ctx context.Context, orgID string, search string, sort string, filter string, paymentStatus string, limit, offset int) ([]*domain.DocumentResponse, error) {
+	query := listInventoryDocumentsQuery + searchInventoryFilter + filterInventoryType + filterInventoryPaymentStatus + sortInventoryFilter
 	var formatSearch = ""
 	if search != "" {
 		formatSearch = `%` + strings.TrimSpace(search) + `%`
 	}
-	args := []any{orgID, formatSearch, filter, sort}
+	args := []any{orgID, formatSearch, filter, paymentStatus, sort}
 
 	query += fmt.Sprintf(" LIMIT $%d OFFSET $%d", len(args)+1, len(args)+2)
 	args = append(args, limit, offset)
@@ -464,9 +464,14 @@ func (r *PostgresInventoryRepository) GetTransactionsByOrgID(ctx context.Context
 	}
 	return txs, nil
 }
-func (r *PostgresInventoryRepository) CountDocumentsByOrgID(ctx context.Context, orgID string) (int64, error) {
+func (r *PostgresInventoryRepository) CountDocumentsByOrgID(ctx context.Context, orgID string, search string, filter string, paymentStatus string) (int64, error) {
 	var total int64
-	if err := r.db.QueryRow(ctx, countInventoryDocumentsQuery, orgID).Scan(&total); err != nil {
+	formatSearch := ""
+	if strings.TrimSpace(search) != "" {
+		formatSearch = `%` + strings.TrimSpace(search) + `%`
+	}
+	query := countInventoryDocumentsQuery + searchInventoryFilter + filterInventoryType + filterInventoryPaymentStatus
+	if err := r.db.QueryRow(ctx, query, orgID, formatSearch, filter, paymentStatus).Scan(&total); err != nil {
 		return 0, fmt.Errorf("lỗi khi đếm lịch sử kho: %w", err)
 	}
 	return total, nil

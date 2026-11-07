@@ -306,18 +306,18 @@ func (u *InventoryUsecase) GetTransactionsByOrgID(ctx context.Context, productID
 	return pagination.NewResult(txs, params, total), nil
 }
 
-func (u *InventoryUsecase) GetDocumentsByOrgID(ctx context.Context, search string, sort string, filter string, page, pageSize int) (*pagination.Result[*domain.DocumentResponse], error) {
+func (u *InventoryUsecase) GetDocumentsByOrgID(ctx context.Context, search string, sort string, filter string, paymentStatus string, page, pageSize int) (*pagination.Result[*domain.DocumentResponse], error) {
 	orgID, err := shared.RequireOrgID(ctx)
 	if err != nil {
 		return nil, err
 	}
 	params := pagination.Normalize(page, pageSize)
-	inventoryDocs, err := u.repo.GetDocumentsByOrgID(ctx, orgID, search, sort, filter, params.PageSize, params.Offset())
+	inventoryDocs, err := u.repo.GetDocumentsByOrgID(ctx, orgID, search, sort, filter, paymentStatus, params.PageSize, params.Offset())
 	if err != nil {
 		return nil, apperror.New(500, "Lỗi khi lấy danh sách phiếu kho", err)
 	}
 
-	total, err := u.repo.CountDocumentsByOrgID(ctx, orgID)
+	total, err := u.repo.CountDocumentsByOrgID(ctx, orgID, search, filter, paymentStatus)
 	if err != nil {
 		return nil, apperror.New(500, "Lỗi khi đếm danh sách phiếu kho", err)
 	}

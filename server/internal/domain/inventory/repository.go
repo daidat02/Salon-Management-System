@@ -25,8 +25,8 @@ type InventoryRepository interface {
 	CreateDocument(ctx context.Context, doc *InventoryDocument, items []*DocumentItemInput) error
 	BulkCreateDocumentItems(ctx context.Context, orgID string, documentID string, items []*DocumentItemInput) error
 	GetTransactionsByOrgID(ctx context.Context, orgID, productID string, limit, offset int) ([]*InventoryTransaction, error)
-	GetDocumentsByOrgID(ctx context.Context, orgID string, search string, sort string, filter string, limit, offset int) ([]*DocumentResponse, error)
-	CountDocumentsByOrgID(ctx context.Context, orgID string) (int64, error)
+	GetDocumentsByOrgID(ctx context.Context, orgID string, search string, sort string, filter string, paymentStatus string, limit, offset int) ([]*DocumentResponse, error)
+	CountDocumentsByOrgID(ctx context.Context, orgID string, search string, filter string, paymentStatus string) (int64, error)
 	CountTransactionsByOrgID(ctx context.Context, orgID, productID string) (int64, error)
 	GetLowStockProducts(ctx context.Context, orgID string, limit, offset int) ([]*LowStockItem, error)
 	CountLowStockProducts(ctx context.Context, orgID string) (int64, error)

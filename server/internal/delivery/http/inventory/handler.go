@@ -126,7 +126,8 @@ func (h *InventoryHandler) GetInventoryStats(c *gin.Context) {
 // @Security     BearerAuth
 // @Param        search     query     string  false  "Tìm theo mã phiếu, tên NCC, mã đơn, tên/SĐT người tạo"
 // @Param        sort       query     string  false  "Sắp xếp" Enums(total_amount_asc,total_amount_desc,created_at_asc,created_at_desc)
-// @Param        filter     query     string  false  "Lọc theo loại phiếu" Enums(import,export,adjust,sale,return)
+// @Param        filter          query     string  false  "Lọc theo loại phiếu" Enums(import,export,adjust,sale,return)
+// @Param        payment_status  query     string  false  "Lọc theo trạng thái công nợ" Enums(unpaid,partial,paid,overdue)
 // @Param        page       query     int     false  "Trang (mặc định 1)"
 // @Param        page_size  query     int     false  "Số dòng/trang (mặc định 20, tối đa 100)"
 // @Success      200        {object}  response.SuccessResponse  "Danh sách phiếu kho kèm phân trang"
@@ -139,8 +140,9 @@ func (h *InventoryHandler) GetDocumentsByOrgID(c *gin.Context) {
 	search := c.DefaultQuery("search", "")
 	sort := c.DefaultQuery("sort", "")
 	filter := c.DefaultQuery("filter", "")
+	paymentStatus := c.DefaultQuery("payment_status", "")
 
-	result, err := h.uc.GetDocumentsByOrgID(c.Request.Context(), search, sort, filter, page, pageSize)
+	result, err := h.uc.GetDocumentsByOrgID(c.Request.Context(), search, sort, filter, paymentStatus, page, pageSize)
 	if err != nil {
 		response.Error(c, err)
 		logger.Error("Lỗi khi lấy danh sách phiếu kho: ", err)

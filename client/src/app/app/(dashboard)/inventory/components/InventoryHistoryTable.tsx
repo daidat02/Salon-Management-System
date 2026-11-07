@@ -25,6 +25,7 @@ export default function InventoryHistoryTable() {
   const search = searchParams.get('hsearch') || '';
   const sort = searchParams.get('hsort') || '';
   const filter = searchParams.get('hfilter') || '';
+  const paymentStatus = searchParams.get('hpayment') || '';
 
   const page = pageFromUrl || 1;
   const [inputValue, setInputValue] = React.useState(search);
@@ -51,6 +52,7 @@ export default function InventoryHistoryTable() {
     search,
     sort,
     filter,
+    paymentStatus,
     page,
     pageSize: PAGE_SIZE,
   });
@@ -78,7 +80,7 @@ export default function InventoryHistoryTable() {
 
   const handleReset = () => {
     setInputValue('');
-    setUrlParams({ hsearch: null, hsort: null, hfilter: null });
+    setUrlParams({ hsearch: null, hsort: null, hfilter: null, hpayment: null });
   };
 
   if (isError) {
@@ -133,6 +135,20 @@ export default function InventoryHistoryTable() {
               { value: 'return', label: 'Trả hàng' },
             ],
             onValueChange: (v) => setUrlParams({ hfilter: v || null }),
+          },
+          {
+            id: 'hpayment',
+            placeholder: 'Tất cả công nợ',
+            value: paymentStatus || undefined,
+            widthClass: 'sm:w-44',
+            options: [
+              { value: '', label: 'Tất cả công nợ' },
+              { value: 'unpaid', label: 'Chưa thanh toán' },
+              { value: 'partial', label: 'Trả một phần' },
+              { value: 'paid', label: 'Đã trả hết' },
+              { value: 'overdue', label: 'Quá hạn' },
+            ],
+            onValueChange: (v) => setUrlParams({ hpayment: v || null }),
           },
           {
             id: 'hsort',

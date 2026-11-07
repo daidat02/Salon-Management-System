@@ -13,12 +13,14 @@ export const getInventoryDocuments = async ({
   search,
   sort,
   filter,
+  paymentStatus,
   page,
   pageSize,
 }: {
   search?: string;
   sort?: string;
   filter?: string;
+  paymentStatus?: string;
   page: number;
   pageSize: number;
 }) => {
@@ -29,6 +31,7 @@ export const getInventoryDocuments = async ({
         search: search || undefined,
         sort: sort || undefined,
         filter: filter || undefined,
+        payment_status: paymentStatus || undefined,
         page: page,
         page_size: pageSize,
       },

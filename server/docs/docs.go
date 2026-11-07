@@ -1898,6 +1898,18 @@ const docTemplate = `{
                         "in": "query"
                     },
                     {
+                        "enum": [
+                            "unpaid",
+                            "partial",
+                            "paid",
+                            "overdue"
+                        ],
+                        "type": "string",
+                        "description": "Lọc theo trạng thái công nợ",
+                        "name": "payment_status",
+                        "in": "query"
+                    },
+                    {
                         "type": "integer",
                         "description": "Trang (mặc định 1)",
                         "name": "page",

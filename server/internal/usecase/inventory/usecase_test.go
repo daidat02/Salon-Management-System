@@ -498,3 +498,21 @@ func TestInventoryUsecase_AddPayment(t *testing.T) {
 		assertFlatAppError(t, err, 404)
 	})
 }
+
+func TestInventoryUsecase_GetDocumentsByOrgID_PaymentFilter(t *testing.T) {
+	t.Run("Truyền payment_status xuống repo và đếm đúng bộ lọc", func(t *testing.T) {
+		repo := new(MockInventoryRepository)
+		repo.On("GetDocumentsByOrgID", mock.Anything, "org-123", "PNK", "", "import", "overdue", 20, 0).
+			Return([]*domain.DocumentResponse{}, nil)
+		repo.On("CountDocumentsByOrgID", mock.Anything, "org-123", "PNK", "import", "overdue").
+			Return(int64(0), nil)
+
+		uc := NewInventoryUsecase(repo, productsOK())
+		res, err := uc.GetDocumentsByOrgID(withOrgCtx("org-123"), "PNK", "", "import", "overdue", 1, 20)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, res)
+		assert.Equal(t, int64(0), res.Total)
+		repo.AssertExpectations(t)
+	})
+}

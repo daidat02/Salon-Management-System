@@ -2035,6 +2035,15 @@ paths:
         in: query
         name: filter
         type: string
+      - description: Lọc theo trạng thái công nợ
+        enum:
+        - unpaid
+        - partial
+        - paid
+        - overdue
+        in: query
+        name: payment_status
+        type: string
       - description: Trang (mặc định 1)
         in: query
         name: page
