@@ -9,9 +9,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { DashInput } from '@/components/dashboard/DashInput';
 import { DashOptionPills } from '@/components/dashboard/DashOptionPills';
 import { DashSelect } from '@/components/dashboard/DashSelect';
-import { useCreateCustomer } from '@/hooks/use-create-customer';
+import { useCreateCustomer, type CreateCustomerPayload } from '@/hooks/use-create-customer';
 import { useUpdateCustomer } from '@/hooks/use-update-customer';
 import { getApiErrorMessage } from '@/services/apiClient';
+import type { Customer } from '@/types/customer';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { toast } from '@/components/ui/toast';
 
@@ -52,6 +53,7 @@ export function CustomerForm({ open, onOpenChange, onSuccess, mode = 'create', i
   const { mutate: updateMutate, isPending: isUpdating } = useUpdateCustomer();
   const isPending = isCreating || isUpdating;
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   React.useEffect(() => {
     if (open) {
       setError(null);
@@ -59,19 +61,20 @@ export function CustomerForm({ open, onOpenChange, onSuccess, mode = 'create', i
       setBirthDate(toDateValue(initialData?.birth_date));
     }
   }, [open, initialData?.gender, initialData?.id, initialData?.birth_date]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     const form = e.target as HTMLFormElement;
     const data = Object.fromEntries(new FormData(form).entries()) as Record<string, string>;
-    const payload = {
-      full_name: data.full_name?.trim(),
-      phone: data.phone?.trim().replace(/\s+/g, ''),
-      gender,
+    const payload: CreateCustomerPayload = {
+      full_name: data.full_name?.trim() ?? '',
+      phone: data.phone?.trim().replace(/\s+/g, '') ?? '',
+      gender: gender as Customer['gender'],
       birth_date: birthDate ? format(birthDate, 'yyyy-MM-dd') : null,
       note: data.note?.trim() || '',
-    } as const;
+    };
     if (!payload.full_name || !payload.phone) {
       setError('Vui lòng nhập họ tên và số điện thoại');
       return;
@@ -104,11 +107,11 @@ export function CustomerForm({ open, onOpenChange, onSuccess, mode = 'create', i
         return;
       }
       updateMutate(
-        { id: initialData.id, payload: payload as any },
+        { id: initialData.id, payload },
         { onSuccess: () => done(payload.full_name, 'Cập nhật'), onError: failed('Cập nhật') },
       );
     } else {
-      createMutate(payload as any, {
+      createMutate(payload, {
         onSuccess: () => done(payload.full_name, 'Tạo'),
         onError: failed('Tạo'),
       });

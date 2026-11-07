@@ -13,7 +13,7 @@ export interface PaginationResult<T> {
 }
 
 export interface ApiErrorResponse {
-  code: any;
-  message: any;
-  error?: any;
+  code: number;
+  message: string;
+  error?: unknown;
 }

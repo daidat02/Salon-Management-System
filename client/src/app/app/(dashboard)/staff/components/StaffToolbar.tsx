@@ -10,10 +10,12 @@ export default function StaffToolbar() {
   const searchParams = useSearchParams();
   const search = searchParams.get('search') || '';
   const [inputValue, setInputValue] = React.useState(search);
+  const [lastSearch, setLastSearch] = React.useState(search);
 
-  useEffect(() => {
+  if (search !== lastSearch) {
+    setLastSearch(search);
     setInputValue(search);
-  }, [search]);
+  }
 
   // debounce 400ms để không push router mỗi phím gõ
   useEffect(() => {

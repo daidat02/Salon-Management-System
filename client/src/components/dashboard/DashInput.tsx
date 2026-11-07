@@ -4,7 +4,7 @@ import * as React from 'react';
 import { Input } from '@/components/ui/input';
 import { cn } from 'cn';
 
-export interface DashInputProps extends React.ComponentProps<typeof Input> {}
+export type DashInputProps = React.ComponentProps<typeof Input>;
 
 export function DashInput({ className, ...props }: DashInputProps) {
   return (

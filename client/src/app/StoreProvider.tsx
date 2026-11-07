@@ -13,9 +13,9 @@ export default function StoreProvider({ children }: { children: React.ReactNode 
 
   // Expose store cho apiClient có thể dispatch setAccessToken sau khi refresh
   useEffect(() => {
-    (window as any).__REDUX_STORE__ = store;
+    window.__REDUX_STORE__ = store;
     return () => {
-      if ((window as any).__REDUX_STORE__ === store) delete (window as any).__REDUX_STORE__;
+      if (window.__REDUX_STORE__ === store) delete window.__REDUX_STORE__;
     };
   }, [store]);
 

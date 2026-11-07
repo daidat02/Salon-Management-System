@@ -28,11 +28,10 @@ export function setApiAccessToken(token: string | null) {
   }
   // Thử đồng bộ Redux nếu store đã được gắn (tránh circular import)
   try {
-    // @ts-ignore
-    if (typeof window !== 'undefined' && (window as any).__REDUX_STORE__?.dispatch) {
-      // @ts-ignore
-      const { setAccessToken } = require('@/store/slices/authSlice');
-      if (token) (window as any).__REDUX_STORE__.dispatch(setAccessToken(token));
+    if (typeof window !== 'undefined' && window.__REDUX_STORE__?.dispatch) {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { setAccessToken } = require('@/store/slices/authSlice') as typeof import('@/store/slices/authSlice');
+      if (token) window.__REDUX_STORE__.dispatch(setAccessToken(token));
     }
   } catch {}
 }

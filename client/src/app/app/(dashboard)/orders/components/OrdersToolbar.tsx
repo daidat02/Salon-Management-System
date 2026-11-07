@@ -32,10 +32,12 @@ export default function OrdersToolbar({ historyOnly = false }: OrdersToolbarProp
   const search = searchParams.get('search') || '';
   const status = searchParams.get('status') || '';
   const [inputValue, setInputValue] = React.useState(search);
+  const [lastSearch, setLastSearch] = React.useState(search);
 
-  React.useEffect(() => {
+  if (search !== lastSearch) {
+    setLastSearch(search);
     setInputValue(search);
-  }, [search]);
+  }
 
   React.useEffect(() => {
     if (inputValue === search) return;
