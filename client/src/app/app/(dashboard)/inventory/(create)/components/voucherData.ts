@@ -148,8 +148,6 @@ export const VOUCHER_META: Record<VoucherType, VoucherMeta> = {
   },
 };
 
-export type PaymentStatus = 'paid' | 'partial' | 'unpaid';
-
 export type VoucherFormState = {
   type: VoucherType;
   code: string;
@@ -163,15 +161,15 @@ export type VoucherFormState = {
   note: string;
   items: VoucherItem[];
   shippingFee: number;
-  paymentMethod: string;
-  paymentStatus: PaymentStatus;
+  vatRate: number;
+  dueDate: string;
+  paidAmount: string;
+  fundId: string;
   vatInvoiceCode: string;
   autoAddStock: boolean;
-  autoCashbook: boolean;
-  trackExpiry: boolean;
 };
 
-export const VAT_RATE = 0.08;
+export const DEFAULT_VAT_RATE = 8;
 
 export const warehouses = [
   'Kho Chi nhánh Trung tâm (Quận 1)',
@@ -195,13 +193,6 @@ export const outboundReasons = [
 
 export const keepers = ['Lê Tuấn (Thủ kho chính)', 'Trần Hoàng (Kho phụ)', 'Thu Hà (Thu ngân)'];
 
-export const paymentMethods = [
-  'Chuyển khoản ngân hàng (NCC)',
-  'Tiền mặt tại quầy salon',
-  'Ghi nợ công nợ (Hạn thanh toán 30 ngày)',
-  'Ví điện tử công ty',
-];
-
 export function makeInitialFormState(type: VoucherType): VoucherFormState {
   return {
     type,
@@ -215,12 +206,12 @@ export function makeInitialFormState(type: VoucherType): VoucherFormState {
     note: '',
     items: [],
     shippingFee: 0,
-    paymentMethod: paymentMethods[0],
-    paymentStatus: 'paid',
+    vatRate: DEFAULT_VAT_RATE,
+    dueDate: '',
+    paidAmount: '',
+    fundId: '',
     vatInvoiceCode: '',
     autoAddStock: true,
-    autoCashbook: true,
-    trackExpiry: true,
   };
 }
 

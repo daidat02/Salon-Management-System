@@ -6,37 +6,13 @@ import type { VoucherFormState } from './voucherData';
 
 type VoucherAutomationCardProps = {
   form: VoucherFormState;
-  onChange: (patch: Partial<VoucherFormState>) => void;
   onComplete?: () => void;
   isSubmitting?: boolean;
   submitLabel?: string;
 };
 
-const toggles: {
-  key: 'autoAddStock' | 'autoCashbook' | 'trackExpiry';
-  title: string;
-  desc: string;
-}[] = [
-  {
-    key: 'autoAddStock',
-    title: 'Cộng tồn kho tức thì',
-    desc: 'Tăng số lượng tồn của kho ngay khi bấm lưu phiếu',
-  },
-  {
-    key: 'autoCashbook',
-    title: 'Ghi nhận vào sổ quỹ chi',
-    desc: 'Tự động tạo phiếu chi tiền tương ứng trong ca làm',
-  },
-  {
-    key: 'trackExpiry',
-    title: 'Tem kiểm định & Hạn dùng (HSD)',
-    desc: 'Bật theo dõi số lô & cảnh báo trước hạn 60 ngày',
-  },
-];
-
 export default function VoucherAutomationCard({
   form,
-  onChange,
   onComplete,
   isSubmitting,
   submitLabel = 'Hoàn tất & Cập nhật Kho',
@@ -48,20 +24,14 @@ export default function VoucherAutomationCard({
         <span>Thiết lập tự động hóa</span>
       </h3>
 
-      <div className="space-y-3.5">
-        {toggles.map((t) => (
-          <div key={t.key} className="flex items-start justify-between gap-3">
-            <div className="text-xs">
-              <div className="font-medium text-on-surface">{t.title}</div>
-              <div className="text-[11px] text-on-surface-variant">{t.desc}</div>
-            </div>
-            <Switch
-              checked={form[t.key]}
-              onCheckedChange={(v) => onChange({ [t.key]: v } as Partial<VoucherFormState>)}
-              className="shrink-0"
-            />
+      <div className="flex items-start justify-between gap-3">
+        <div className="text-xs">
+          <div className="font-medium text-on-surface">Cộng tồn kho tức thì</div>
+          <div className="text-[11px] text-on-surface-variant">
+            Tăng số lượng tồn của kho ngay khi bấm lưu phiếu
           </div>
-        ))}
+        </div>
+        <Switch checked={form.autoAddStock} disabled className="shrink-0" />
       </div>
 
       <div className="pt-2">

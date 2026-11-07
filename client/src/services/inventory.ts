@@ -46,6 +46,8 @@ export type CreateDocumentItemPayload = {
   unit?: string;
   /** Đơn giá theo unit hiển thị — chỉ dùng cho phiếu nhập, phiếu xuất server tự lấy giá vốn. */
   unit_price: number;
+  /** Chiết khấu phần trăm trên dòng (0-100). */
+  discount_percent?: number;
 };
 
 export type CreateDocumentPayload = {
@@ -56,6 +58,13 @@ export type CreateDocumentPayload = {
   note?: string | null;
   reason?: string | null;
   items: CreateDocumentItemPayload[];
+  /** Các field dưới chỉ áp dụng cho phiếu nhập (import). */
+  due_date?: string | null;
+  vat_rate?: number;
+  shipping_fee?: number;
+  paid_amount?: number;
+  fund_id?: string | null;
+  invoice_code?: string | null;
 };
 
 export const createInventoryDocument = async (payload: CreateDocumentPayload) => {

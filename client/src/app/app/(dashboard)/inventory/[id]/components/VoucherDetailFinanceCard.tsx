@@ -6,7 +6,6 @@ import {
   numberToVietnameseWords,
 } from '../../(create)/components/voucherUtils';
 import { formatPlain as formatVND } from '@/lib/format';
-import { VAT_RATE } from '../../(create)/components/voucherData';
 
 type VoucherDetailFinanceCardProps = {
   document: InventoryDocument;
@@ -15,9 +14,8 @@ type VoucherDetailFinanceCardProps = {
 
 export default function VoucherDetailFinanceCard({ document, items }: VoucherDetailFinanceCardProps) {
   const totalQty = items.reduce((s, it) => s + it.quantity, 0);
-  // Backend chỉ lưu total_amount = Σ(qty × unit_price), không tách CK/VAT/phí ship
-  // nên các dòng đó hiển thị 0đ cho khớp layout form tạo.
-  const gross = items.reduce((s, it) => s + it.total_price, 0);
+  const gross =
+    document.gross_amount || items.reduce((s, it) => s + it.total_price, 0);
 
   return (
     <section className="space-y-4 rounded-xl bg-surface p-5 shadow-sm">
@@ -47,15 +45,17 @@ export default function VoucherDetailFinanceCard({ document, items }: VoucherDet
             <span>Chiết khấu NCC</span>
             <span className="text-[10px] font-medium text-success">(Khuyến mãi)</span>
           </span>
-          <span className="font-medium text-error">-{formatVND(0)} đ</span>
+          <span className="font-medium text-error">
+            -{formatVND(document.discount_amount)} đ
+          </span>
         </div>
         <div className="flex items-center justify-between text-on-surface-variant">
-          <span>Tiền thuế VAT ({Math.round(VAT_RATE * 100)}%)</span>
-          <span className="font-medium text-on-surface">{formatVND(0)} đ</span>
+          <span>Tiền thuế VAT ({document.vat_rate}%)</span>
+          <span className="font-medium text-on-surface">{formatVND(document.vat_amount)} đ</span>
         </div>
         <div className="flex items-center justify-between text-on-surface-variant">
           <span>Phí bốc xếp / Vận chuyển</span>
-          <span className="font-medium text-on-surface">{formatVND(0)} đ</span>
+          <span className="font-medium text-on-surface">{formatVND(document.shipping_fee)} đ</span>
         </div>
 
         <div className="mt-3 space-y-1 rounded-lg bg-surface-container p-3.5">

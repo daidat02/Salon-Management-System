@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
+	cashflowdomain "github.com/daidat02/server/internal/domain/cashflow"
 	domain "github.com/daidat02/server/internal/domain/inventory"
 	prodomain "github.com/daidat02/server/internal/domain/product"
 	"github.com/daidat02/server/pkg/utils"
@@ -133,7 +135,7 @@ func insertDocumentItemsCopy(ctx context.Context, tx pgx.Tx, documentID string, 
 	_, err := tx.CopyFrom(
 		ctx,
 		pgx.Identifier{"inventory_document_items"},
-		[]string{"id", "document_id", "product_id", "product_name", "sku", "unit", "net_unit", "net_amount", "quantity", "unit_price", "total_price"},
+		[]string{"id", "document_id", "product_id", "product_name", "sku", "unit", "net_unit", "net_amount", "quantity", "unit_price", "total_price", "discount_percent", "discount_amount"},
 		pgx.CopyFromSlice(len(items), func(i int) ([]any, error) {
 			it := items[i]
 			p := products[it.ProductID]
@@ -154,6 +156,8 @@ func insertDocumentItemsCopy(ctx context.Context, tx pgx.Tx, documentID string, 
 				it.Quantity,
 				it.UnitPrice,
 				lineTotal,
+				it.DiscountPercent,
+				it.DiscountAmount,
 			}, nil
 		}),
 	)
@@ -182,6 +186,47 @@ func applyDocumentLedger(ctx context.Context, tx pgx.Tx, orgID string, doc *doma
 		}
 	}
 	return nil
+}
+
+// insertInventoryExpenseVoucherTx sinh phiếu chi đã duyệt cho tiền đã trả khi
+// nhập hàng, chạy trong cùng tx tạo phiếu nên rollback nếu quỹ không đủ.
+func insertInventoryExpenseVoucherTx(ctx context.Context, tx pgx.Tx, doc *domain.InventoryDocument) error {
+	if doc == nil || doc.FundID == nil || *doc.FundID == "" || doc.PaidAmount <= 0 {
+		return nil
+	}
+
+	var categoryID *string
+	var resolvedCategory string
+	if err := tx.QueryRow(ctx, findActiveCategoryIDByCodeQuery, doc.OrganizationID, "GOODS_IMPORT", cashflowdomain.KindExpense).Scan(&resolvedCategory); err == nil {
+		categoryID = &resolvedCategory
+	} else if err != pgx.ErrNoRows {
+		return fmt.Errorf("lỗi khi tìm danh mục chi phí nhập hàng: %w", err)
+	}
+
+	now := time.Now()
+	desc := "Chi tiền nhập hàng phiếu " + doc.DocumentCode
+	voucher := &cashflowdomain.CashFlow{
+		ID:                  utils.NewID(),
+		OrganizationID:      doc.OrganizationID,
+		Kind:                cashflowdomain.KindExpense,
+		CategoryID:          categoryID,
+		FundID:              *doc.FundID,
+		Amount:              doc.PaidAmount,
+		Description:         &desc,
+		OccurredAt:          &now,
+		Status:              cashflowdomain.VoucherStatusApproved,
+		InventoryDocumentID: &doc.ID,
+		CreatedBy:           doc.CreatedBy,
+	}
+
+	for attempts := 0; ; attempts++ {
+		voucher.Code = utils.GenerateCashFlowCode(cashflowdomain.KindExpense)
+		if err := createCashFlowTx(ctx, tx, voucher); err == nil {
+			return nil
+		} else if !isUniqueViolation(err) || attempts >= 2 {
+			return fmt.Errorf("lỗi khi sinh phiếu chi nhập hàng: %w", err)
+		}
+	}
 }
 
 func (r *PostgresInventoryRepository) BulkCreateDocumentItems(ctx context.Context, orgID string, documentID string, items []*domain.DocumentItemInput) error {
@@ -267,15 +312,11 @@ func (r *PostgresInventoryRepository) CreateDocument(ctx context.Context, doc *d
 		return err
 	}
 
-	// Tính tổng server-side trước để insert header (items FK vào header nên phải tạo header trước).
-	var total float64
-	for _, it := range items {
-		total += it.Quantity * it.UnitPrice
-	}
-	doc.TotalAmount = total
-
+	// Tổng tiền/chiết khấu/VAT đã được usecase tính server-side.
 	if _, err := dbTx.Exec(ctx, createInventoryDocumentQuery,
-		doc.ID, doc.OrganizationID, doc.SupplierID, doc.OrderID, doc.DocumentCode, doc.Type, doc.TotalAmount, doc.Reason, doc.Note, doc.CreatedBy,
+		doc.ID, doc.OrganizationID, doc.SupplierID, doc.OrderID, doc.DocumentCode, doc.Type, doc.TotalAmount,
+		doc.Reason, doc.Note, doc.CreatedBy, doc.PaymentTracked, doc.DueDate, doc.GrossAmount, doc.DiscountAmount,
+		doc.VATRate, doc.VATAmount, doc.ShippingFee, doc.PaidAmount, doc.InvoiceCode,
 	); err != nil {
 		return fmt.Errorf("lỗi khi tạo phiếu kho: %w", err)
 	}
@@ -285,6 +326,10 @@ func (r *PostgresInventoryRepository) CreateDocument(ctx context.Context, doc *d
 	}
 
 	if err := applyDocumentLedger(ctx, dbTx, doc.OrganizationID, doc, items); err != nil {
+		return err
+	}
+
+	if err := insertInventoryExpenseVoucherTx(ctx, dbTx, doc); err != nil {
 		return err
 	}
 

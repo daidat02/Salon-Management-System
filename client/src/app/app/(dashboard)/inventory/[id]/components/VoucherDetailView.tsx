@@ -10,6 +10,7 @@ import VoucherDetailHeading from './VoucherDetailHeading';
 import VoucherDetailInfoCard from './VoucherDetailInfoCard';
 import VoucherDetailItemsCard from './VoucherDetailItemsCard';
 import VoucherDetailFinanceCard from './VoucherDetailFinanceCard';
+import VoucherDebtCard from './VoucherDebtCard';
 
 function toVoucherType(type: string): VoucherType {
   return type === 'export' || type === 'sale' ? 'outbound' : 'inbound';
@@ -55,6 +56,7 @@ export default function VoucherDetailView() {
 
         <div className="space-y-6 lg:col-span-4">
           <VoucherDetailFinanceCard document={document} items={items} />
+          <VoucherDebtCard document={document} />
         </div>
       </div>
     </div>

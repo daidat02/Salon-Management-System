@@ -1,5 +1,4 @@
 import {
-  VAT_RATE,
   buildUnitOptions,
   priceForUnit,
   toSuggestion,
@@ -50,7 +49,7 @@ export function buildLines(items: VoucherItem[], products: Product[]): VoucherLi
     const price = p ? priceForUnit(p, selectedUnit) : 0;
     const gross = item.qty * price;
     const discountAmount = Math.round((gross * item.discount) / 100);
-    const total = Math.round((gross - discountAmount) * (1 + VAT_RATE));
+    const total = Math.round(gross - discountAmount);
     return {
       ...item,
       name: s?.name ?? 'Sản phẩm không xác định',
@@ -100,10 +99,14 @@ export type VoucherTotals = {
   grand: number;
 };
 
-export function calcTotals(lines: VoucherLine[], shippingFee: number): VoucherTotals {
+export function calcTotals(
+  lines: VoucherLine[],
+  shippingFee: number,
+  vatRatePercent: number,
+): VoucherTotals {
   const gross = lines.reduce((s, l) => s + l.gross, 0);
   const discount = lines.reduce((s, l) => s + l.discountAmount, 0);
-  const vat = Math.round((gross - discount) * VAT_RATE);
+  const vat = Math.round(((gross - discount) * vatRatePercent) / 100);
   return {
     totalQty: lines.reduce((s, l) => s + l.qty, 0),
     itemCount: lines.length,

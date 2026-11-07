@@ -2,12 +2,16 @@ package postgres
 
 const (
 	createInventoryDocumentQuery = `
-		INSERT INTO inventory_documents (id,organization_id,supplier_id,order_id,document_code,type,total_amount,reason,note,created_by)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9,$10)
+		INSERT INTO inventory_documents (
+			id, organization_id, supplier_id, order_id, document_code, type, total_amount,
+			reason, note, created_by, payment_tracked, due_date, gross_amount, discount_amount,
+			vat_rate, vat_amount, shipping_fee, paid_amount, invoice_code
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
 	`
 	createInventoryDocumentItemQuery = `
-		INSERT INTO inventory_document_items (id,document_id,product_id,product_name,sku,unit, net_unit, net_amount, quantity, unit_price, total_price)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		INSERT INTO inventory_document_items (id,document_id,product_id,product_name,sku,unit, net_unit, net_amount, quantity, unit_price, total_price, discount_percent, discount_amount)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 	`
 	getProductsByIDsQuery = `
 		SELECT id, sku, name, unit, net_unit, net_amount
@@ -41,6 +45,27 @@ const (
 			id.total_amount AS total_amount,
 			id.note AS note,
 			id.reason AS reason,
+			id.payment_tracked AS payment_tracked,
+			id.due_date AS due_date,
+			id.gross_amount AS gross_amount,
+			id.discount_amount AS discount_amount,
+			id.vat_rate AS vat_rate,
+			id.vat_amount AS vat_amount,
+			id.shipping_fee AS shipping_fee,
+			id.paid_amount AS paid_amount,
+			id.invoice_code AS invoice_code,
+			CASE WHEN id.payment_tracked
+				THEN GREATEST(id.total_amount - id.paid_amount, 0)
+				ELSE 0
+			END AS remaining_amount,
+			CASE
+				WHEN NOT id.payment_tracked THEN 'not_tracked'
+				WHEN id.paid_amount >= id.total_amount THEN 'paid'
+				WHEN id.paid_amount > 0 THEN 'partial'
+				ELSE 'unpaid'
+			END AS payment_status,
+			(id.payment_tracked AND id.due_date IS NOT NULL
+				AND id.due_date < CURRENT_DATE AND id.paid_amount < id.total_amount) AS is_overdue,
 			s.id AS supplier_id,
 			s.name AS supplier_name,
 
@@ -152,8 +177,30 @@ const (
 				id.type, 
 				id.total_amount, 
 				id.note, 
-				id.reason,            -- Đã bổ sung
-				id.created_by,        -- Đã bổ sung
+				id.reason,
+				id.payment_tracked,
+				id.due_date,
+				id.gross_amount,
+				id.discount_amount,
+				id.vat_rate,
+				id.vat_amount,
+				id.shipping_fee,
+				id.paid_amount,
+				id.invoice_code,
+				CASE WHEN id.payment_tracked
+					THEN GREATEST(id.total_amount - id.paid_amount, 0)
+					ELSE 0
+				END AS remaining_amount,
+				CASE
+					WHEN NOT id.payment_tracked THEN 'not_tracked'
+					WHEN id.paid_amount >= id.total_amount THEN 'paid'
+					WHEN id.paid_amount > 0 THEN 'partial'
+					ELSE 'unpaid'
+				END AS payment_status,
+				(id.payment_tracked AND id.due_date IS NOT NULL
+					AND id.due_date < CURRENT_DATE AND id.paid_amount < id.total_amount) AS is_overdue,
+				id.created_by,
+
 				u.full_name AS created_by_name,
 				id.created_at, 
 				o.id AS order_id, 
@@ -176,6 +223,8 @@ const (
 						'quantity', idi.quantity,
 						'unit_price', idi.unit_price,
 						'total_price', idi.total_price,
+						'discount_percent', idi.discount_percent,
+						'discount_amount', idi.discount_amount,
 						-- Quy đổi hiển thị: có net đầy đủ và đủ 1 đơn vị lớn thì show theo unit lớn,
 						-- ngược lại giữ nguyên theo đơn vị nhỏ (số đã lưu luôn ở đơn vị nhỏ nhất)
 						'display_quantity', CASE

@@ -5,8 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math"
 	"strings"
+	"time"
 
+	cashflowdomain "github.com/daidat02/server/internal/domain/cashflow"
 	domain "github.com/daidat02/server/internal/domain/inventory"
 	orderdomain "github.com/daidat02/server/internal/domain/order"
 	productdomain "github.com/daidat02/server/internal/domain/product"
@@ -59,10 +62,19 @@ func (u *InventoryUsecase) CreateDocument(ctx context.Context, req *domain.Creat
 		return nil, err
 	}
 
+	if err := applyPaymentTerms(doc, req, items); err != nil {
+		return nil, err
+	}
+
 	if err := u.repo.CreateDocument(ctx, doc, items); err != nil {
 		log.Println("Error creating inventory document:", err)
-		if errors.Is(err, domain.ErrInsufficientStock) {
+		switch {
+		case errors.Is(err, domain.ErrInsufficientStock):
 			return nil, apperror.New(400, "Tồn kho không đủ cho phiếu này", err)
+		case errors.Is(err, cashflowdomain.ErrFundNotFound):
+			return nil, apperror.New(400, "Quỹ thanh toán không tồn tại hoặc đã ngừng hoạt động", err)
+		case errors.Is(err, cashflowdomain.ErrInsufficientFundBalance):
+			return nil, apperror.New(400, "Số dư quỹ không đủ để thanh toán phiếu nhập", err)
 		}
 		return nil, apperror.New(500, "Lỗi khi tạo phiếu kho", err)
 	}
@@ -77,7 +89,127 @@ func (u *InventoryUsecase) CreateDocument(ctx context.Context, req *domain.Creat
 		TotalAmount:    doc.TotalAmount,
 		Note:           doc.Note,
 		CreatedAt:      doc.CreatedAt,
+		PaymentTracked: doc.PaymentTracked,
+		DueDate:        doc.DueDate,
+		GrossAmount:    doc.GrossAmount,
+		DiscountAmount: doc.DiscountAmount,
+		VATRate:        doc.VATRate,
+		VATAmount:      doc.VATAmount,
+		ShippingFee:    doc.ShippingFee,
+		PaidAmount:     doc.PaidAmount,
+		RemainingAmount: func() float64 {
+			if !doc.PaymentTracked {
+				return 0
+			}
+			return math.Max(doc.TotalAmount-doc.PaidAmount, 0)
+		}(),
+		PaymentStatus: paymentStatus(doc),
+		InvoiceCode:   doc.InvoiceCode,
 	}, nil
+}
+
+// applyPaymentTerms tính toàn bộ tiền phiếu nhập ở server và gắn điều kiện
+// thanh toán/công nợ. Phiếu không phải nhập bỏ qua hoàn toàn các field này.
+func applyPaymentTerms(doc *domain.InventoryDocument, req *domain.CreateDocumentRequest, items []*domain.DocumentItemInput) error {
+	if doc.Type != domain.TypeImport {
+		var total float64
+		for _, it := range items {
+			it.DiscountPercent = 0
+			it.DiscountAmount = 0
+			total += it.Quantity * it.UnitPrice
+		}
+		doc.PaymentTracked = false
+		doc.DueDate = nil
+		doc.VATRate = 0
+		doc.VATAmount = 0
+		doc.ShippingFee = 0
+		doc.PaidAmount = 0
+		doc.FundID = nil
+		doc.InvoiceCode = nil
+		doc.GrossAmount = 0
+		doc.DiscountAmount = 0
+		doc.TotalAmount = total
+		return nil
+	}
+
+	if req.VATRate < 0 || req.VATRate > 100 {
+		return apperror.New(400, "Thuế VAT phải trong khoảng 0-100%", nil)
+	}
+	if req.ShippingFee < 0 {
+		return apperror.New(400, "Phí vận chuyển không được âm", nil)
+	}
+	if req.PaidAmount < 0 {
+		return apperror.New(400, "Số tiền đã trả không được âm", nil)
+	}
+	if req.PaidAmount > 0 && (req.FundID == nil || strings.TrimSpace(*req.FundID) == "") {
+		return apperror.New(400, "Vui lòng chọn quỹ thanh toán", nil)
+	}
+
+	var gross, discount float64
+	for i, it := range items {
+		if it.DiscountPercent < 0 || it.DiscountPercent > 100 {
+			return apperror.New(400, fmt.Sprintf("Dòng thứ %d: chiết khấu phải trong khoảng 0-100%%", i+1), nil)
+		}
+		lineGross := it.Quantity * it.UnitPrice
+		lineDiscount := math.Round(lineGross * it.DiscountPercent / 100)
+		it.DiscountAmount = lineDiscount
+		gross += lineGross
+		discount += lineDiscount
+	}
+
+	vatAmount := math.Round((gross - discount) * req.VATRate / 100)
+	total := gross - discount + vatAmount + req.ShippingFee
+	if req.PaidAmount > total {
+		return apperror.New(400, "Số tiền đã trả không được vượt quá tổng tiền phiếu nhập", nil)
+	}
+
+	if req.DueDate != nil && strings.TrimSpace(*req.DueDate) != "" {
+		due, err := parseDate(strings.TrimSpace(*req.DueDate))
+		if err != nil {
+			return apperror.New(400, "Hạn thanh toán không hợp lệ (định dạng YYYY-MM-DD)", err)
+		}
+		doc.DueDate = &due
+	}
+
+	doc.PaymentTracked = true
+	doc.GrossAmount = gross
+	doc.DiscountAmount = discount
+	doc.VATRate = req.VATRate
+	doc.VATAmount = vatAmount
+	doc.ShippingFee = req.ShippingFee
+	doc.PaidAmount = req.PaidAmount
+	doc.TotalAmount = total
+	if req.FundID != nil {
+		fundID := strings.TrimSpace(*req.FundID)
+		doc.FundID = &fundID
+	}
+	if req.InvoiceCode != nil {
+		invoice := strings.TrimSpace(*req.InvoiceCode)
+		if invoice != "" {
+			doc.InvoiceCode = &invoice
+		}
+	}
+	return nil
+}
+
+func paymentStatus(doc *domain.InventoryDocument) string {
+	if !doc.PaymentTracked {
+		return "not_tracked"
+	}
+	if doc.PaidAmount >= doc.TotalAmount {
+		return "paid"
+	}
+	if doc.PaidAmount > 0 {
+		return "partial"
+	}
+	return "unpaid"
+}
+
+func parseDate(value string) (time.Time, error) {
+	if t, err := time.Parse("2006-01-02", value); err == nil {
+		return t, nil
+	}
+	return time.Parse(time.RFC3339, value)
 }
 
 // toBaseItems quy từng dòng phiếu về đơn vị nhỏ nhất + giá chuẩn server.
@@ -142,10 +274,11 @@ func (u *InventoryUsecase) toBaseItems(ctx context.Context, orgID, docType strin
 			return nil, apperror.New(400, fmt.Sprintf("Dòng thứ %d: %s", i+1, convErr.Error()), convErr)
 		}
 		items = append(items, &domain.DocumentItemInput{
-			ProductID: pid,
-			Unit:      unit,
-			Quantity:  baseQty,
-			UnitPrice: basePrice,
+			ProductID:       pid,
+			Unit:            unit,
+			Quantity:        baseQty,
+			UnitPrice:       basePrice,
+			DiscountPercent: inputs[i].DiscountPercent,
 		})
 	}
 	return items, nil

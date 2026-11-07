@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/daidat02/server/internal/delivery/http/middlewares"
+	cashflowdomain "github.com/daidat02/server/internal/domain/cashflow"
 	domain "github.com/daidat02/server/internal/domain/inventory"
 	orderdomain "github.com/daidat02/server/internal/domain/order"
 	"github.com/daidat02/server/pkg/apperror"
@@ -294,5 +295,115 @@ func TestInventoryUsecase_CreateDocument_Units(t *testing.T) {
 		assert.Error(t, err)
 		assert.Nil(t, res)
 		assertFlatAppError(t, err, 404)
+	})
+}
+
+func TestInventoryUsecase_CreateDocument_PaymentTerms(t *testing.T) {
+	units := map[string]orderdomain.ProductUnit{
+		"prod-1": {Unit: "chai", NetUnit: strPtr("ml"), NetAmount: f64Ptr(1000)},
+	}
+	pricing := map[string]orderdomain.ProductPricing{
+		"prod-1": {SellPrice: 200000, CostPrice: 120000},
+	}
+	productsStub := func() *MockInventoryProducts {
+		p := new(MockInventoryProducts)
+		p.On("ProductsExistInOrg", mock.Anything, "org-123", mock.Anything).Return([]string{}, nil)
+		p.On("GetProductUnits", mock.Anything, "org-123", mock.Anything).Return(units, nil)
+		p.On("GetProductPricing", mock.Anything, "org-123", mock.Anything).Return(pricing, nil)
+		return p
+	}
+	baseReq := func() *domain.CreateDocumentRequest {
+		return &domain.CreateDocumentRequest{
+			DocumentCode: "NK-001",
+			Type:         domain.TypeImport,
+			Items: []domain.DocumentItemInput{
+				{ProductID: "prod-1", Quantity: 1, Unit: "chai", UnitPrice: 100000, DiscountPercent: 10},
+			},
+			VATRate:     8,
+			ShippingFee: 5000,
+			PaidAmount:  102200,
+			FundID:      strPtr("fund-1"),
+		}
+	}
+
+	t.Run("Thành công - tính chiết khấu, VAT, phí ship và công nợ", func(t *testing.T) {
+		repo := new(MockInventoryRepository)
+		var gotDoc *domain.InventoryDocument
+		var gotItems []*domain.DocumentItemInput
+		repo.On("CreateDocument", mock.Anything, mock.Anything, mock.Anything).
+			Run(func(args mock.Arguments) {
+				gotDoc = args.Get(1).(*domain.InventoryDocument)
+				gotItems = args.Get(2).([]*domain.DocumentItemInput)
+			}).Return(nil)
+
+		uc := NewInventoryUsecase(repo, productsStub())
+		res, err := uc.CreateDocument(withOrgCtx("org-123"), baseReq())
+
+		assert.NoError(t, err)
+		assert.NotNil(t, res)
+		assert.Equal(t, 100000.0, gotDoc.GrossAmount)
+		assert.Equal(t, 10000.0, gotDoc.DiscountAmount)
+		assert.Equal(t, 7200.0, gotDoc.VATAmount)
+		assert.Equal(t, 102200.0, gotDoc.TotalAmount)
+		assert.True(t, gotDoc.PaymentTracked)
+		assert.Equal(t, 10000.0, gotItems[0].DiscountAmount)
+		assert.Equal(t, "paid", res.PaymentStatus)
+		assert.Equal(t, 0.0, res.RemainingAmount)
+	})
+
+	t.Run("Thất bại - trả vượt tổng", func(t *testing.T) {
+		req := baseReq()
+		req.PaidAmount = 999999
+		uc := NewInventoryUsecase(new(MockInventoryRepository), productsStub())
+		res, err := uc.CreateDocument(withOrgCtx("org-123"), req)
+
+		assert.Error(t, err)
+		assert.Nil(t, res)
+		assertFlatAppError(t, err, 400)
+	})
+
+	t.Run("Thất bại - đã trả nhưng thiếu quỹ", func(t *testing.T) {
+		req := baseReq()
+		req.FundID = nil
+		uc := NewInventoryUsecase(new(MockInventoryRepository), productsStub())
+		res, err := uc.CreateDocument(withOrgCtx("org-123"), req)
+
+		assert.Error(t, err)
+		assert.Nil(t, res)
+		assertFlatAppError(t, err, 400)
+	})
+
+	t.Run("Thất bại - quỹ không đủ số dư", func(t *testing.T) {
+		repo := new(MockInventoryRepository)
+		repo.On("CreateDocument", mock.Anything, mock.Anything, mock.Anything).
+			Return(cashflowdomain.ErrInsufficientFundBalance)
+
+		uc := NewInventoryUsecase(repo, productsStub())
+		res, err := uc.CreateDocument(withOrgCtx("org-123"), baseReq())
+
+		assert.Error(t, err)
+		assert.Nil(t, res)
+		assertFlatAppError(t, err, 400)
+	})
+
+	t.Run("Phiếu xuất bỏ qua thanh toán/công nợ", func(t *testing.T) {
+		repo := new(MockInventoryRepository)
+		var gotDoc *domain.InventoryDocument
+		repo.On("CreateDocument", mock.Anything, mock.Anything, mock.Anything).
+			Run(func(args mock.Arguments) {
+				gotDoc = args.Get(1).(*domain.InventoryDocument)
+			}).Return(nil)
+
+		req := baseReq()
+		req.Type = domain.TypeExport
+		uc := NewInventoryUsecase(repo, productsStub())
+		res, err := uc.CreateDocument(withOrgCtx("org-123"), req)
+
+		assert.NoError(t, err)
+		assert.NotNil(t, res)
+		assert.False(t, gotDoc.PaymentTracked)
+		assert.Equal(t, 0.0, gotDoc.PaidAmount)
+		assert.Equal(t, 120000.0, gotDoc.TotalAmount)
+		assert.Equal(t, "not_tracked", res.PaymentStatus)
 	})
 }

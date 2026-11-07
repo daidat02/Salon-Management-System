@@ -30,7 +30,21 @@ export interface InventoryDocument {
   created_by: string | null;
   created_by_name: string | null;
   created_at: string | null;
+  payment_tracked: boolean;
+  due_date: string | null;
+  gross_amount: number;
+  discount_amount: number;
+  vat_rate: number;
+  vat_amount: number;
+  shipping_fee: number;
+  paid_amount: number;
+  remaining_amount: number;
+  payment_status: InventoryPaymentStatus;
+  is_overdue: boolean;
+  invoice_code: string | null;
 }
+
+export type InventoryPaymentStatus = 'paid' | 'partial' | 'unpaid' | 'not_tracked';
 
 export interface InventoryDocumentItem {
   id: string;
@@ -44,6 +58,8 @@ export interface InventoryDocumentItem {
   quantity: number;
   unit_price: number;
   total_price: number;
+  discount_percent: number;
+  discount_amount: number;
   /** Số lượng/đơn vị/giá đã quy đổi để hiển thị (tính ở API detail, fallback về field gốc). */
   display_quantity?: number;
   display_unit?: string;

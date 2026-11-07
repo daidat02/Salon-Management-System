@@ -5604,6 +5604,16 @@ const docTemplate = `{
                 "document_code": {
                     "type": "string"
                 },
+                "due_date": {
+                    "description": "Thanh toán / công nợ — chỉ áp dụng cho phiếu nhập.",
+                    "type": "string"
+                },
+                "fund_id": {
+                    "type": "string"
+                },
+                "invoice_code": {
+                    "type": "string"
+                },
                 "items": {
                     "type": "array",
                     "items": {
@@ -5616,20 +5626,35 @@ const docTemplate = `{
                 "order_id": {
                     "type": "string"
                 },
+                "paid_amount": {
+                    "type": "number"
+                },
                 "reason": {
                     "type": "string"
+                },
+                "shipping_fee": {
+                    "type": "number"
                 },
                 "supplier_id": {
                     "type": "string"
                 },
                 "type": {
                     "type": "string"
+                },
+                "vat_rate": {
+                    "type": "number"
                 }
             }
         },
         "github_com_daidat02_server_internal_domain_inventory.DocumentItemInput": {
             "type": "object",
             "properties": {
+                "discount_amount": {
+                    "type": "number"
+                },
+                "discount_percent": {
+                    "type": "number"
+                },
                 "product_id": {
                     "type": "string"
                 },

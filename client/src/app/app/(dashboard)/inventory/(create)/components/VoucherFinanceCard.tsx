@@ -2,7 +2,6 @@
 
 import { ReceiptText } from 'lucide-react';
 import { DashInput } from '@/components/dashboard/DashInput';
-import { VAT_RATE } from './voucherData';
 import { formatPlain as formatVND } from '@/lib/format';
 import { numberToVietnameseWords, type VoucherTotals } from './voucherUtils';
 
@@ -10,12 +9,16 @@ type VoucherFinanceCardProps = {
   totals: VoucherTotals;
   shippingFee: number;
   onShippingFeeChange: (fee: number) => void;
+  vatRate: number;
+  onVatRateChange: (rate: number) => void;
 };
 
 export default function VoucherFinanceCard({
   totals,
   shippingFee,
   onShippingFeeChange,
+  vatRate,
+  onVatRateChange,
 }: VoucherFinanceCardProps) {
   return (
     <section className="space-y-4 rounded-xl bg-surface p-5 shadow-sm">
@@ -48,7 +51,22 @@ export default function VoucherFinanceCard({
           <span className="font-medium text-error">-{formatVND(totals.discount)} đ</span>
         </div>
         <div className="flex items-center justify-between text-on-surface-variant">
-          <span>Tiền thuế VAT ({Math.round(VAT_RATE * 100)}%)</span>
+          <span className="flex items-center gap-1.5">
+            <span>Thuế VAT</span>
+            <span className="w-14">
+              <DashInput
+                type="number"
+                min={0}
+                max={100}
+                value={vatRate}
+                onChange={(e) =>
+                  onVatRateChange(Math.min(100, Math.max(0, Number(e.target.value))))
+                }
+                className="bg-surface-container px-2 py-0.5 text-right text-[11px] font-medium"
+              />
+            </span>
+            <span>%</span>
+          </span>
           <span className="font-medium text-on-surface">{formatVND(totals.vat)} đ</span>
         </div>
         <div className="flex items-center justify-between text-on-surface-variant">

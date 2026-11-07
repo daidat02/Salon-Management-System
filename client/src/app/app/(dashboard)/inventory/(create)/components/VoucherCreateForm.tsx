@@ -8,6 +8,7 @@ import { getApiErrorMessage } from '@/services/apiClient';
 import useCategory from '@/hooks/use-category';
 import useProduct from '@/hooks/use-product';
 import useSuppliers from '@/hooks/use-suppliers';
+import useFunds from '@/hooks/use-funds';
 import { useCreateDocument } from '@/hooks/use-create-document';
 import type { Product } from '@/types/product';
 import VoucherHeading from './VoucherHeading';
@@ -41,6 +42,12 @@ export default function VoucherCreateForm({ initialType }: { initialType: Vouche
   const { mutate: createDocument, isPending: isSubmitting } = useCreateDocument();
   const { data: supplierData } = useSuppliers();
   const suppliers = React.useMemo(() => supplierData?.data ?? [], [supplierData]);
+  const { data: funds = [] } = useFunds(true);
+  const defaultFund =
+    funds.find((fund) => fund.is_default && fund.is_active) ??
+    funds.find((fund) => fund.is_active) ??
+    funds[0];
+  const effectiveFundId = form.fundId || defaultFund?.id || '';
 
   // Danh mục loại product để lọc gợi ý thêm dòng.
   const { data: categoryData } = useCategory({ page: 1, pageSize: 100 });
@@ -120,8 +127,8 @@ export default function VoucherCreateForm({ initialType }: { initialType: Vouche
 
   const lines = React.useMemo(() => buildLines(form.items, allProducts), [form.items, allProducts]);
   const totals = React.useMemo(
-    () => calcTotals(lines, form.shippingFee),
-    [lines, form.shippingFee],
+    () => calcTotals(lines, form.shippingFee, form.vatRate),
+    [lines, form.shippingFee, form.vatRate],
   );
   const overStockLines = React.useMemo(
     () => (form.type === 'outbound' ? findOverStockLines(lines) : []),
@@ -156,6 +163,27 @@ export default function VoucherCreateForm({ initialType }: { initialType: Vouche
       toast.add({ title: 'Số lượng không hợp lệ', description: msg, type: 'error' });
       return;
     }
+    const paidAmount = Number(form.paidAmount) || 0;
+    if (form.type === 'inbound') {
+      if (paidAmount < 0) {
+        const msg = 'Số tiền đã trả không được âm';
+        setSubmitError(msg);
+        toast.add({ title: 'Thanh toán không hợp lệ', description: msg, type: 'error' });
+        return;
+      }
+      if (paidAmount > totals.grand) {
+        const msg = 'Số tiền đã trả không được vượt quá tổng thanh toán';
+        setSubmitError(msg);
+        toast.add({ title: 'Thanh toán không hợp lệ', description: msg, type: 'error' });
+        return;
+      }
+      if (paidAmount > 0 && !effectiveFundId) {
+        const msg = 'Vui lòng chọn quỹ thanh toán';
+        setSubmitError(msg);
+        toast.add({ title: 'Thiếu quỹ thanh toán', description: msg, type: 'error' });
+        return;
+      }
+    }
     if (overStockLines.length > 0) {
       const names = overStockLines
         .map((l) => `${l.name} (tồn ${l.stock.toLocaleString('vi-VN')} ${l.baseUnit})`)
@@ -180,7 +208,18 @@ export default function VoucherCreateForm({ initialType }: { initialType: Vouche
           quantity: l.qty,
           unit: l.selectedUnit,
           unit_price: l.price,
+          discount_percent: l.discount,
         })),
+        ...(form.type === 'inbound'
+          ? {
+              due_date: form.dueDate || null,
+              vat_rate: form.vatRate,
+              shipping_fee: form.shippingFee,
+              paid_amount: Number(form.paidAmount) || 0,
+              fund_id: effectiveFundId || null,
+              invoice_code: form.vatInvoiceCode.trim() || null,
+            }
+          : {}),
       },
       {
         onSuccess: (doc) => {
@@ -198,7 +237,7 @@ export default function VoucherCreateForm({ initialType }: { initialType: Vouche
         },
       },
     );
-  }, [form, lines, overStockLines, createDocument, router]);
+  }, [form, lines, totals, overStockLines, effectiveFundId, createDocument, router]);
 
   return (
     <div className="space-y-4">
@@ -265,11 +304,19 @@ export default function VoucherCreateForm({ initialType }: { initialType: Vouche
             totals={totals}
             shippingFee={form.shippingFee}
             onShippingFeeChange={(fee) => patch({ shippingFee: fee })}
+            vatRate={form.vatRate}
+            onVatRateChange={(rate) => patch({ vatRate: rate })}
           />
-          {form.type === 'inbound' && <VoucherPaymentCard form={form} onChange={patch} />}
+          {form.type === 'inbound' && (
+            <VoucherPaymentCard
+              form={{ ...form, fundId: effectiveFundId }}
+              onChange={patch}
+              totals={totals}
+              funds={funds}
+            />
+          )}
           <VoucherAutomationCard
             form={form}
-            onChange={patch}
             onComplete={handleComplete}
             isSubmitting={isSubmitting}
             submitLabel={VOUCHER_META[form.type].submitLabel}

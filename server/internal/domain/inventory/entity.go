@@ -55,21 +55,31 @@ type LowStockItem struct {
 	MinStock      float64 `json:"min_stock" db:"min_stock"`
 }
 
+// Receipts
 
-// Receipts 
-
-type InventoryDocument struct{
+type InventoryDocument struct {
 	ID             string
 	OrganizationID string
 	SupplierID     *string
-	OrderID		*string
+	OrderID        *string
 	DocumentCode   string
-	Type		   string
+	Type           string
 	TotalAmount    float64
 	Reason         *string
 	Note           *string
 	CreatedBy      *string
 	CreatedAt      *time.Time
+
+	PaymentTracked bool
+	DueDate        *time.Time
+	GrossAmount    float64
+	DiscountAmount float64
+	VATRate        float64
+	VATAmount      float64
+	ShippingFee    float64
+	PaidAmount     float64
+	FundID         *string
+	InvoiceCode    *string
 }
 
 func (d *InventoryDocument) Validate() error {
@@ -87,17 +97,19 @@ func (d *InventoryDocument) Validate() error {
 	return nil
 }
 
-type InventoryDocumentItem struct{
-	ID             string
-	OrganizationID string
-	ProductID      string
-	ProductName    string
-	SKU     	   string
-	DocumentID     string
-	NetUnit       *string
-	NetAmount     *float64
-	UnitPrice      float64
-	Quantity       float64
-	TotalPrice     float64
-	CreatedAt      *time.Time
+type InventoryDocumentItem struct {
+	ID              string
+	OrganizationID  string
+	ProductID       string
+	ProductName     string
+	SKU             string
+	DocumentID      string
+	NetUnit         *string
+	NetAmount       *float64
+	UnitPrice       float64
+	Quantity        float64
+	TotalPrice      float64
+	DiscountPercent float64
+	DiscountAmount  float64
+	CreatedAt       *time.Time
 }
