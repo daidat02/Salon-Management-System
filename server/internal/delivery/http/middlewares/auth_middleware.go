@@ -12,30 +12,32 @@ import (
 )
 
 type contextKey string
+
 const OrgIdKey contextKey = contextKey("organization_id")
 const UserIdKey contextKey = contextKey("user_id")
-func VerifyToken() gin.HandlerFunc{
-	return func(c *gin.Context){
+
+func VerifyToken() gin.HandlerFunc {
+	return func(c *gin.Context) {
 		// Lấy token từ header Authorization
 		authHeader := c.GetHeader("Authorization")
 
-		if authHeader == ""{
-			response.Error(c,apperror.New(401,"Thiếu token xác thực, đăng nhập để tiếp tục",nil))
+		if authHeader == "" {
+			response.Error(c, apperror.New(401, "Thiếu token xác thực, đăng nhập để tiếp tục", nil))
 			c.Abort()
-			return	
+			return
 		}
 
-		paths := strings.Split(authHeader," ")
-		if len(paths) != 2 || paths[0] != "Bearer"{
-			response.Error(c,apperror.New(401,"Token xác thực không hợp lệ",nil))
+		paths := strings.Split(authHeader, " ")
+		if len(paths) != 2 || paths[0] != "Bearer" {
+			response.Error(c, apperror.New(401, "Token xác thực không hợp lệ", nil))
 			c.Abort()
 			return
 		}
 
 		tokenString := paths[1]
-		claims ,err := utils.ValidateToken(tokenString)
-		if err != nil{
-			response.Error(c,apperror.New(401,"Token xác thực không hợp lệ",nil))
+		claims, err := utils.ValidateAccessToken(tokenString)
+		if err != nil {
+			response.Error(c, apperror.New(401, "Token xác thực không hợp lệ", nil))
 			c.Abort()
 			return
 		}
@@ -43,9 +45,9 @@ func VerifyToken() gin.HandlerFunc{
 		c.Set("role", claims.Role)
 		c.Set("orgId", claims.OrgID)
 		ctx := c.Request.Context()
-        ctx = context.WithValue(ctx, OrgIdKey, claims.OrgID)
-        ctx = context.WithValue(ctx, UserIdKey, claims.UserID)
-		
+		ctx = context.WithValue(ctx, OrgIdKey, claims.OrgID)
+		ctx = context.WithValue(ctx, UserIdKey, claims.UserID)
+
 		c.Request = c.Request.WithContext(ctx)
 
 		c.Next()
@@ -53,7 +55,7 @@ func VerifyToken() gin.HandlerFunc{
 }
 
 func VertifyRole(requiredRole []string) gin.HandlerFunc {
-	return func(c *gin.Context){
+	return func(c *gin.Context) {
 		userRole, exists := c.Get("role")
 		if !exists {
 			response.Error(c, apperror.New(401, "Không tìm thấy vai trò người dùng", nil))
@@ -61,7 +63,7 @@ func VertifyRole(requiredRole []string) gin.HandlerFunc {
 			return
 		}
 
-		for _, role := range requiredRole{
+		for _, role := range requiredRole {
 			if userRole == role {
 				c.Next()
 			}
@@ -72,14 +74,13 @@ func VertifyRole(requiredRole []string) gin.HandlerFunc {
 	}
 }
 
-
 func GetOrgID(ctx context.Context) (string, error) {
-    orgID, ok := ctx.Value(OrgIdKey).(string)
-    
-    if !ok || orgID == "" {
-        return "", errors.New("missing organization_id in context")
-    }
-    return orgID, nil
+	orgID, ok := ctx.Value(OrgIdKey).(string)
+
+	if !ok || orgID == "" {
+		return "", errors.New("missing organization_id in context")
+	}
+	return orgID, nil
 }
 
 func GetUserID(ctx context.Context) (string, error) {

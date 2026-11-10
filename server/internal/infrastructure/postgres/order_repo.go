@@ -680,30 +680,44 @@ func (r *PostgresOrderRepository) ApplyCancel(ctx context.Context, orgID, orderI
 // trong cùng tx. Trả về mã phiếu vừa sinh.
 // Guard: khóa row đơn + chỉ chốt đơn chưa hoàn tất (chống chốt 2 lần);
 // tồn không đủ ở bất kỳ SP nào thì rollback toàn bộ (ErrInsufficientStock).
-func (r *PostgresOrderRepository) CompleteOrderWithSlip(ctx context.Context, orgID, orderID string, appointmentID *string, lines []domain.SaleSlipLine, fundID string) (domain.SaleSlipResult, error) {
+func (r *PostgresOrderRepository) CompleteOrderWithSlip(ctx context.Context, orgID, orderID string, appointmentID *string, lines []domain.SaleSlipLine, fundID string, confirmation *domain.PaymentCompletion) (domain.SaleSlipResult, error) {
 	var empty domain.SaleSlipResult
-	if len(lines) == 0 {
-		return empty, fmt.Errorf("phiếu bán hàng phải có ít nhất 1 dòng hàng")
-	}
-	items := make([]*invdomain.DocumentItemInput, 0, len(lines))
-	var total float64
-	for _, l := range lines {
-		if l.Quantity <= 0 {
-			return empty, fmt.Errorf("số lượng sản phẩm %s phải lớn hơn 0", l.ProductID)
-		}
-		if l.UnitPrice < 0 {
-			return empty, fmt.Errorf("đơn giá sản phẩm %s không được âm", l.ProductID)
-		}
-		// Cộng tổng theo từng dòng (không gom rồi nhân 1 giá để khỏi lệch
-		// header khi cùng SP xuất hiện nhiều dòng với đơn giá khác nhau).
-		total += l.Quantity * l.UnitPrice
-		items = append(items, &invdomain.DocumentItemInput{
-			ProductID: l.ProductID,
-			Quantity:  l.Quantity,
-			UnitPrice: l.UnitPrice,
-		})
+	if confirmation == nil {
+		return empty, fmt.Errorf("thiếu thông tin xác nhận thanh toán")
 	}
 
+	// 1. Nếu có sản phẩm (bán lẻ/nguyên liệu), tính toán và validate danh sách
+	var items []*invdomain.DocumentItemInput
+	var total float64
+	qtyByProduct := map[string]float64{}
+	var pids []string
+
+	if len(lines) > 0 {
+		items = make([]*invdomain.DocumentItemInput, 0, len(lines))
+		for _, l := range lines {
+			if l.Quantity <= 0 {
+				return empty, fmt.Errorf("số lượng sản phẩm %s phải lớn hơn 0", l.ProductID)
+			}
+			if l.UnitPrice < 0 {
+				return empty, fmt.Errorf("đơn giá sản phẩm %s không được âm", l.ProductID)
+			}
+			total += l.Quantity * l.UnitPrice
+			items = append(items, &invdomain.DocumentItemInput{
+				ProductID: l.ProductID,
+				Quantity:  l.Quantity,
+				UnitPrice: l.UnitPrice,
+			})
+			qtyByProduct[l.ProductID] += l.Quantity
+		}
+
+		pids = make([]string, 0, len(qtyByProduct))
+		for pid := range qtyByProduct {
+			pids = append(pids, pid)
+		}
+		sort.Strings(pids)
+	}
+
+	// 2. Bắt đầu DB Transaction
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return empty, fmt.Errorf("lỗi khi bắt đầu transaction: %w", err)
@@ -722,7 +736,62 @@ func (r *PostgresOrderRepository) CompleteOrderWithSlip(ctx context.Context, org
 		return empty, fmt.Errorf("đơn hàng %s chưa sẵn sàng chốt: %w", orderID, domain.ErrOrderNotReady)
 	}
 
-	tag, err := tx.Exec(ctx, flipToCompletedQuery, orgID, orderID)
+	// Cập nhật payment + giảm giá/total đơn trong cùng tx với việc chốt đơn.
+	// Khóa dòng payment để 2 request confirm đồng thời không ghi đè nhau.
+	var orderSubtotal, orderDiscount, orderTotal float64
+	if err := tx.QueryRow(ctx, orderAmountsQuery, orgID, orderID).
+		Scan(&orderSubtotal, &orderDiscount, &orderTotal); err != nil {
+		return empty, fmt.Errorf("lỗi khi đọc tổng tiền đơn hàng: %w", err)
+	}
+
+	var paymentStatus string
+	if err := tx.QueryRow(ctx, lockPaymentRowQuery, orgID, orderID, confirmation.PaymentID).
+		Scan(&paymentStatus); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return empty, fmt.Errorf("payment %s: %w", confirmation.PaymentID, domain.ErrPaymentNotFound)
+		}
+		return empty, fmt.Errorf("lỗi khi khóa payment: %w", err)
+	}
+	if paymentStatus != domain.PaymentStatusPending {
+		return empty, fmt.Errorf("payment %s: %w", confirmation.PaymentID, domain.ErrPaymentNotPending)
+	}
+
+	var totalPaid float64
+	if err := tx.QueryRow(ctx, totalPaidByOrderQuery, orgID, orderID).Scan(&totalPaid); err != nil {
+		return empty, fmt.Errorf("lỗi khi tính tổng đã thu: %w", err)
+	}
+	remaining := orderTotal - totalPaid
+	if remaining < 0 {
+		remaining = 0
+	}
+	if confirmation.DiscountAmount < 0 || confirmation.DiscountAmount > remaining {
+		return empty, fmt.Errorf("giảm giá %.2f vượt số còn thiếu %.2f: %w",
+			confirmation.DiscountAmount, remaining, domain.ErrDiscountExceedsRemaining)
+	}
+	newDiscount := orderDiscount + confirmation.DiscountAmount
+	newTotal := orderSubtotal - newDiscount
+	if newTotal < 0 {
+		newTotal = 0
+	}
+	amount := remaining - confirmation.DiscountAmount
+	if amount < 0 {
+		amount = 0
+	}
+
+	if _, err := tx.Exec(ctx, updateOrderDiscountQuery, orgID, orderID, newDiscount, newTotal); err != nil {
+		return empty, fmt.Errorf("lỗi khi cập nhật giảm giá đơn hàng: %w", err)
+	}
+	tag, err := tx.Exec(ctx, confirmPaymentQuery, orgID, orderID, confirmation.PaymentID,
+		confirmation.Method, nullableStr(confirmation.Provider), nullableStr(confirmation.ProviderTxnID), amount)
+	if err != nil {
+		return empty, fmt.Errorf("lỗi khi xác nhận thanh toán: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return empty, fmt.Errorf("payment %s: %w", confirmation.PaymentID, domain.ErrPaymentNotPending)
+	}
+
+	// Chuyển đơn hàng sang status 'completed'
+	tag, err = tx.Exec(ctx, flipToCompletedQuery, orgID, orderID)
 	if err != nil {
 		return empty, fmt.Errorf("lỗi khi chốt đơn hàng: %w", err)
 	}
@@ -730,8 +799,7 @@ func (r *PostgresOrderRepository) CompleteOrderWithSlip(ctx context.Context, org
 		return empty, fmt.Errorf("đơn hàng %s chưa sẵn sàng chốt: %w", orderID, domain.ErrOrderNotReady)
 	}
 
-	// Đơn gắn lịch hẹn thì lịch cũng hoàn thành trong cùng tx: chốt đơn và
-	// đóng lịch sống/chết cùng nhau, không để lịch mắc ở in_progress.
+	// Hoàn thành lịch hẹn nếu đơn có gắn lịch
 	if appointmentID != nil {
 		if id := strings.TrimSpace(*appointmentID); id != "" {
 			if _, err := tx.Exec(ctx, completeAppointmentQuery, orgID, id); err != nil {
@@ -740,70 +808,79 @@ func (r *PostgresOrderRepository) CompleteOrderWithSlip(ctx context.Context, org
 		}
 	}
 
-	// Gom số lượng theo sản phẩm, trừ theo thứ tự cố định chống deadlock.
-	// (Tổng tiền đã cộng theo từng dòng ở trên.)
-	qtyByProduct := map[string]float64{}
-	for _, l := range lines {
-		if l.Quantity <= 0 {
-			return empty, fmt.Errorf("số lượng sản phẩm %s phải lớn hơn 0", l.ProductID)
-		}
-		qtyByProduct[l.ProductID] += l.Quantity
-	}
-	pids := make([]string, 0, len(qtyByProduct))
-	for pid := range qtyByProduct {
-		pids = append(pids, pid)
-	}
-	sort.Strings(pids)
-
 	var orderCode string
-	var orderTotal float64
 	if err := tx.QueryRow(ctx, `SELECT code, total_amount FROM orders WHERE organization_id = $1 AND id = $2`, orgID, orderID).Scan(&orderCode, &orderTotal); err != nil {
 		return empty, fmt.Errorf("lỗi khi đọc đơn hàng: %w", err)
 	}
 
-	docID := utils.NewID()
+	var docID string
 	var docCode string
-	for _, pid := range pids {
-		qty := qtyByProduct[pid]
-		tag, err := tx.Exec(ctx, completeDeductStockQuery, pid, orgID, qty)
+
+	// 3. CHỈ XUẤT KHO KHI CÓ SẢN PHẨM (len(lines) > 0)
+	if len(lines) > 0 {
+		docID = utils.NewID()
+
+		// Trừ kho từng sản phẩm
+		for _, pid := range pids {
+			qty := qtyByProduct[pid]
+			tag, err := tx.Exec(ctx, completeDeductStockQuery, pid, orgID, qty)
+			if err != nil {
+				return empty, fmt.Errorf("lỗi khi trừ kho sản phẩm %s: %w", pid, err)
+			}
+			if tag.RowsAffected() == 0 {
+				return empty, fmt.Errorf("sản phẩm %s: %w", pid, domain.ErrInsufficientStock)
+			}
+			if _, err := tx.Exec(ctx, insertInventoryLedgerQuery,
+				utils.NewID(), orgID, pid, "sale", -qty, "order", orderID, nil,
+			); err != nil {
+				return empty, fmt.Errorf("lỗi khi ghi sổ bán hàng: %w", err)
+			}
+		}
+
+		// Sinh header phiếu xuất kho bán hàng
+		for attempts := 0; ; attempts++ {
+			docCode = slipCodeForOrder(orderCode, attempts)
+			_, err = tx.Exec(ctx, createInventoryDocumentQuery,
+				docID,                            // $1  - id
+				orgID,                            // $2  - organization_id
+				nil,                              // $3  - supplier_id
+				orderID,                          // $4  - order_id
+				docCode,                          // $5  - document_code
+				"sale",                           // $6  - type
+				total,                            // $7  - total_amount
+				"Xuất kho bán hàng - "+orderCode, // $8  - reason
+				nil,                              // $9  - note
+				nil,                              // $10 - created_by
+				false,                            // $11 - payment_tracked
+				nil,                              // $12 - due_date
+				total,                            // $13 - gross_amount
+				0,                                // $14 - discount_amount
+				0,                                // $15 - vat_rate
+				0,                                // $16 - vat_amount
+				0,                                // $17 - shipping_fee
+				0,                                // $18 - paid_amount
+				nil,                              // $19 - invoice_code
+			)
+			if err == nil {
+				break
+			}
+			if !isUniqueViolation(err) || attempts >= 2 {
+				return empty, fmt.Errorf("lỗi khi tạo phiếu bán hàng: %w", err)
+			}
+		}
+
+		// Lưu chi tiết các item xuất kho
+		products, err := fetchProductSnapshots(ctx, tx, orgID, pids)
 		if err != nil {
-			return empty, fmt.Errorf("lỗi khi trừ kho sản phẩm %s: %w", pid, err)
+			return empty, err
 		}
-		if tag.RowsAffected() == 0 {
-			return empty, fmt.Errorf("sản phẩm %s: %w", pid, domain.ErrInsufficientStock)
-		}
-		if _, err := tx.Exec(ctx, insertInventoryLedgerQuery,
-			utils.NewID(), orgID, pid, "sale", -qty, "order", orderID, nil,
-		); err != nil {
-			return empty, fmt.Errorf("lỗi khi ghi sổ bán hàng: %w", err)
+		if err := insertDocumentItemsCopy(ctx, tx, docID, items, products); err != nil {
+			return empty, err
 		}
 	}
 
-	// Sinh header phiếu bán hàng, retry khi trùng mã.
-	for attempts := 0; ; attempts++ {
-		docCode = slipCodeForOrder(orderCode, attempts)
-		_, err = tx.Exec(ctx, createInventoryDocumentQuery,
-			docID, orgID, nil, orderID, docCode, "sale", total, nil, nil, nil,
-		)
-		if err == nil {
-			break
-		}
-		if !isUniqueViolation(err) || attempts >= 2 {
-			return empty, fmt.Errorf("lỗi khi tạo phiếu bán hàng: %w", err)
-		}
-	}
-
-	products, err := fetchProductSnapshots(ctx, tx, orgID, pids)
-	if err != nil {
-		return empty, err
-	}
-	if err := insertDocumentItemsCopy(ctx, tx, docID, items, products); err != nil {
-		return empty, err
-	}
-
-	// Sinh phiếu thu tiền mặt cho đơn (hard-code quỹ CASH phase 1):
-	// cùng tx với chốt đơn nên đơn chốt ↔ tiền vào quỹ cùng sống/chết.
-	// Đơn 0đ không có dòng tiền thật thì bỏ qua.
+	// 4. LUÔN GHI PHIẾU THU TIỀN (Nếu orderTotal > 0)
+	// Áp dụng cho cả đơn chỉ có dịch vụ lẫn đơn có bán sản phẩm
 	if orderTotal > 0 {
 		if err := insertOrderIncomeVoucherTx(ctx, tx, orgID, orderID, orderCode, orderTotal, fundID); err != nil {
 			return empty, err
@@ -813,36 +890,118 @@ func (r *PostgresOrderRepository) CompleteOrderWithSlip(ctx context.Context, org
 	if err := tx.Commit(ctx); err != nil {
 		return empty, fmt.Errorf("lỗi khi commit transaction: %w", err)
 	}
+
 	return domain.SaleSlipResult{DocumentID: docID, DocumentCode: docCode}, nil
 }
 
 // ---------- 5. Thanh toán ----------
 
-// FindPaymentByProviderTxn tìm thanh toán theo cặp cổng/mã giao dịch (idempotency).
-// Không thấy trả về (nil, nil).
-func (r *PostgresOrderRepository) FindPaymentByProviderTxn(ctx context.Context, provider, txnID string) (*domain.Payment, error) {
-	var p domain.Payment
-	if err := r.qx.GetContext(ctx, &p, findPaymentByProviderTxnQuery, provider, txnID); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("lỗi khi tìm thanh toán: %w", err)
+// InitPayment tạo (hoặc trả lại) payment pending duy nhất của đơn.
+// Khóa dòng đơn để serialize 2 request init đồng thời.
+func (r *PostgresOrderRepository) InitPayment(ctx context.Context, orgID, orderID string, amount float64) (*domain.Payment, error) {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("lỗi khi bắt đầu transaction: %w", err)
 	}
-	return &p, nil
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	var status string
+	if err := tx.QueryRow(ctx, lockOrderRowQuery, orgID, orderID).Scan(&status); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("đơn hàng %s: %w", orderID, domain.ErrOrderNotFound)
+		}
+		return nil, fmt.Errorf("lỗi khi khóa đơn hàng: %w", err)
+	}
+	if status != domain.StatusPending && status != domain.StatusConfirm && status != domain.StatusDelivery {
+		return nil, fmt.Errorf("đơn hàng %s chưa sẵn sàng thanh toán: %w", orderID, domain.ErrOrderNotReady)
+	}
+
+	var payment domain.Payment
+	err = tx.QueryRow(ctx, findPendingPaymentByOrderQuery, orgID, orderID).Scan(
+		&payment.ID, &payment.OrganizationID, &payment.OrderID, &payment.Method,
+		&payment.Provider, &payment.ProviderTxnID, &payment.Amount, &payment.Status,
+		&payment.PaidAt, &payment.CreatedAt,
+	)
+	if err == nil {
+		if err := tx.Commit(ctx); err != nil {
+			return nil, fmt.Errorf("lỗi khi commit transaction: %w", err)
+		}
+		return &payment, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return nil, fmt.Errorf("lỗi khi tìm payment đang chờ: %w", err)
+	}
+
+	err = tx.QueryRow(ctx, findLatestFailedPaymentByOrderQuery, orgID, orderID).Scan(
+		&payment.ID, &payment.OrganizationID, &payment.OrderID, &payment.Method,
+		&payment.Provider, &payment.ProviderTxnID, &payment.Amount, &payment.Status,
+		&payment.PaidAt, &payment.CreatedAt,
+	)
+	if err == nil {
+		tag, execErr := tx.Exec(ctx, resetPaymentToPendingQuery, orgID, orderID, payment.ID, amount)
+		if execErr != nil {
+			return nil, fmt.Errorf("lỗi khi khởi tạo lại payment: %w", execErr)
+		}
+		if tag.RowsAffected() == 0 {
+			return nil, fmt.Errorf("payment %s: %w", payment.ID, domain.ErrPaymentNotPending)
+		}
+		payment.Method = domain.PaymentMethodCash
+		payment.Provider = nil
+		payment.ProviderTxnID = nil
+		payment.Amount = amount
+		payment.Status = domain.PaymentStatusPending
+		payment.PaidAt = nil
+		if err := tx.Commit(ctx); err != nil {
+			return nil, fmt.Errorf("lỗi khi commit transaction: %w", err)
+		}
+		return &payment, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return nil, fmt.Errorf("lỗi khi tìm payment thất bại: %w", err)
+	}
+
+	payment = domain.Payment{
+		ID:             utils.NewID(),
+		OrganizationID: orgID,
+		OrderID:        orderID,
+		Method:         domain.PaymentMethodCash,
+		Amount:         amount,
+		Status:         domain.PaymentStatusPending,
+	}
+	if _, err := tx.Exec(ctx, createPaymentQuery,
+		payment.ID, payment.OrganizationID, payment.OrderID, payment.Method,
+		nil, nil, payment.Amount, payment.Status, nil,
+	); err != nil {
+		return nil, fmt.Errorf("lỗi khi tạo payment chờ: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("lỗi khi commit transaction: %w", err)
+	}
+	return &payment, nil
 }
 
-// CreatePayment ghi 1 thanh toán succeeded (không tự đổi trạng thái đơn —
-// usecase cộng dồn GetTotalPaidByOrder rồi flip sang paid khi đủ).
-func (r *PostgresOrderRepository) CreatePayment(ctx context.Context, payment *domain.Payment) error {
-	_, err := r.db.Exec(ctx, createPaymentQuery,
-		payment.ID, payment.OrganizationID, payment.OrderID, payment.Method,
-		nullableStr(payment.Provider), nullableStr(payment.ProviderTxnID),
-		payment.Amount, payment.Status, payment.PaidAt,
-	)
-	if err != nil {
-		return fmt.Errorf("lỗi khi tạo thanh toán: %w", err)
+// GetPaymentByID tìm payment thuộc đúng đơn/tổ chức.
+func (r *PostgresOrderRepository) GetPaymentByID(ctx context.Context, orgID, orderID, paymentID string) (*domain.Payment, error) {
+	var payment domain.Payment
+	if err := r.qx.GetContext(ctx, &payment, getPaymentByIDQuery, orgID, orderID, paymentID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("payment %s: %w", paymentID, domain.ErrPaymentNotFound)
+		}
+		return nil, fmt.Errorf("lỗi khi lấy payment: %w", err)
 	}
-	return nil
+	return &payment, nil
+}
+
+// GetSaleSlipByOrder trả phiếu bán hàng đã sinh cho đơn (rỗng nếu chưa có).
+func (r *PostgresOrderRepository) GetSaleSlipByOrder(ctx context.Context, orgID, orderID string) (domain.SaleSlipResult, error) {
+	var result domain.SaleSlipResult
+	if err := r.qx.GetContext(ctx, &result, getSaleSlipByOrderQuery, orgID, orderID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.SaleSlipResult{}, nil
+		}
+		return domain.SaleSlipResult{}, fmt.Errorf("lỗi khi lấy phiếu bán hàng: %w", err)
+	}
+	return result, nil
 }
 
 // GetTotalPaidByOrder cộng tổng đã thu succeeded của đơn (quyết định flip paid).

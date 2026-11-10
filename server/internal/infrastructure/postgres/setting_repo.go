@@ -70,26 +70,33 @@ const insertDefaultBusinessHoursQuery = `
 
 const getGeneralSettingsQuery = `
 	SELECT o.id, o.name, o.slug, o.phone, o.email, o.website, o.address,
-	       o.tax_code, o.slogan, o.logo_url, o.timezone, o.status, bh.days
+	       o.tax_code, o.slogan, o.logo_url, o.timezone, o.status,
+	       COALESCE(bh.open_time_minutes, 510) AS open_time_minutes,
+	       COALESCE(bh.close_time_minutes, 1230) AS close_time_minutes,
+	       bh.break_start_minutes, bh.break_end_minutes, bh.days
 	FROM organizations o
 	LEFT JOIN business_hours bh ON bh.organization_id = o.id
 	WHERE o.id = $1
 `
 
 type generalSettingsRow struct {
-	ID       string  `db:"id"`
-	Name     string  `db:"name"`
-	Slug     string  `db:"slug"`
-	Phone    *string `db:"phone"`
-	Email    *string `db:"email"`
-	Website  *string `db:"website"`
-	Address  *string `db:"address"`
-	TaxCode  *string `db:"tax_code"`
-	Slogan   *string `db:"slogan"`
-	LogoURL  *string `db:"logo_url"`
-	Timezone string  `db:"timezone"`
-	Status   string  `db:"status"`
-	Days     []byte  `db:"days"`
+	ID                string  `db:"id"`
+	Name              string  `db:"name"`
+	Slug              string  `db:"slug"`
+	Phone             *string `db:"phone"`
+	Email             *string `db:"email"`
+	Website           *string `db:"website"`
+	Address           *string `db:"address"`
+	TaxCode           *string `db:"tax_code"`
+	Slogan            *string `db:"slogan"`
+	LogoURL           *string `db:"logo_url"`
+	Timezone          string  `db:"timezone"`
+	Status            string  `db:"status"`
+	OpenTimeMinutes   int     `db:"open_time_minutes"`
+	CloseTimeMinutes  int     `db:"close_time_minutes"`
+	BreakStartMinutes *int    `db:"break_start_minutes"`
+	BreakEndMinutes   *int    `db:"break_end_minutes"`
+	Days              []byte  `db:"days"`
 }
 
 func (r *PostgresSettingRepository) GetGeneralSettings(ctx context.Context, orgID string) (*settingDomain.GeneralSettingsResponse, error) {
@@ -102,8 +109,12 @@ func (r *PostgresSettingRepository) GetGeneralSettings(ctx context.Context, orgI
 	}
 
 	workingHours := settingDomain.DefaultWorkingHours()
+	workingHours.OpenTimeMinutes = row.OpenTimeMinutes
+	workingHours.CloseTimeMinutes = row.CloseTimeMinutes
+	workingHours.BreakStartMinutes = row.BreakStartMinutes
+	workingHours.BreakEndMinutes = row.BreakEndMinutes
 	if len(row.Days) > 0 {
-		if err := json.Unmarshal(row.Days, &workingHours); err != nil {
+		if err := json.Unmarshal(row.Days, &workingHours.Days); err != nil {
 			return nil, fmt.Errorf("lỗi khi đọc giờ làm việc: %w", err)
 		}
 	}
@@ -225,7 +236,6 @@ func (r *PostgresSettingRepository) GetReceiptSettings(ctx context.Context, orgI
 	return &s, nil
 }
 
-
 func (r *PostgresSettingRepository) ListPaymentMethods(ctx context.Context, orgID string) ([]settingDomain.PaymentMethod, error) {
 	methods := make([]settingDomain.PaymentMethod, 0)
 	if err := r.qx.SelectContext(ctx, &methods, listPaymentMethodsQuery, orgID); err != nil {
@@ -324,15 +334,23 @@ const updateOrganizationInfoQuery = `
 `
 
 const upsertBusinessHoursQuery = `
-	INSERT INTO business_hours (organization_id, days)
-	VALUES ($1, $2)
+	INSERT INTO business_hours (
+		organization_id, open_time_minutes, close_time_minutes,
+		break_start_minutes, break_end_minutes, days
+	)
+	VALUES ($1, $2, $3, $4, $5, $6)
 	ON CONFLICT (organization_id) DO UPDATE SET
+		open_time_minutes = EXCLUDED.open_time_minutes,
+		close_time_minutes = EXCLUDED.close_time_minutes,
+		break_start_minutes = EXCLUDED.break_start_minutes,
+		break_end_minutes = EXCLUDED.break_end_minutes,
 		days = EXCLUDED.days,
 		updated_at = now()
 `
 
 func (r *PostgresSettingRepository) UpdateGeneralSettings(ctx context.Context, orgID string, settings *settingDomain.GeneralSettingsResponse) error {
-	days, err := json.Marshal(settings.WorkingHours)
+	hours := settings.WorkingHours
+	days, err := json.Marshal(hours.Days)
 	if err != nil {
 		return fmt.Errorf("lỗi khi mã hóa giờ làm việc: %w", err)
 	}
@@ -364,7 +382,16 @@ func (r *PostgresSettingRepository) UpdateGeneralSettings(ctx context.Context, o
 		return settingDomain.ErrGeneralSettingsNotFound
 	}
 
-	if _, err := tx.Exec(ctx, upsertBusinessHoursQuery, orgID, days); err != nil {
+	if _, err := tx.Exec(
+		ctx,
+		upsertBusinessHoursQuery,
+		orgID,
+		hours.OpenTimeMinutes,
+		hours.CloseTimeMinutes,
+		hours.BreakStartMinutes,
+		hours.BreakEndMinutes,
+		days,
+	); err != nil {
 		return fmt.Errorf("lỗi khi cập nhật giờ làm việc: %w", err)
 	}
 

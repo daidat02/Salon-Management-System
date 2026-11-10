@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -310,24 +311,20 @@ func (r *PostgresAppointmentRepository) CountAppointmentsByOrgID(ctx context.Con
 	return total, nil
 }
 
-func (r *PostgresAppointmentRepository) GetAppointmentsByCustomerID(ctx context.Context, orgID, customerID string, limit, offset int) ([]*domain.Appointment, error) {
-	rows := make([]appointmentRow, 0)
+func (r *PostgresAppointmentRepository) GetAppointmentsByCustomerID(ctx context.Context, orgID, customerID string, limit, offset int) ([]*domain.AppointmentResponse, error) {
+	rows := make([]*domain.AppointmentResponse, 0)
 	if err := r.qx.SelectContext(ctx, &rows, `
 		SELECT `+appointmentColumns+`
-		FROM appointments
-		WHERE organization_id = $1 AND customer_id = $2
-		ORDER BY start_time DESC
+		FROM appointments a
+		LEFT JOIN customers c ON a.customer_id = c.id
+		LEFT JOIN staff s ON a.staff_id = s.id
+		WHERE a.organization_id = $1 AND a.customer_id = $2
+		ORDER BY a.start_time DESC
 		LIMIT $3 OFFSET $4
 	`, orgID, customerID, limit, offset); err != nil {
 		return nil, fmt.Errorf("lỗi khi truy vấn lịch sử lịch hẹn: %w", err)
 	}
-
-	appointments := make([]*domain.Appointment, 0, len(rows))
-	for _, row := range rows {
-		appointments = append(appointments, row.toDomain())
-	}
-
-	return appointments, nil
+	return rows, nil
 }
 
 func (r *PostgresAppointmentRepository) CountAppointmentsByCustomerID(ctx context.Context, orgID, customerID string) (int64, error) {
@@ -401,6 +398,55 @@ func (r *PostgresAppointmentRepository) CountCustomerNoShows(ctx context.Context
 	var total int
 	if err := r.qx.GetContext(ctx, &total, countCustomerNoShowsQuery, orgID, customerID, since); err != nil {
 		return 0, fmt.Errorf("lỗi khi đếm số lần không đến của khách: %w", err)
+	}
+	return total, nil
+}
+
+func (r *PostgresAppointmentRepository) CountCustomerCancellations(ctx context.Context, orgID, customerID string, since time.Time) (int, error) {
+	var total int
+	if err := r.qx.GetContext(ctx, &total, countCustomerCancellationsQuery, orgID, customerID, since); err != nil {
+		return 0, fmt.Errorf("lỗi khi đếm số lần hủy lịch của khách: %w", err)
+	}
+	return total, nil
+}
+
+func (r *PostgresAppointmentRepository) GetBusinessHours(ctx context.Context, orgID string) (*domain.BusinessHours, error) {
+	var row struct {
+		Timezone          string `db:"timezone"`
+		OpenTimeMinutes   int    `db:"open_time_minutes"`
+		CloseTimeMinutes  int    `db:"close_time_minutes"`
+		BreakStartMinutes *int   `db:"break_start_minutes"`
+		BreakEndMinutes   *int   `db:"break_end_minutes"`
+		Days              []byte `db:"days"`
+	}
+	if err := r.qx.GetContext(ctx, &row, getBusinessHoursQuery, orgID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("lỗi khi lấy giờ làm việc: %w", err)
+	}
+
+	days := make([]domain.BusinessDay, 0, 7)
+	if len(row.Days) > 0 {
+		if err := json.Unmarshal(row.Days, &days); err != nil {
+			return nil, fmt.Errorf("lỗi khi đọc giờ làm việc: %w", err)
+		}
+	}
+
+	return &domain.BusinessHours{
+		OpenTimeMinutes:   row.OpenTimeMinutes,
+		CloseTimeMinutes:  row.CloseTimeMinutes,
+		BreakStartMinutes: row.BreakStartMinutes,
+		BreakEndMinutes:   row.BreakEndMinutes,
+		Days:              days,
+		Timezone:          row.Timezone,
+	}, nil
+}
+
+func (r *PostgresAppointmentRepository) CountActiveAppointmentsInSlot(ctx context.Context, orgID string, start, end time.Time, excludeAppointmentID string) (int, error) {
+	var total int
+	if err := r.qx.GetContext(ctx, &total, countActiveAppointmentsInSlotQuery, orgID, start, end, excludeAppointmentID); err != nil {
+		return 0, fmt.Errorf("lỗi khi đếm lịch hẹn trong khung giờ: %w", err)
 	}
 	return total, nil
 }

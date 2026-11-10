@@ -2385,6 +2385,36 @@ const docTemplate = `{
                 }
             }
         },
+        "/logout": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Đăng xuất",
+                "responses": {
+                    "200": {
+                        "description": "Đăng xuất thành công",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Access token không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/orders": {
             "get": {
                 "security": [
@@ -3135,7 +3165,58 @@ const docTemplate = `{
                 }
             }
         },
-        "/orders/{id}/payments": {
+        "/orders/{id}/payments/init": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Orders"
+                ],
+                "summary": "Khởi tạo (hoặc lấy lại) payment đang chờ của đơn",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID đơn hàng",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Payment đang chờ xác nhận",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Đơn không thể thanh toán / đã thanh toán đủ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Thiếu token / token không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Không tìm thấy đơn hàng",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/orders/{id}/payments/{paymentId}/confirm": {
             "post": {
                 "security": [
                     {
@@ -3151,7 +3232,7 @@ const docTemplate = `{
                 "tags": [
                     "Orders"
                 ],
-                "summary": "Ghi nhận thanh toán cho đơn (idempotent theo mã giao dịch)",
+                "summary": "Xác nhận thanh toán và chốt đơn trong 1 transaction",
                 "parameters": [
                     {
                         "type": "string",
@@ -3161,24 +3242,31 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "description": "Thông tin thanh toán",
+                        "type": "string",
+                        "description": "ID payment đang chờ",
+                        "name": "paymentId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Phương thức, giảm giá",
                         "name": "body",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/github_com_daidat02_server_internal_domain_order.CreatePaymentRequest"
+                            "$ref": "#/definitions/github_com_daidat02_server_internal_domain_order.ConfirmPaymentRequest"
                         }
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Ghi nhận thanh toán thành công",
+                        "description": "Đã thu tiền và chốt đơn",
                         "schema": {
                             "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
                         }
                     },
                     "400": {
-                        "description": "Dữ liệu không hợp lệ / đơn đã hủy",
+                        "description": "Dữ liệu không hợp lệ / giảm giá vượt số còn thiếu",
                         "schema": {
                             "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
                         }
@@ -3190,7 +3278,7 @@ const docTemplate = `{
                         }
                     },
                     "404": {
-                        "description": "Không tìm thấy đơn hàng",
+                        "description": "Không tìm thấy đơn hàng / thanh toán",
                         "schema": {
                             "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
                         }
@@ -3294,6 +3382,43 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Lỗi server",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/overview": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Trả KPI hôm nay, doanh thu 7 ngày, cảnh báo tồn kho, lịch hẹn hôm nay và đơn hàng gần đây.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Reports"
+                ],
+                "summary": "Tổng quan vận hành trong ngày",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
                         }
@@ -3719,6 +3844,56 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Lỗi server",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/reports/revenue": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Reports"
+                ],
+                "summary": "Báo cáo doanh thu và lợi nhuận theo kỳ",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Từ ngày (RFC3339 hoặc yyyy-MM-dd), mặc định đầu tháng",
+                        "name": "date_from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Đến ngày (RFC3339 hoặc yyyy-MM-dd), mặc định cuối tháng",
+                        "name": "date_to",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
                         "schema": {
                             "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
                         }
@@ -5769,6 +5944,26 @@ const docTemplate = `{
                 }
             }
         },
+        "github_com_daidat02_server_internal_domain_order.ConfirmPaymentRequest": {
+            "type": "object",
+            "properties": {
+                "discount_amount": {
+                    "type": "number"
+                },
+                "method": {
+                    "type": "string"
+                },
+                "method_payment_id": {
+                    "type": "string"
+                },
+                "provider": {
+                    "type": "string"
+                },
+                "provider_txn_id": {
+                    "type": "string"
+                }
+            }
+        },
         "github_com_daidat02_server_internal_domain_order.CreateOrderRequest": {
             "type": "object",
             "properties": {
@@ -5794,26 +5989,6 @@ const docTemplate = `{
                             "$ref": "#/definitions/github_com_daidat02_server_internal_domain_order.NewCustomerInput"
                         }
                     ]
-                }
-            }
-        },
-        "github_com_daidat02_server_internal_domain_order.CreatePaymentRequest": {
-            "type": "object",
-            "properties": {
-                "amount": {
-                    "type": "number"
-                },
-                "method": {
-                    "type": "string"
-                },
-                "method_payment_id": {
-                    "type": "string"
-                },
-                "provider": {
-                    "type": "string"
-                },
-                "provider_txn_id": {
-                    "type": "string"
                 }
             }
         },
@@ -6212,10 +6387,7 @@ const docTemplate = `{
                     "$ref": "#/definitions/github_com_daidat02_server_internal_domain_setting.OrganizationInfo"
                 },
                 "working_hours": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/github_com_daidat02_server_internal_domain_setting.WorkingHourDay"
-                    }
+                    "$ref": "#/definitions/github_com_daidat02_server_internal_domain_setting.WorkingHours"
                 }
             }
         },
@@ -6394,25 +6566,33 @@ const docTemplate = `{
         "github_com_daidat02_server_internal_domain_setting.WorkingHourDay": {
             "type": "object",
             "properties": {
-                "break_end": {
-                    "type": "string"
-                },
-                "break_start": {
-                    "type": "string"
-                },
-                "close_time": {
-                    "type": "string"
-                },
                 "is_open": {
                     "type": "boolean"
                 },
-                "note": {
-                    "type": "string"
-                },
-                "open_time": {
-                    "type": "string"
-                },
                 "weekday": {
+                    "type": "integer"
+                }
+            }
+        },
+        "github_com_daidat02_server_internal_domain_setting.WorkingHours": {
+            "type": "object",
+            "properties": {
+                "break_end_minutes": {
+                    "type": "integer"
+                },
+                "break_start_minutes": {
+                    "type": "integer"
+                },
+                "close_time_minutes": {
+                    "type": "integer"
+                },
+                "days": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_daidat02_server_internal_domain_setting.WorkingHourDay"
+                    }
+                },
+                "open_time_minutes": {
                     "type": "integer"
                 }
             }

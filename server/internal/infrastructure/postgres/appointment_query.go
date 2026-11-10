@@ -102,6 +102,36 @@ const (
 		  AND start_time >= $3
 	`
 
+	countCustomerCancellationsQuery = `
+		SELECT COUNT(*)
+		FROM appointments
+		WHERE organization_id = $1
+		  AND customer_id = $2
+		  AND status = 'cancelled'
+		  AND start_time >= $3
+	`
+
+	getBusinessHoursQuery = `
+		SELECT o.timezone,
+		       COALESCE(bh.open_time_minutes, 510) AS open_time_minutes,
+		       COALESCE(bh.close_time_minutes, 1230) AS close_time_minutes,
+		       bh.break_start_minutes, bh.break_end_minutes, bh.days
+		FROM organizations o
+		LEFT JOIN business_hours bh ON bh.organization_id = o.id
+		WHERE o.id = $1
+	`
+
+	// Đếm lịch đang hoạt động giao với khung giờ [start, end) để chặn vượt sức chứa.
+	countActiveAppointmentsInSlotQuery = `
+		SELECT COUNT(*)
+		FROM appointments
+		WHERE organization_id = $1
+		  AND status IN ('pending', 'confirmed', 'checked_in', 'in_progress')
+		  AND start_time < $3
+		  AND end_time > $2
+		  AND ($4 = '' OR id::text <> $4)
+	`
+
 	// markOverdueAppointmentsAsNoShowQuery chuyển các lịch chưa check-in và đã
 	// trễ quá grace period sang no_show trong 1 câu atomic, trả về id đã đổi.
 	markOverdueAppointmentsAsNoShowQuery = `

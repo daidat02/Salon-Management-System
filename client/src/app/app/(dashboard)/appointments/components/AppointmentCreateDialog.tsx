@@ -19,6 +19,8 @@ import { useCreateAppointment } from '@/hooks/use-create-appointment';
 import { useUpdateAppointment } from '@/hooks/use-update-appointment';
 import { getCustomerByPhone, normalizePhone } from '@/services/customer';
 import { getApiErrorMessage } from '@/services/apiClient';
+import { useBookingSettings, useGeneralSettings } from '@/hooks/use-settings';
+import { describeWorkingHours, validateBookingWindow, workingDayFor } from '@/lib/booking';
 import type { CreateAppointmentPayload } from '@/services/appointment';
 import type { Customer } from '@/types/customer';
 import type { Service } from '@/types/service';
@@ -98,6 +100,7 @@ export function AppointmentCreateDialog({
       .map((item) => item.service_id as string),
   );
   const [serviceToAdd, setServiceToAdd] = useState('');
+  const [statusTouched, setStatusTouched] = useState(false);
   const [error, setError] = useState('');
 
   const createAppointment = useCreateAppointment();
@@ -108,6 +111,19 @@ export function AppointmentCreateDialog({
     status: 'active',
   });
   const { data: staffData } = useStaff({ page: 1, pageSize: 100, status: 'active' });
+  const { data: generalSettings } = useGeneralSettings();
+  const { data: bookingSettings } = useBookingSettings();
+  const workingHours = generalSettings?.working_hours;
+  const selectedWorkingDay = useMemo(
+    () => (date ? workingDayFor(date, workingHours) : undefined),
+    [date, workingHours],
+  );
+  const effectiveStatus: AppointmentStatus =
+    !isEdit && !statusTouched && bookingSettings
+      ? bookingSettings.auto_confirm
+        ? 'confirmed'
+        : 'pending'
+      : status;
 
   const services = useMemo(
     () => (servicesData?.data ?? []).filter((service) => service.is_active),
@@ -239,7 +255,8 @@ export function AppointmentCreateDialog({
     setDate(new Date());
     setStartTime('09:00');
     setSource('walk_in');
-    setStatus('confirmed');
+    setStatusTouched(false);
+    setStatus(bookingSettings?.auto_confirm ? 'confirmed' : 'pending');
     setNote('');
     setSelectedServiceIds([]);
     setServiceToAdd('');
@@ -283,6 +300,22 @@ export function AppointmentCreateDialog({
       return;
     }
 
+    const startChanged =
+      !appointment ||
+      Math.abs(startAt.getTime() - new Date(appointment.start_time).getTime()) > 60_000;
+    if (startChanged) {
+      const bookingError = validateBookingWindow({
+        start: startAt,
+        end: endAt,
+        workingHours,
+        settings: bookingSettings,
+      });
+      if (bookingError) {
+        setError(bookingError);
+        return;
+      }
+    }
+
     setError('');
     try {
       // Form chỉ quản lý dịch vụ; giữ nguyên các item sản phẩm khi cập nhật.
@@ -303,7 +336,7 @@ export function AppointmentCreateDialog({
         staff_id: staffId === 'auto' ? undefined : staffId,
         start_time: startAt.toISOString(),
         end_time: endAt.toISOString(),
-        status,
+        status: effectiveStatus,
         source,
         note: note.trim() || undefined,
         items: [
@@ -525,6 +558,7 @@ export function AppointmentCreateDialog({
             <DashInput
               id="appointment-start-time"
               type="time"
+              step={Math.max(bookingSettings?.slot_step_minutes ?? 15, 1) * 60}
               value={startTime}
               onChange={(event) => setStartTime(event.target.value)}
             />
@@ -543,6 +577,12 @@ export function AppointmentCreateDialog({
           </div>
         </div>
 
+        {workingHours && selectedWorkingDay && (
+          <p className="-mt-2 text-[11px] text-on-surface-variant">
+            {describeWorkingHours(workingHours, selectedWorkingDay)}
+          </p>
+        )}
+
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <Label className={labelClass}>Nguồn đặt lịch</Label>
@@ -555,8 +595,11 @@ export function AppointmentCreateDialog({
           <div>
             <Label className={labelClass}>Trạng thái</Label>
             <DashSelect
-              value={status}
-              onValueChange={(value) => setStatus(value as AppointmentStatus)}
+              value={effectiveStatus}
+              onValueChange={(value) => {
+                setStatusTouched(true);
+                setStatus(value as AppointmentStatus);
+              }}
               options={isEdit ? editStatusOptions : statusOptions}
             />
           </div>

@@ -1,7 +1,7 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import type { RootState } from '../store';
 import { API_BASE } from '../../constants/index';
-import { loginUser } from '@/services/auth';
+import { loginUser, logoutUser } from '@/services/auth';
 
 // Giữ re-export để code cũ dùng API_BASE từ slice không gãy.
 export { API_BASE };
@@ -74,6 +74,12 @@ const authSlice = createSlice({
       .addCase(loginUser.rejected, (state, action) => {
         state.status = 'failed';
         state.error = (action.payload as string | undefined) ?? 'Đăng nhập thất bại';
+      })
+      .addCase(logoutUser.fulfilled, (state) => {
+        state.user = null;
+        state.accessToken = null;
+        state.status = 'idle';
+        state.error = null;
       });
   },
 });

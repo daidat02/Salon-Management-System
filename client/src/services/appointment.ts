@@ -107,3 +107,27 @@ export const updateAppointment = async (id: string, payload: CreateAppointmentPa
   );
   return res.data.data;
 };
+
+export type RescheduleAppointmentPayload = {
+  start_time: string;
+  end_time: string;
+};
+
+export const rescheduleAppointment = async (
+  id: string,
+  payload: RescheduleAppointmentPayload,
+) => {
+  const res = await apiClient.put<ApiResponse<Appointment>>(
+    API_ENDPOINTS.APPOINTMENTS.RESCHEDULE_APPOINTMENT(id),
+    payload,
+  );
+  return res.data.data;
+};
+
+export const cancelAppointment = async (id: string, reason?: string) => {
+  const res = await apiClient.post<ApiResponse<Appointment>>(
+    API_ENDPOINTS.APPOINTMENTS.CANCEL_APPOINTMENT(id),
+    { reason: reason ?? '' },
+  );
+  return res.data.data;
+};

@@ -4,6 +4,22 @@ import { createAsyncThunk } from '@reduxjs/toolkit';
 import { API_ENDPOINTS } from '@/constants';
 
 const { AUTH } = API_ENDPOINTS;
+export const logoutUser = createAsyncThunk('auth/logout', async () => {
+  try {
+    await apiClient.post(AUTH.LOGOUT);
+  } catch {
+    // Logout phía server là best-effort; client vẫn phải xóa phiên cục bộ.
+  }
+  setApiAccessToken(null);
+  if (typeof window !== 'undefined') {
+    try {
+      sessionStorage.removeItem('access_token');
+      localStorage.removeItem('access_token');
+    } catch {}
+  }
+  return true;
+});
+
 export const loginUser = createAsyncThunk(
   'auth/login',
   async (payload: { phone: string; password: string }, { rejectWithValue }) => {

@@ -520,79 +520,154 @@ func TestOrderUsecase_CancelRefund(t *testing.T) {
 	})
 }
 
-func TestOrderUsecase_CreatePayment(t *testing.T) {
+func TestOrderUsecase_InitPayment(t *testing.T) {
 	pendingOrder := &domain.Order{ID: "ord-1", OrganizationID: "org-123", Code: "ORD-1", Status: domain.StatusPending, TotalAmount: 300000}
 
-	t.Run("Thành công - Thu đủ tiền mặt, đơn tự chốt completed", func(t *testing.T) {
+	t.Run("Thành công - Tạo payment pending với số còn thiếu", func(t *testing.T) {
 		repo := new(MockOrderRepository)
 		repo.On("GetOrderByID", mock.Anything, "org-123", "ord-1").Return(pendingOrder, nil)
-		repo.On("CreatePayment", mock.Anything, mock.Anything).Return(nil)
+		repo.On("GetTotalPaidByOrder", mock.Anything, "org-123", "ord-1").Return(float64(0), nil)
+		repo.On("InitPayment", mock.Anything, "org-123", "ord-1", float64(300000)).
+			Return(&domain.Payment{ID: "pay-1", OrganizationID: "org-123", OrderID: "ord-1", Method: domain.PaymentMethodCash, Amount: 300000, Status: domain.PaymentStatusPending}, nil)
+
+		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), settingOK())
+		res, err := uc.InitPayment(withOrgCtx("org-123"), "ord-1")
+
+		assert.NoError(t, err)
+		assert.Equal(t, "pay-1", res.Payment.ID)
+		assert.Equal(t, float64(300000), res.RemainingAmount)
+		assert.Equal(t, float64(0), res.PaidAmount)
+	})
+
+	t.Run("Thất bại - Đơn đã thanh toán đủ", func(t *testing.T) {
+		repo := new(MockOrderRepository)
+		repo.On("GetOrderByID", mock.Anything, "org-123", "ord-1").Return(pendingOrder, nil)
 		repo.On("GetTotalPaidByOrder", mock.Anything, "org-123", "ord-1").Return(float64(300000), nil)
+
+		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), settingOK())
+		res, err := uc.InitPayment(withOrgCtx("org-123"), "ord-1")
+
+		assert.Nil(t, res)
+		assertFlatAppError(t, err, 400)
+		repo.AssertNotCalled(t, "InitPayment", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	})
+
+	t.Run("Thất bại - Đơn đã hủy", func(t *testing.T) {
+		cancelled := &domain.Order{ID: "ord-3", OrganizationID: "org-123", Status: domain.StatusCancelled}
+		repo := new(MockOrderRepository)
+		repo.On("GetOrderByID", mock.Anything, "org-123", "ord-3").Return(cancelled, nil)
+
+		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), settingOK())
+		res, err := uc.InitPayment(withOrgCtx("org-123"), "ord-3")
+
+		assert.Nil(t, res)
+		assertFlatAppError(t, err, 400)
+	})
+}
+
+func TestOrderUsecase_ConfirmPayment(t *testing.T) {
+	pendingOrder := &domain.Order{ID: "ord-1", OrganizationID: "org-123", Code: "ORD-1", Status: domain.StatusPending, SubtotalAmount: 300000, TotalAmount: 300000}
+	pendingPayment := &domain.Payment{ID: "pay-1", OrganizationID: "org-123", OrderID: "ord-1", Method: domain.PaymentMethodCash, Amount: 300000, Status: domain.PaymentStatusPending}
+
+	itemMocks := func(repo *MockOrderRepository) {
 		repo.On("GetOrderItems", mock.Anything, "org-123", "ord-1").
 			Return([]*domain.OrderItem{
 				{ID: "it-1", OrganizationID: "org-123", OrderID: "ord-1", ItemType: domain.ItemTypeProduct, ProductID: strP("prod-1"), Quantity: 2, UnitPrice: 150000, LineTotal: 300000},
 			}, nil)
 		repo.On("GetOrderMaterials", mock.Anything, "ord-1").
 			Return([]*domain.OrderItemMaterial{}, nil)
-		repo.On("CompleteOrderWithSlip", mock.Anything, "org-123", "ord-1", mock.Anything, mock.Anything, mock.Anything).
+	}
+
+	t.Run("Thành công - Cập nhật giảm giá, payment và chốt đơn", func(t *testing.T) {
+		completedOrder := *pendingOrder
+		completedOrder.Status = domain.StatusCompleted
+		completedOrder.DiscountAmount = 50000
+		completedOrder.TotalAmount = 250000
+		succeededPayment := *pendingPayment
+		succeededPayment.Amount = 250000
+		succeededPayment.Status = domain.PaymentStatusSucceeded
+
+		repo := new(MockOrderRepository)
+		repo.On("GetOrderByID", mock.Anything, "org-123", "ord-1").Return(pendingOrder, nil).Once()
+		repo.On("GetPaymentByID", mock.Anything, "org-123", "ord-1", "pay-1").Return(pendingPayment, nil).Once()
+		itemMocks(repo)
+		repo.On("CompleteOrderWithSlip", mock.Anything, "org-123", "ord-1", mock.Anything, mock.Anything, "fund-1", mock.Anything).
+			Return(domain.SaleSlipResult{DocumentID: "doc-1", DocumentCode: "XK-ORD-1"}, nil).Once()
+		repo.On("GetOrderByID", mock.Anything, "org-123", "ord-1").Return(&completedOrder, nil).Once()
+		repo.On("GetPaymentByID", mock.Anything, "org-123", "ord-1", "pay-1").Return(&succeededPayment, nil).Once()
+
+		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), settingOK())
+		res, err := uc.ConfirmPayment(withOrgCtx("org-123"), "ord-1", "pay-1", &domain.ConfirmPaymentRequest{
+			Method: domain.PaymentMethodCash, DiscountAmount: 50000,
+		})
+
+		assert.NoError(t, err)
+		assert.Equal(t, "doc-1", res.DocumentID)
+		assert.Equal(t, domain.StatusCompleted, res.Order.Status)
+		assert.Equal(t, float64(250000), res.Order.TotalAmount)
+		assert.Equal(t, domain.PaymentStatusSucceeded, res.Payment.Status)
+		repo.AssertExpectations(t)
+	})
+
+	t.Run("Thành công - Confirm lặp lại trả kết quả cũ", func(t *testing.T) {
+		completedOrder := &domain.Order{ID: "ord-1", OrganizationID: "org-123", Code: "ORD-1", Status: domain.StatusCompleted, TotalAmount: 300000}
+		succeededPayment := &domain.Payment{ID: "pay-1", OrganizationID: "org-123", OrderID: "ord-1", Method: domain.PaymentMethodCash, Amount: 300000, Status: domain.PaymentStatusSucceeded}
+
+		repo := new(MockOrderRepository)
+		repo.On("GetOrderByID", mock.Anything, "org-123", "ord-1").Return(completedOrder, nil)
+		repo.On("GetPaymentByID", mock.Anything, "org-123", "ord-1", "pay-1").Return(succeededPayment, nil)
+		repo.On("GetSaleSlipByOrder", mock.Anything, "org-123", "ord-1").
 			Return(domain.SaleSlipResult{DocumentID: "doc-1", DocumentCode: "XK-ORD-1"}, nil)
 
 		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), settingOK())
-		res, err := uc.CreatePayment(withOrgCtx("org-123"), "ord-1", &domain.CreatePaymentRequest{
-			Method: domain.PaymentMethodCash, Amount: 300000,
+		res, err := uc.ConfirmPayment(withOrgCtx("org-123"), "ord-1", "pay-1", &domain.ConfirmPaymentRequest{
+			Method: domain.PaymentMethodCash,
 		})
 
 		assert.NoError(t, err)
-		assert.NotNil(t, res)
-		repo.AssertExpectations(t)
+		assert.Equal(t, "XK-ORD-1", res.DocumentCode)
+		repo.AssertNotCalled(t, "CompleteOrderWithSlip", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	})
 
-	t.Run("Thành công - Thu thiếu thì giữ nguyên trạng thái, chưa chốt", func(t *testing.T) {
+	t.Run("Thất bại - Giảm giá vượt số còn thiếu", func(t *testing.T) {
 		repo := new(MockOrderRepository)
 		repo.On("GetOrderByID", mock.Anything, "org-123", "ord-1").Return(pendingOrder, nil)
-		repo.On("CreatePayment", mock.Anything, mock.Anything).Return(nil)
-		repo.On("GetTotalPaidByOrder", mock.Anything, "org-123", "ord-1").Return(float64(100000), nil)
+		repo.On("GetPaymentByID", mock.Anything, "org-123", "ord-1", "pay-1").Return(pendingPayment, nil)
+		itemMocks(repo)
+		repo.On("CompleteOrderWithSlip", mock.Anything, "org-123", "ord-1", mock.Anything, mock.Anything, "fund-1", mock.Anything).
+			Return(domain.SaleSlipResult{}, domain.ErrDiscountExceedsRemaining)
 
 		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), settingOK())
-		res, err := uc.CreatePayment(withOrgCtx("org-123"), "ord-1", &domain.CreatePaymentRequest{
-			Method: domain.PaymentMethodCash, Amount: 100000,
+		res, err := uc.ConfirmPayment(withOrgCtx("org-123"), "ord-1", "pay-1", &domain.ConfirmPaymentRequest{
+			Method: domain.PaymentMethodCash, DiscountAmount: 500000,
 		})
 
-		assert.NoError(t, err)
-		assert.NotNil(t, res)
-		repo.AssertNotCalled(t, "CompleteOrderWithSlip", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
-		repo.AssertExpectations(t)
+		assert.Nil(t, res)
+		assertFlatAppError(t, err, 400)
 	})
 
-	t.Run("Thành công - Trùng mã giao dịch trả bản ghi cũ", func(t *testing.T) {
-		existing := &domain.Payment{ID: "pay-old", OrganizationID: "org-123", OrderID: "ord-1",
-			Method: domain.PaymentMethodGateway, Provider: strP("vnpay"), ProviderTxnID: strP("txn-1"),
-			Amount: 300000, Status: domain.PaymentStatusSucceeded}
+	t.Run("Thất bại - Đơn đã hủy", func(t *testing.T) {
+		cancelled := &domain.Order{ID: "ord-1", OrganizationID: "org-123", Status: domain.StatusCancelled}
 		repo := new(MockOrderRepository)
-		repo.On("GetOrderByID", mock.Anything, "org-123", "ord-1").Return(pendingOrder, nil)
-		repo.On("FindPaymentByProviderTxn", mock.Anything, "vnpay", "txn-1").Return(existing, nil)
+		repo.On("GetOrderByID", mock.Anything, "org-123", "ord-1").Return(cancelled, nil)
+		repo.On("GetPaymentByID", mock.Anything, "org-123", "ord-1", "pay-1").Return(pendingPayment, nil)
 
 		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), settingOK())
-		res, err := uc.CreatePayment(withOrgCtx("org-123"), "ord-1", &domain.CreatePaymentRequest{
-			Method: domain.PaymentMethodGateway, Provider: strP("vnpay"), ProviderTxnID: strP("txn-1"), Amount: 300000,
+		res, err := uc.ConfirmPayment(withOrgCtx("org-123"), "ord-1", "pay-1", &domain.ConfirmPaymentRequest{
+			Method: domain.PaymentMethodCash,
 		})
 
-		assert.NoError(t, err)
-		assert.Equal(t, "pay-old", res.ID)
-		repo.AssertNotCalled(t, "CreatePayment", mock.Anything, mock.Anything)
+		assert.Nil(t, res)
+		assertFlatAppError(t, err, 400)
 	})
 
-	t.Run("Thất bại - Thanh toán đơn đã hủy", func(t *testing.T) {
-		cancelled := &domain.Order{ID: "ord-3", OrganizationID: "org-123", Status: domain.StatusCancelled}
+	t.Run("Thất bại - Giảm giá âm", func(t *testing.T) {
 		repo := new(MockOrderRepository)
-		repo.On("GetOrderByID", mock.Anything, "org-123", "ord-3").Return(cancelled, nil)
-
 		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), settingOK())
-		res, err := uc.CreatePayment(withOrgCtx("org-123"), "ord-3", &domain.CreatePaymentRequest{
-			Method: domain.PaymentMethodCash, Amount: 100000,
+		res, err := uc.ConfirmPayment(withOrgCtx("org-123"), "ord-1", "pay-1", &domain.ConfirmPaymentRequest{
+			Method: domain.PaymentMethodCash, DiscountAmount: -1,
 		})
 
-		assert.Error(t, err)
 		assert.Nil(t, res)
 		assertFlatAppError(t, err, 400)
 	})

@@ -1,15 +1,15 @@
 'use client';
 
 import * as React from 'react';
-import { BadgePercent, Banknote, CreditCard, QrCode, Smartphone, Ticket } from 'lucide-react';
+import { BadgePercent, Banknote, CreditCard, QrCode, Smartphone } from 'lucide-react';
 import { DashDialog, DashDialogFooter } from '@/components/dashboard/DashDialog';
 import { DashInput } from '@/components/dashboard/DashInput';
 import { Button } from '@/components/ui/button';
-import { useCreatePayment } from '@/hooks/use-create-payment';
+import { useConfirmPayment } from '@/hooks/use-confirm-payment';
 import { usePaymentSettings } from '@/hooks/use-settings';
 import { getApiErrorMessage } from '@/services/apiClient';
 import { toast } from '@/components/ui/toast';
-import type { PaymentMethod } from '@/services/order';
+import type { InitPaymentResponse, PaymentMethod } from '@/services/order';
 import type { SettingPaymentMethod } from '@/types/setting';
 import { cn } from '@/lib/utils';
 import { type EnrichedRetailLine, type EnrichedServiceLine } from './orderDetailUtils';
@@ -88,7 +88,7 @@ type Props = {
   onOpenChange: (open: boolean) => void;
   orderId: string;
   orderCode: string;
-  remaining: number;
+  payment: InitPaymentResponse;
   services: EnrichedServiceLine[];
   retail: EnrichedRetailLine[];
 };
@@ -98,10 +98,11 @@ export default function PaymentDialog({
   onOpenChange,
   orderId,
   orderCode,
-  remaining,
+  payment,
   services,
   retail,
 }: Props) {
+  const remaining = payment.remaining_amount;
   const { data } = usePaymentSettings();
   const methodOptions = React.useMemo(
     () => buildMethodOptions(data?.payment_methods),
@@ -109,9 +110,8 @@ export default function PaymentDialog({
   );
   const [methodKey, setMethodKey] = React.useState<string>('');
   const [discount, setDiscount] = React.useState(0);
-  const [coupon, setCoupon] = React.useState('');
   const [error, setError] = React.useState<string | null>(null);
-  const { mutate, isPending } = useCreatePayment(orderId);
+  const { mutate, isPending } = useConfirmPayment(orderId);
 
   const selectedMethod =
     methodOptions.find((option) => option.key === methodKey) ?? methodOptions[0];
@@ -123,27 +123,29 @@ export default function PaymentDialog({
     if (!v) {
       setMethodKey('');
       setDiscount(0);
-      setCoupon('');
       setError(null);
     }
     onOpenChange(v);
   };
 
   const handleSubmit = () => {
-    if (!selectedMethod || collectAmount <= 0 || isPending) return;
+    if (!selectedMethod || isPending) return;
     setError(null);
     mutate(
       {
-        method: selectedMethod.value,
-        method_payment_id: selectedMethod.methodPaymentId,
-        provider: selectedMethod.value === 'bank_transfer' ? 'vietqr' : null,
-        amount: collectAmount,
+        paymentId: payment.payment.id,
+        payload: {
+          method: selectedMethod.value,
+          method_payment_id: selectedMethod.methodPaymentId,
+          provider: selectedMethod.value === 'bank_transfer' ? 'vietqr' : null,
+          discount_amount: clampedDiscount,
+        },
       },
       {
         onSuccess: () => {
           toast.add({
             title: 'Thu tiền thành công',
-            description: `Đơn ${orderCode} — đã thu ${formatVND(collectAmount)}${coupon.trim() ? ` (mã ${coupon.trim()})` : ''}`,
+            description: `Đơn ${orderCode} — đã thu ${formatVND(collectAmount)} và chốt đơn.`,
             type: 'success',
           });
           handleOpenChange(false);
@@ -169,8 +171,8 @@ export default function PaymentDialog({
           onCancel={() => onOpenChange(false)}
           onConfirm={handleSubmit}
           cancelText="Hủy"
-          confirmText={collectAmount > 0 ? `Thu ${formatVND(collectAmount)}` : 'Thu tiền'}
-          confirmDisabled={isPending || collectAmount <= 0}
+          confirmText={`Xác nhận thu ${formatVND(collectAmount)}`}
+          confirmDisabled={isPending}
           isLoading={isPending}
         />
       }
@@ -258,34 +260,20 @@ export default function PaymentDialog({
               {formatVND(remaining)}
             </span>
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <div className="mb-1.5 flex items-center gap-1 text-xs font-semibold text-on-surface">
-                <BadgePercent className="h-3.5 w-3.5" />
-                Giảm giá (đ)
-              </div>
-              <DashInput
-                type="number"
-                min={0}
-                max={remaining}
-                value={discount}
-                onChange={(e) => setDiscount(Math.max(0, Number(e.target.value) || 0))}
-                className="h-9 text-xs"
-                placeholder="0"
-              />
+          <div>
+            <div className="mb-1.5 flex items-center gap-1 text-xs font-semibold text-on-surface">
+              <BadgePercent className="h-3.5 w-3.5" />
+              Giảm giá thêm (đ)
             </div>
-            <div>
-              <div className="mb-1.5 flex items-center gap-1 text-xs font-semibold text-on-surface">
-                <Ticket className="h-3.5 w-3.5" />
-                Mã giảm giá
-              </div>
-              <DashInput
-                value={coupon}
-                onChange={(e) => setCoupon(e.target.value)}
-                className="h-9 text-xs uppercase"
-                placeholder="VD: VIP10"
-              />
-            </div>
+            <DashInput
+              type="number"
+              min={0}
+              max={remaining}
+              value={discount}
+              onChange={(e) => setDiscount(Math.max(0, Number(e.target.value) || 0))}
+              className="h-9 text-xs"
+              placeholder="0"
+            />
           </div>
           <div>
             <div className="mb-1.5 text-xs font-semibold text-on-surface">
@@ -337,14 +325,9 @@ export default function PaymentDialog({
             </span>
           </div>
           {clampedDiscount > 0 && (
-            <p className="text-[11px] leading-snug text-warning">
-              Thu thiếu {formatVND(clampedDiscount)} so với tổng server — đơn có thể ở lại trạng
-              thái Chờ xử lý.
-            </p>
-          )}
-          {collectAmount <= 0 && remaining > 0 && (
-            <p className="text-[11px] leading-snug text-error">
-              Giảm hết toàn đơn — cần API giảm giá để hoàn tất, không thể ghi nhận thanh toán 0đ.
+            <p className="text-[11px] leading-snug text-on-surface-variant">
+              Giảm {formatVND(clampedDiscount)} và chốt đơn với tổng mới{' '}
+              {formatVND(remaining - clampedDiscount)}.
             </p>
           )}
           {error && <p className="text-xs font-medium text-error">{error}</p>}
@@ -352,12 +335,9 @@ export default function PaymentDialog({
             variant="outline"
             size="sm"
             className="w-full text-xs"
-            onClick={() => {
-              setDiscount(0);
-              setCoupon('');
-            }}
+            onClick={() => setDiscount(0)}
           >
-            Xóa giảm giá / mã
+            Xóa giảm giá
           </Button>
         </div>
       </div>

@@ -3,6 +3,8 @@ package user
 import (
 	"context"
 	"errors"
+	"net"
+	"strings"
 	"time"
 
 	userdomain "github.com/daidat02/server/internal/domain/user"
@@ -10,13 +12,20 @@ import (
 	utils "github.com/daidat02/server/pkg/utils"
 )
 
-type UserUsecase struct {
-	userRepo userdomain.UserRepository
+type TokenMetadata struct {
+	UserAgent string
+	IP        string
 }
 
-func NewCreateUserUsecase(userRepo userdomain.UserRepository) *UserUsecase {
+type UserUsecase struct {
+	userRepo  userdomain.UserRepository
+	tokenRepo userdomain.RefreshTokenRepository
+}
+
+func NewUserUsecase(userRepo userdomain.UserRepository, tokenRepo userdomain.RefreshTokenRepository) *UserUsecase {
 	return &UserUsecase{
-		userRepo: userRepo,
+		userRepo:  userRepo,
+		tokenRepo: tokenRepo,
 	}
 }
 
@@ -68,7 +77,7 @@ func (uc *UserUsecase) RegisterUser(c context.Context, user *userdomain.User) (*
 	return response, nil
 }
 
-func (uc *UserUsecase) LoginUser(c context.Context, req *userdomain.LoginRequest) (*userdomain.UserResponse, *string, *string, error) {
+func (uc *UserUsecase) LoginUser(c context.Context, req *userdomain.LoginRequest, meta TokenMetadata) (*userdomain.UserResponse, *string, *string, error) {
 	ctx, cancel := context.WithTimeout(c, 5*time.Second)
 	defer cancel()
 	err := req.Validate()
@@ -91,14 +100,31 @@ func (uc *UserUsecase) LoginUser(c context.Context, req *userdomain.LoginRequest
 		return nil, nil, nil, apperror.New(401, "Mật khẩu không đúng", nil)
 	}
 
-	acccessToken, err := utils.GenerateToken(existingUser.ID, existingUser.OrganizationID, existingUser.Role)
+	accessToken, err := utils.GenerateAccessToken(existingUser.ID, existingUser.OrganizationID, existingUser.Role)
 	if err != nil {
 		return nil, nil, nil, apperror.New(500, "Lỗi khi tạo token", err)
 	}
 
-	refreshToken, err := utils.GenerateRefreshToken(existingUser.ID, existingUser.OrganizationID, existingUser.Role)
+	refreshToken, refreshExpiresAt, err := utils.GenerateRefreshToken(existingUser.ID, existingUser.OrganizationID, existingUser.Role)
 	if err != nil {
 		return nil, nil, nil, apperror.New(500, "Lỗi khi tạo Refresh Token", err)
+	}
+
+	userAgent, ip := normalizeTokenMetadata(meta)
+	err = uc.tokenRepo.Create(ctx, &userdomain.RefreshToken{
+		ID:        utils.NewID(),
+		UserID:    existingUser.ID,
+		FamilyID:  utils.NewID(),
+		TokenHash: utils.HashToken(*refreshToken),
+		ExpiresAt: refreshExpiresAt,
+		UserAgent: userAgent,
+		IP:        ip,
+	})
+	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			return nil, nil, nil, apperror.New(408, "Lỗi: Hết thời gian chờ khi lưu Refresh Token", err)
+		}
+		return nil, nil, nil, apperror.New(500, "Lỗi khi lưu Refresh Token", err)
 	}
 
 	var lastLogin time.Time
@@ -117,25 +143,90 @@ func (uc *UserUsecase) LoginUser(c context.Context, req *userdomain.LoginRequest
 		LastLoginAt:    lastLogin,
 		CreatedAt:      *existingUser.CreatedAt,
 		UpdatedAt:      *existingUser.UpdatedAt,
-	}, &acccessToken, &refreshToken, nil
+	}, &accessToken, refreshToken, nil
 }
 
-func (uc *UserUsecase) RefreshToken(c context.Context, refreshToken string) (*string, *string, error) {
+func (uc *UserUsecase) RefreshToken(c context.Context, refreshToken string, meta TokenMetadata) (*string, *string, error) {
+	ctx, cancel := context.WithTimeout(c, 5*time.Second)
+	defer cancel()
 
-	refreshClaims, err := utils.ValidateToken(refreshToken)
+	claims, err := utils.ValidateRefreshToken(refreshToken)
 	if err != nil {
 		return nil, nil, apperror.New(401, "Refresh Token không hợp lệ", err)
 	}
 
-	accessToken, err := utils.GenerateToken(refreshClaims.UserID, refreshClaims.OrgID, refreshClaims.Role)
+	existingUser, err := uc.userRepo.FindUserByID(ctx, claims.UserID)
+	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			return nil, nil, apperror.New(408, "Lỗi: Hết thời gian chờ khi tìm kiếm người dùng", err)
+		}
+		return nil, nil, apperror.New(500, "Lỗi khi tìm kiếm người dùng", err)
+	}
+	if existingUser == nil || existingUser.Status != userdomain.StatusActive {
+		return nil, nil, apperror.New(401, "Tài khoản không khả dụng", nil)
+	}
+
+	newRefreshToken, refreshExpiresAt, err := utils.GenerateRefreshToken(claims.UserID, claims.OrgID, claims.Role)
+	if err != nil {
+		return nil, nil, apperror.New(500, "Lỗi khi tạo Refresh Token", err)
+	}
+	userAgent, ip := normalizeTokenMetadata(meta)
+	err = uc.tokenRepo.Rotate(ctx, utils.HashToken(refreshToken), &userdomain.RefreshToken{
+		ID:        utils.NewID(),
+		UserID:    claims.UserID,
+		TokenHash: utils.HashToken(*newRefreshToken),
+		ExpiresAt: refreshExpiresAt,
+		UserAgent: userAgent,
+		IP:        ip,
+	}, time.Now())
+	if err != nil {
+		switch {
+		case errors.Is(err, userdomain.ErrRefreshTokenNotFound),
+			errors.Is(err, userdomain.ErrRefreshTokenReused),
+			errors.Is(err, userdomain.ErrRefreshTokenExpired):
+			return nil, nil, apperror.New(401, "Refresh Token không hợp lệ hoặc đã hết hạn", nil)
+		default:
+			return nil, nil, apperror.New(500, "Lỗi khi xoay vòng Refresh Token", err)
+		}
+	}
+
+	accessToken, err := utils.GenerateAccessToken(claims.UserID, claims.OrgID, claims.Role)
 	if err != nil {
 		return nil, nil, apperror.New(500, "Lỗi khi tạo Access Token", err)
 	}
 
-	newRefreshToken, err := utils.GenerateRefreshToken(refreshClaims.UserID, refreshClaims.OrgID, refreshClaims.Role)
+	return &accessToken, newRefreshToken, nil
+}
+
+func (uc *UserUsecase) Logout(c context.Context, refreshToken string) error {
+	ctx, cancel := context.WithTimeout(c, 5*time.Second)
+	defer cancel()
+
+	if refreshToken == "" {
+		return nil
+	}
+	err := uc.tokenRepo.RevokeFamilyByTokenHash(ctx, utils.HashToken(refreshToken), time.Now())
 	if err != nil {
-		return nil, nil, apperror.New(500, "Lỗi khi tạo Refresh Token", err)
+		return apperror.New(500, "Lỗi khi đăng xuất", err)
+	}
+	return nil
+}
+
+func normalizeTokenMetadata(meta TokenMetadata) (*string, *string) {
+	userAgent := strings.TrimSpace(meta.UserAgent)
+	if len(userAgent) > 512 {
+		userAgent = userAgent[:512]
+	}
+	var userAgentPtr *string
+	if userAgent != "" {
+		userAgentPtr = &userAgent
 	}
 
-	return &accessToken, &newRefreshToken, nil
+	ip := strings.TrimSpace(meta.IP)
+	var ipPtr *string
+	if parsed := net.ParseIP(ip); parsed != nil {
+		normalized := parsed.String()
+		ipPtr = &normalized
+	}
+	return userAgentPtr, ipPtr
 }

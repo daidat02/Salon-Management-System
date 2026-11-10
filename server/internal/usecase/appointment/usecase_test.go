@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/daidat02/server/internal/delivery/http/middlewares"
 	domain "github.com/daidat02/server/internal/domain/appointment"
@@ -35,6 +36,41 @@ func validRequest() *domain.AppointmentCreateRequest {
 			{ItemType: "product", ProductID: "prod-1", Quantity: 1, UnitPrice: 150000},
 		},
 	}
+}
+
+// futureRequest trả request với khung giờ 14:00–15:00 trong tương lai gần,
+// luôn nằm trong giờ mở cửa permissiveHours và trong max_advance_days mặc định.
+func futureRequest() *domain.AppointmentCreateRequest {
+	req := validRequest()
+	loc := time.FixedZone("ICT", 7*3600)
+	d := time.Now().In(loc).AddDate(0, 0, 3)
+	start := time.Date(d.Year(), d.Month(), d.Day(), 14, 0, 0, 0, loc)
+	end := start.Add(time.Hour)
+	req.StartTime = start.Format(time.RFC3339)
+	req.EndTime = end.Format(time.RFC3339)
+	return req
+}
+
+// permissiveHours mở cửa 08:00–22:00 cả tuần, không nghỉ trưa.
+func permissiveHours() *domain.BusinessHours {
+	days := make([]domain.BusinessDay, 0, 7)
+	for weekday := 1; weekday <= 7; weekday++ {
+		days = append(days, domain.BusinessDay{Weekday: weekday, IsOpen: true})
+	}
+	return &domain.BusinessHours{
+		OpenTimeMinutes:  8 * 60,
+		CloseTimeMinutes: 22 * 60,
+		Days:             days,
+		Timezone:         domain.DefaultTimezone,
+	}
+}
+
+// stubBookingRules thêm expectation cho các truy vấn cưỡng chế quy tắc đặt lịch.
+func stubBookingRules(settingsRepo *MockSettingsRepository, slotsUsed int) {
+	settingsRepo.On("GetBusinessHours", mock.Anything, "org-123").
+		Return(permissiveHours(), nil).Maybe()
+	settingsRepo.On("CountActiveAppointmentsInSlot", mock.Anything, "org-123", mock.Anything, mock.Anything, mock.Anything).
+		Return(slotsUsed, nil).Maybe()
 }
 
 func existingCustomer() *customerDomain.Customer {
@@ -337,6 +373,7 @@ func TestAppointmentUseCase_CreateAppointment(t *testing.T) {
 		finder := new(MockCustomerFinder)
 		catalog := catalogOK()
 		settingsRepo := new(MockSettingsRepository)
+		stubBookingRules(settingsRepo, 0)
 		finder.On("FindCustomerByPhone", mock.Anything, "org-123", "0912345678").
 			Return(existingCustomer(), nil).Once()
 		settings := domain.DefaultAppointmentSettings("org-123")
@@ -351,7 +388,7 @@ func TestAppointmentUseCase_CreateAppointment(t *testing.T) {
 		}), mock.Anything).Return(nil).Once()
 
 		uc := NewAppointmentUseCase(repo, finder, catalog, settingsRepo)
-		res, err := uc.CreateAppointment(withOrgCtx("org-123"), validRequest())
+		res, err := uc.CreateAppointment(withOrgCtx("org-123"), futureRequest())
 
 		assert.NoError(t, err)
 		assert.Equal(t, 195000.0, res.RequiredDepositAmount, "30% của 650000")
@@ -365,6 +402,7 @@ func TestAppointmentUseCase_CreateAppointment(t *testing.T) {
 		finder := new(MockCustomerFinder)
 		catalog := catalogOK()
 		settingsRepo := new(MockSettingsRepository)
+		stubBookingRules(settingsRepo, 0)
 		finder.On("FindCustomerByPhone", mock.Anything, "org-123", "0912345678").
 			Return(existingCustomer(), nil).Once()
 		settings := domain.DefaultAppointmentSettings("org-123")
@@ -380,7 +418,7 @@ func TestAppointmentUseCase_CreateAppointment(t *testing.T) {
 		}), mock.Anything).Return(nil).Once()
 
 		uc := NewAppointmentUseCase(repo, finder, catalog, settingsRepo)
-		res, err := uc.CreateAppointment(withOrgCtx("org-123"), validRequest())
+		res, err := uc.CreateAppointment(withOrgCtx("org-123"), futureRequest())
 
 		assert.NoError(t, err)
 		assert.Equal(t, 100000.0, res.RequiredDepositAmount, "30% của 650000 bị cap bởi 100000")
@@ -394,6 +432,7 @@ func TestAppointmentUseCase_CreateAppointment(t *testing.T) {
 		finder := new(MockCustomerFinder)
 		catalog := catalogOK()
 		settingsRepo := new(MockSettingsRepository)
+		stubBookingRules(settingsRepo, 0)
 		finder.On("FindCustomerByPhone", mock.Anything, "org-123", "0912345678").
 			Return(existingCustomer(), nil).Once()
 		settings := domain.DefaultAppointmentSettings("org-123")
@@ -406,7 +445,7 @@ func TestAppointmentUseCase_CreateAppointment(t *testing.T) {
 			Return(nil).Once()
 
 		uc := NewAppointmentUseCase(repo, finder, catalog, settingsRepo)
-		res, err := uc.CreateAppointment(withOrgCtx("org-123"), validRequest())
+		res, err := uc.CreateAppointment(withOrgCtx("org-123"), futureRequest())
 
 		assert.NoError(t, err)
 		assert.Equal(t, 0.0, res.RequiredDepositAmount)

@@ -6,10 +6,10 @@ import (
 	"log"
 	"strings"
 
-	"github.com/daidat02/server/internal/usecase/shared"
 	appointmentDomain "github.com/daidat02/server/internal/domain/appointment"
 	domain "github.com/daidat02/server/internal/domain/customer"
 	orderDomain "github.com/daidat02/server/internal/domain/order"
+	"github.com/daidat02/server/internal/usecase/shared"
 	"github.com/daidat02/server/pkg/apperror"
 	"github.com/daidat02/server/pkg/pagination"
 	"github.com/daidat02/server/pkg/utils"
@@ -24,7 +24,7 @@ type CustomerUsecase struct {
 // HistoryStore lấy lịch sử lịch hẹn của khách.
 // PostgresAppointmentRepository thỏa mãn ngầm.
 type HistoryStore interface {
-	GetAppointmentsByCustomerID(ctx context.Context, orgID, customerID string, limit, offset int) ([]*appointmentDomain.Appointment, error)
+	GetAppointmentsByCustomerID(ctx context.Context, orgID, customerID string, limit, offset int) ([]*appointmentDomain.AppointmentResponse, error)
 	CountAppointmentsByCustomerID(ctx context.Context, orgID, customerID string) (int64, error)
 }
 
@@ -47,7 +47,7 @@ func NewCustomerUsecase(repo domain.CustomerRepository, history HistoryStore, or
 // + lịch sử đơn hàng (mỗi loại phân trang riêng).
 type CustomerDetail struct {
 	Customer     *domain.CustomerDetailsResponse                    `json:"customer"`
-	Appointments *pagination.Result[*appointmentDomain.Appointment] `json:"appointments"`
+	Appointments *pagination.Result[*appointmentDomain.AppointmentResponse] `json:"appointments"`
 	Orders       *pagination.Result[*orderDomain.Order]              `json:"orders"`
 }
 
@@ -139,6 +139,7 @@ func (u *CustomerUsecase) GetCustomerDetail(ctx context.Context, id string, hist
 
 	appointments, err := u.history.GetAppointmentsByCustomerID(ctx, orgID, id, params.PageSize, params.Offset())
 	if err != nil {
+		log.Println("Error getting appointments by customer ID:", err)
 		return nil, apperror.New(500, "Lỗi khi lấy lịch sử lịch hẹn", err)
 	}
 

@@ -4,9 +4,13 @@ import * as React from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { BadgeDollarSign, ChartColumn, ChevronDown, Phone, Star, User, UserPlus, Wallet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { toast } from '@/components/ui/toast';
 import { Tag } from '@/components/ui/tag';
 import type { Customer } from '@/types/customer';
 import type { Order, OrderDetailPayment } from '@/types/order';
+import type { InitPaymentResponse } from '@/services/order';
+import { useInitPayment } from '@/hooks/use-init-payment';
+import { getApiErrorMessage } from '@/services/apiClient';
 import type { EnrichedRetailLine, EnrichedServiceLine, OrderProfit, StaffCommission } from './orderDetailUtils';
 import { customerTier } from './orderDetailUtils';
 import { formatDateTime, formatVND } from '@/lib/format';
@@ -65,19 +69,39 @@ export default function OrderDetailSide({
   retail: EnrichedRetailLine[];
 }) {
   const totalCommission = commissions.reduce((s, c) => s + c.amount, 0);
-  const paidTotal = payments.reduce((s, p) => s + p.amount, 0);
+  const succeededPayments = payments.filter((p) => p.status === 'succeeded');
+  const paidTotal = succeededPayments.reduce((s, p) => s + p.amount, 0);
   const remaining = Math.max(0, order.total_amount - paidTotal);
   const canPay =
     remaining > 0 &&
     order.status !== 'cancelled' &&
     order.status !== 'refunded' &&
     order.status !== 'completed';
-  const [payOpen, setPayOpen] = React.useState(false);
+  const [paymentSession, setPaymentSession] = React.useState<InitPaymentResponse | null>(null);
+  const [isInitingPayment, setIsInitingPayment] = React.useState(false);
   // Picker tìm/thêm khách — chỉ mở khi đơn chưa có khách và còn được sửa.
   const [pickerOpen, setPickerOpen] = React.useState(false);
   const queryClient = useQueryClient();
   const tier = customerTier(customer?.total_spent ?? 0);
-  const mainPayment = payments[0];
+  const mainPayment = succeededPayments[0];
+  const { mutateAsync: initPayment } = useInitPayment(order.id);
+
+  const startPayment = async () => {
+    if (!canPay || isInitingPayment) return;
+    setIsInitingPayment(true);
+    try {
+      const session = await initPayment();
+      setPaymentSession(session);
+    } catch (err) {
+      toast.add({
+        title: 'Không thể khởi tạo thanh toán',
+        description: getApiErrorMessage(err),
+        type: 'error',
+      });
+    } finally {
+      setIsInitingPayment(false);
+    }
+  };
   const canEditCustomer =
     !customer &&
     (order.status === 'pending' ||
@@ -205,12 +229,12 @@ export default function OrderDetailSide({
               </span>
             </div>
           )}
-          {payments.length > 1 && (
+          {succeededPayments.length > 1 && (
             <div className="space-y-1 border-t border-outline pt-2">
               <div className="font-medium text-on-surface-variant">
-                Lịch sử các lần thu ({payments.length}):
+                Lịch sử các lần thu ({succeededPayments.length}):
               </div>
-              {payments.map((p) => (
+              {succeededPayments.map((p) => (
                 <div key={p.id} className="flex items-center justify-between">
                   <span className="text-on-surface-variant">
                     {METHOD_LABEL[p.method] ?? p.method} • {formatDateTime(p.paid_at)}
@@ -222,20 +246,29 @@ export default function OrderDetailSide({
           )}
         </div>
         {canPay && (
-          <Button onClick={() => setPayOpen(true)} className="mt-1 h-10 w-full text-sm font-bold">
-            <Wallet className="h-4 w-4" /> Thu {formatVND(remaining)}
+          <Button
+            onClick={() => void startPayment()}
+            disabled={isInitingPayment}
+            className="mt-1 h-10 w-full text-sm font-bold"
+          >
+            <Wallet className="h-4 w-4" />
+            {isInitingPayment ? 'Đang khởi tạo...' : `Thu ${formatVND(remaining)}`}
           </Button>
         )}
       </SideCard>
-      <PaymentDialog
-        open={payOpen}
-        onOpenChange={setPayOpen}
-        orderId={order.id}
-        orderCode={order.code}
-        remaining={remaining}
-        services={services}
-        retail={retail}
-      />
+      {paymentSession && (
+        <PaymentDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setPaymentSession(null);
+          }}
+          orderId={order.id}
+          orderCode={order.code}
+          payment={paymentSession}
+          services={services}
+          retail={retail}
+        />
+      )}
 
       <SideCard icon={BadgeDollarSign} title="Nhân viên & Hoa hồng ca làm" extra={<span className="text-xs text-on-surface-variant">Trực tiếp</span>}>
         <div className="space-y-2.5 text-sm">

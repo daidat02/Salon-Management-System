@@ -193,6 +193,7 @@ func TestUserUsecase_RegisterUser(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockRepo := new(MockUserRepository)
+			mockTokenRepo := new(MockRefreshTokenRepository)
 			if tt.expectFind {
 				mockRepo.On("FindUserByPhoneNumber", mock.Anything, tt.inputUser.Phone).
 					Return(tt.findUser, tt.findErr)
@@ -201,7 +202,7 @@ func TestUserUsecase_RegisterUser(t *testing.T) {
 				mockRepo.On("CreateUser", mock.Anything, mock.Anything, mock.Anything).Return(tt.createErr)
 			}
 
-			uc := NewCreateUserUsecase(mockRepo)
+			uc := NewUserUsecase(mockRepo, mockTokenRepo)
 			plainPassword := tt.inputUser.Password
 			res, err := uc.RegisterUser(context.Background(), tt.inputUser)
 
@@ -354,13 +355,17 @@ func TestUserUsecase_LoginUser(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockRepo := new(MockUserRepository)
+			mockTokenRepo := new(MockRefreshTokenRepository)
 			if tt.expectFind {
 				mockRepo.On("FindUserByPhoneNumber", mock.Anything, tt.inputReq.PhoneNumber).
 					Return(tt.findUser, tt.findErr)
 			}
+			if !tt.expectedError {
+				mockTokenRepo.On("Create", mock.Anything, mock.Anything).Return(nil)
+			}
 
-			uc := NewCreateUserUsecase(mockRepo)
-			res, accessToken, refreshToken, err := uc.LoginUser(context.Background(), tt.inputReq)
+			uc := NewUserUsecase(mockRepo, mockTokenRepo)
+			res, accessToken, refreshToken, err := uc.LoginUser(context.Background(), tt.inputReq, TokenMetadata{})
 
 			if tt.expectedError {
 				assert.Error(t, err)
@@ -389,6 +394,199 @@ func TestUserUsecase_LoginUser(t *testing.T) {
 			} else {
 				mockRepo.AssertNotCalled(t, "FindUserByPhoneNumber", mock.Anything, mock.Anything)
 			}
+			if tt.expectedError {
+				mockTokenRepo.AssertNotCalled(t, "Create", mock.Anything, mock.Anything)
+			} else {
+				mockTokenRepo.AssertExpectations(t)
+			}
 		})
 	}
+}
+
+func TestUserUsecase_RefreshToken(t *testing.T) {
+	utils.InitJWT("test-secret-key", time.Hour, 24*time.Hour)
+	activeUser := &userdomain.User{
+		ID:             "user-1",
+		OrganizationID: "org-123",
+		Role:           userdomain.RoleOwner,
+		Status:         userdomain.StatusActive,
+	}
+
+	newRefresh := func(t *testing.T) string {
+		t.Helper()
+		token, _, err := utils.GenerateRefreshToken(activeUser.ID, activeUser.OrganizationID, activeUser.Role)
+		assert.NoError(t, err)
+		return *token
+	}
+
+	tests := []struct {
+		name          string
+		rawToken      func(t *testing.T) string
+		findUser      *userdomain.User
+		findErr       error
+		rotateErr     error
+		expectFind    bool
+		expectRotate  bool
+		expectedError bool
+		expectedCode  int
+	}{
+		{
+			name:         "Thành công - rotate refresh token",
+			rawToken:     newRefresh,
+			findUser:     activeUser,
+			expectFind:   true,
+			expectRotate: true,
+		},
+		{
+			name: "Thất bại - dùng access token ở endpoint refresh",
+			rawToken: func(t *testing.T) string {
+				token, err := utils.GenerateAccessToken(activeUser.ID, activeUser.OrganizationID, activeUser.Role)
+				assert.NoError(t, err)
+				return token
+			},
+			expectedError: true,
+			expectedCode:  401,
+		},
+		{
+			name:          "Thất bại - token đã bị thu hồi hoặc reuse",
+			rawToken:      newRefresh,
+			findUser:      activeUser,
+			rotateErr:     userdomain.ErrRefreshTokenReused,
+			expectFind:    true,
+			expectRotate:  true,
+			expectedError: true,
+			expectedCode:  401,
+		},
+		{
+			name:          "Thất bại - token không tồn tại trong DB",
+			rawToken:      newRefresh,
+			findUser:      activeUser,
+			rotateErr:     userdomain.ErrRefreshTokenNotFound,
+			expectFind:    true,
+			expectRotate:  true,
+			expectedError: true,
+			expectedCode:  401,
+		},
+		{
+			name:          "Thất bại - token đã hết hạn",
+			rawToken:      newRefresh,
+			findUser:      activeUser,
+			rotateErr:     userdomain.ErrRefreshTokenExpired,
+			expectFind:    true,
+			expectRotate:  true,
+			expectedError: true,
+			expectedCode:  401,
+		},
+		{
+			name:          "Thất bại - user không còn active",
+			rawToken:      newRefresh,
+			findUser:      &userdomain.User{ID: activeUser.ID, Status: userdomain.StatusInactive},
+			expectFind:    true,
+			expectedError: true,
+			expectedCode:  401,
+		},
+		{
+			name:          "Thất bại - user không tồn tại",
+			rawToken:      newRefresh,
+			findUser:      nil,
+			expectFind:    true,
+			expectedError: true,
+			expectedCode:  401,
+		},
+		{
+			name:          "Thất bại - lỗi DB khi rotate",
+			rawToken:      newRefresh,
+			findUser:      activeUser,
+			rotateErr:     errors.New("db down"),
+			expectFind:    true,
+			expectRotate:  true,
+			expectedError: true,
+			expectedCode:  500,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockRepo := new(MockUserRepository)
+			mockTokenRepo := new(MockRefreshTokenRepository)
+			rawToken := tt.rawToken(t)
+			if tt.expectFind {
+				mockRepo.On("FindUserByID", mock.Anything, activeUser.ID).Return(tt.findUser, tt.findErr)
+			}
+			if tt.expectRotate {
+				mockTokenRepo.On("Rotate", mock.Anything, utils.HashToken(rawToken), mock.Anything, mock.Anything).
+					Return(tt.rotateErr)
+			}
+
+			uc := NewUserUsecase(mockRepo, mockTokenRepo)
+			accessToken, refreshToken, err := uc.RefreshToken(context.Background(), rawToken, TokenMetadata{UserAgent: "test-agent", IP: "127.0.0.1"})
+
+			if tt.expectedError {
+				assert.Error(t, err)
+				assert.Nil(t, accessToken)
+				assert.Nil(t, refreshToken)
+				assertFlatAppError(t, err, tt.expectedCode)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, accessToken)
+				assert.NotNil(t, refreshToken)
+				_, err := utils.ValidateAccessToken(*accessToken)
+				assert.NoError(t, err)
+				_, err = utils.ValidateRefreshToken(*refreshToken)
+				assert.NoError(t, err)
+			}
+
+			if tt.expectFind {
+				mockRepo.AssertExpectations(t)
+			} else {
+				mockRepo.AssertNotCalled(t, "FindUserByID", mock.Anything, mock.Anything)
+			}
+			if tt.expectRotate {
+				mockTokenRepo.AssertExpectations(t)
+			} else {
+				mockTokenRepo.AssertNotCalled(t, "Rotate", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+			}
+		})
+	}
+}
+
+func TestUserUsecase_Logout(t *testing.T) {
+	rawToken, _, err := utils.GenerateRefreshToken("user-1", "org-123", userdomain.RoleOwner)
+	assert.NoError(t, err)
+
+	t.Run("Thành công - revoke family", func(t *testing.T) {
+		mockRepo := new(MockUserRepository)
+		mockTokenRepo := new(MockRefreshTokenRepository)
+		mockTokenRepo.On("RevokeFamilyByTokenHash", mock.Anything, utils.HashToken(*rawToken), mock.Anything).
+			Return(nil)
+
+		uc := NewUserUsecase(mockRepo, mockTokenRepo)
+		err := uc.Logout(context.Background(), *rawToken)
+
+		assert.NoError(t, err)
+		mockTokenRepo.AssertExpectations(t)
+	})
+
+	t.Run("Không có cookie - không gọi repo", func(t *testing.T) {
+		mockRepo := new(MockUserRepository)
+		mockTokenRepo := new(MockRefreshTokenRepository)
+
+		uc := NewUserUsecase(mockRepo, mockTokenRepo)
+		err := uc.Logout(context.Background(), "")
+
+		assert.NoError(t, err)
+		mockTokenRepo.AssertNotCalled(t, "RevokeFamilyByTokenHash", mock.Anything, mock.Anything, mock.Anything)
+	})
+
+	t.Run("Thất bại - lỗi repo", func(t *testing.T) {
+		mockRepo := new(MockUserRepository)
+		mockTokenRepo := new(MockRefreshTokenRepository)
+		mockTokenRepo.On("RevokeFamilyByTokenHash", mock.Anything, mock.Anything, mock.Anything).
+			Return(errors.New("db down"))
+
+		uc := NewUserUsecase(mockRepo, mockTokenRepo)
+		err := uc.Logout(context.Background(), *rawToken)
+
+		assertFlatAppError(t, err, 500)
+	})
 }

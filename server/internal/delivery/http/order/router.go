@@ -21,7 +21,8 @@ func RegisterOrderRoutes(r *gin.Engine, h *OrderHandler, basePath string) {
 		group.POST("/:id/cancel", h.CancelOrder)
 		group.POST("/:id/refund", h.RefundOrder)
 		group.POST("/:id/complete", h.CompleteOrder)
-		group.POST("/:id/payments", h.CreatePayment)
+		group.POST("/:id/payments/init", h.InitPayment)
+		group.POST("/:id/payments/:paymentId/confirm", h.ConfirmPayment)
 		group.POST("/materials", h.ReplaceOrderMaterials)
 		group.PATCH("/:id/customer", h.UpdateOrderCustomer)
 

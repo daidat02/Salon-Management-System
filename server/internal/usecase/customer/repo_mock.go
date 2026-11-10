@@ -71,12 +71,12 @@ type MockHistoryStore struct {
 	mock.Mock
 }
 
-func (m *MockHistoryStore) GetAppointmentsByCustomerID(ctx context.Context, orgID, customerID string, limit, offset int) ([]*appointmentDomain.Appointment, error) {
+func (m *MockHistoryStore) GetAppointmentsByCustomerID(ctx context.Context, orgID, customerID string, limit, offset int) ([]*appointmentDomain.AppointmentResponse, error) {
 	args := m.Called(ctx, orgID, customerID, limit, offset)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]*appointmentDomain.Appointment), args.Error(1)
+	return args.Get(0).([]*appointmentDomain.AppointmentResponse), args.Error(1)
 }
 
 func (m *MockHistoryStore) CountAppointmentsByCustomerID(ctx context.Context, orgID, customerID string) (int64, error) {

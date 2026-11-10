@@ -2,10 +2,8 @@
 
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
 import { formatVND } from '@/lib/format';
-import {
-  formatCompactMoney,
-  type RevenueCompositionItem,
-} from '../lib/report-data';
+import { formatCompactMoney } from '../lib/report-data';
+import type { RevenueCompositionItem } from '@/types/report';
 
 type RevenueCompositionProps = {
   items: RevenueCompositionItem[];

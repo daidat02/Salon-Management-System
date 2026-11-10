@@ -10,7 +10,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { formatVND } from '@/lib/format';
-import type { ReportRange, TopService } from '../lib/report-data';
+import type { ReportRange, TopService } from '@/types/report';
 
 type TopServicesTableProps = {
   services: TopService[];
@@ -107,7 +107,7 @@ export default function TopServicesTable({
           Tổng lượt top 5:{' '}
           <strong className="font-semibold text-on-surface">{totalTurns}</strong>
         </span>
-        <span>Dữ liệu minh hoạ</span>
+        <span>Nguồn: đơn hàng đã hoàn thành</span>
       </div>
     </section>
   );

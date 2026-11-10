@@ -1,24 +1,28 @@
 package user
 
 import (
+	"errors"
 	"net/http"
 
+	"github.com/daidat02/server/configs"
 	domain "github.com/daidat02/server/internal/domain/user"
 	uc "github.com/daidat02/server/internal/usecase/user"
+	"github.com/daidat02/server/pkg/apperror"
 	"github.com/daidat02/server/pkg/response"
 	"github.com/gin-gonic/gin"
 )
 
 type UserHandler struct {
 	useCase *uc.UserUsecase
+	jwtCfg  config.JWTConfig
 }
 
-func NewCreateUserHandler(useCase *uc.UserUsecase) *UserHandler {
+func NewCreateUserHandler(useCase *uc.UserUsecase, jwtCfg config.JWTConfig) *UserHandler {
 	return &UserHandler{
 		useCase: useCase,
+		jwtCfg:  jwtCfg,
 	}
 }
-
 
 // CreateUser godoc
 // @Summary      Đăng ký người dùng
@@ -38,35 +42,65 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 	}
 
 	user := &domain.User{
-		Email: req.Email,
+		Email:    req.Email,
 		Password: req.Password,
 		FullName: req.FullName,
-		Phone: req.Phone,
-		Role: req.Role,
-		Status: req.Status,
+		Phone:    req.Phone,
+		Role:     req.Role,
+		Status:   req.Status,
 	}
 
-	createdUser, err := h.useCase.RegisterUser(c, user);
-	if err !=nil{
-		response.Error(c,err)
+	createdUser, err := h.useCase.RegisterUser(c, user)
+	if err != nil {
+		response.Error(c, err)
 		return
 	}
-	response.Success(c,http.StatusOK,"Tạo người dùng thành công",createdUser)
+	response.Success(c, http.StatusOK, "Tạo người dùng thành công", createdUser)
 }
 
+func (h *UserHandler) sameSite() http.SameSite {
+	switch h.jwtCfg.CookieSameSite {
+	case "strict":
+		return http.SameSiteStrictMode
+	case "none":
+		return http.SameSiteNoneMode
+	default:
+		return http.SameSiteLaxMode
+	}
+}
 
-func setRefreshTokenCookie(c *gin.Context, refreshToken string) {
+func (h *UserHandler) setRefreshTokenCookie(c *gin.Context, refreshToken string) {
+	c.SetSameSite(h.sameSite())
 	c.SetCookie(
 		"refresh_token",
 		refreshToken,
-		60*60*24*7, // 7 days
+		int(h.jwtCfg.RefreshTokenExpire.Seconds()),
 		"/",
-		"",
-		true,  // secure
-		true,  // httpOnly
+		h.jwtCfg.CookieDomain,
+		h.jwtCfg.CookieSecure,
+		true,
 	)
-}		
-	
+}
+
+func (h *UserHandler) clearRefreshTokenCookie(c *gin.Context) {
+	c.SetSameSite(h.sameSite())
+	c.SetCookie(
+		"refresh_token",
+		"",
+		-1,
+		"/",
+		h.jwtCfg.CookieDomain,
+		h.jwtCfg.CookieSecure,
+		true,
+	)
+}
+
+func tokenMetadata(c *gin.Context) uc.TokenMetadata {
+	return uc.TokenMetadata{
+		UserAgent: c.Request.UserAgent(),
+		IP:        c.ClientIP(),
+	}
+}
 
 // Login godoc
 // @Summary      Đăng nhập
@@ -79,27 +113,26 @@ func setRefreshTokenCookie(c *gin.Context, refreshToken string) {
 // @Failure      401   {object}  response.ErrorResponse    "Mật khẩu không đúng"
 // @Failure      404   {object}  response.ErrorResponse    "Số điện thoại không tồn tại"
 // @Router       /login [post]
-func (h *UserHandler) Login(c *gin.Context){
+func (h *UserHandler) Login(c *gin.Context) {
 	var req domain.LoginRequest
-	if err:= c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
 
-	user,accessToken, refreshToken, err := h.useCase.LoginUser(c, &req)
+	user, accessToken, refreshToken, err := h.useCase.LoginUser(c, &req, tokenMetadata(c))
 	if err != nil {
-		response.Error(c,err)
+		response.Error(c, err)
 		return
 	}
 
-	setRefreshTokenCookie(c, *refreshToken)
+	h.setRefreshTokenCookie(c, *refreshToken)
 
-	response.Success(c,http.StatusOK,"Đăng nhập thành công",gin.H{
-		"user": user,
+	response.Success(c, http.StatusOK, "Đăng nhập thành công", gin.H{
+		"user":         user,
 		"access_token": accessToken,
-	});
+	})
 }
-
 
 // RefreshToken godoc
 // @Summary      Làm mới access token
@@ -109,22 +142,44 @@ func (h *UserHandler) Login(c *gin.Context){
 // @Failure      400   {object}  response.ErrorResponse    "Thiếu cookie refresh_token"
 // @Failure      401   {object}  response.ErrorResponse    "Refresh token không hợp lệ hoặc hết hạn"
 // @Router       /refresh-token [post]
-func (h *UserHandler) RefreshToken(c *gin.Context){
-	refreshToken, err := c.Cookie("refresh_token")	
+func (h *UserHandler) RefreshToken(c *gin.Context) {
+	refreshToken, err := c.Cookie("refresh_token")
 	if err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
 
-	accessToken, newrefreshToken, err := h.useCase.RefreshToken(c,refreshToken)
+	accessToken, newrefreshToken, err := h.useCase.RefreshToken(c, refreshToken, tokenMetadata(c))
 	if err != nil {
-		response.Error(c,err)
+		var appErr *apperror.AppError
+		if errors.As(err, &appErr) && appErr.StatusCode == http.StatusUnauthorized {
+			h.clearRefreshTokenCookie(c)
+		}
+		response.Error(c, err)
 		return
 	}
 
-	setRefreshTokenCookie(c, *newrefreshToken)
-	response.Success(c,http.StatusOK,"Làm mới token thành công",gin.H{
+	h.setRefreshTokenCookie(c, *newrefreshToken)
+	response.Success(c, http.StatusOK, "Làm mới token thành công", gin.H{
 		"access_token": *accessToken,
-	});
+	})
 }
 
+// Logout godoc
+// @Summary      Đăng xuất
+// @Tags         Auth
+// @Security     BearerAuth
+// @Produce      json
+// @Success      200   {object}  response.SuccessResponse  "Đăng xuất thành công"
+// @Failure      401   {object}  response.ErrorResponse    "Access token không hợp lệ"
+// @Router       /logout [post]
+func (h *UserHandler) Logout(c *gin.Context) {
+	refreshToken, _ := c.Cookie("refresh_token")
+	err := h.useCase.Logout(c, refreshToken)
+	h.clearRefreshTokenCookie(c)
+	if err != nil {
+		response.Error(c, err)
+		return
+	}
+	response.Success(c, http.StatusOK, "Đăng xuất thành công", nil)
+}

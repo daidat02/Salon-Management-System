@@ -60,12 +60,40 @@ type NewCustomerInput struct {
 	Phone    string `json:"phone"`
 }
 
-type CreatePaymentRequest struct {
-	Method        string  `json:"method"`
-	Provider      *string `json:"provider"`
-	ProviderTxnID *string `json:"provider_txn_id"`
-	Amount        float64 `json:"amount"`
+// InitPaymentResponse trả payment đang chờ xác nhận kèm số tiền hiện tại.
+type InitPaymentResponse struct {
+	Payment         *PaymentResponse `json:"payment"`
+	RemainingAmount float64          `json:"remaining_amount"`
+	TotalAmount     float64          `json:"total_amount"`
+	PaidAmount      float64          `json:"paid_amount"`
+	DiscountAmount  float64          `json:"discount_amount"`
+}
+
+// ConfirmPaymentRequest dữ liệu người dùng chọn trong dialog thu tiền.
+// Server tự tính amount từ total/đã thu/giảm giá, không tin số client gửi.
+type ConfirmPaymentRequest struct {
+	Method          string  `json:"method"`
 	MethodPaymentID *string `json:"method_payment_id"`
+	Provider        *string `json:"provider"`
+	ProviderTxnID   *string `json:"provider_txn_id"`
+	DiscountAmount  float64 `json:"discount_amount"`
+}
+
+// ConfirmPaymentResponse trả payment đã ghi nhận + đơn đã chốt + phiếu bán hàng.
+type ConfirmPaymentResponse struct {
+	Payment      *PaymentResponse `json:"payment"`
+	Order        *OrderResponse   `json:"order"`
+	DocumentID   string           `json:"document_id"`
+	DocumentCode string           `json:"document_code"`
+}
+
+// PaymentCompletion dữ liệu cập nhật payment trong cùng transaction chốt đơn.
+type PaymentCompletion struct {
+	PaymentID      string
+	Method         string
+	Provider       *string
+	ProviderTxnID  *string
+	DiscountAmount float64
 }
 
 // UpdateOrderCustomerRequest gán khách cho đơn đã tạo.

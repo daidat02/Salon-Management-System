@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 )
 
 // Validate kiểm tra dữ liệu tab Cài đặt chung trước khi ghi DB.
@@ -12,12 +11,15 @@ func (r *GeneralSettingsResponse) Validate() error {
 	if strings.TrimSpace(r.Organization.Name) == "" {
 		return errors.New("Tên salon không được để trống")
 	}
-	if len(r.WorkingHours) != 7 {
+
+	hours := r.WorkingHours
+	if len(hours.Days) != 7 {
 		return errors.New("Giờ làm việc phải có đủ 7 ngày trong tuần")
 	}
 
 	seen := make(map[int]bool, 7)
-	for _, day := range r.WorkingHours {
+	openDays := 0
+	for _, day := range hours.Days {
 		if day.Weekday < 1 || day.Weekday > 7 {
 			return fmt.Errorf("Thứ %d không hợp lệ", day.Weekday)
 		}
@@ -25,32 +27,31 @@ func (r *GeneralSettingsResponse) Validate() error {
 			return fmt.Errorf("Thứ %d bị lặp lại", day.Weekday)
 		}
 		seen[day.Weekday] = true
+		if day.IsOpen {
+			openDays++
+		}
+	}
+	if openDays == 0 {
+		return errors.New("Phải mở cửa ít nhất một ngày trong tuần")
+	}
 
-		if !day.IsOpen {
-			continue
-		}
-		if _, err := time.Parse("15:04", day.OpenTime); err != nil {
-			return fmt.Errorf("Giờ mở cửa thứ %d không đúng định dạng HH:MM", day.Weekday)
-		}
-		if _, err := time.Parse("15:04", day.CloseTime); err != nil {
-			return fmt.Errorf("Giờ đóng cửa thứ %d không đúng định dạng HH:MM", day.Weekday)
-		}
-		if day.OpenTime >= day.CloseTime {
-			return fmt.Errorf("Giờ đóng cửa thứ %d phải sau giờ mở cửa", day.Weekday)
-		}
-		if (day.BreakStart == nil) != (day.BreakEnd == nil) {
-			return fmt.Errorf("Giờ nghỉ thứ %d phải có đủ bắt đầu và kết thúc", day.Weekday)
-		}
-		if day.BreakStart != nil && day.BreakEnd != nil {
-			if _, err := time.Parse("15:04", *day.BreakStart); err != nil {
-				return fmt.Errorf("Giờ nghỉ bắt đầu thứ %d không hợp lệ", day.Weekday)
-			}
-			if _, err := time.Parse("15:04", *day.BreakEnd); err != nil {
-				return fmt.Errorf("Giờ nghỉ kết thúc thứ %d không hợp lệ", day.Weekday)
-			}
-			if *day.BreakStart >= *day.BreakEnd {
-				return fmt.Errorf("Giờ nghỉ thứ %d không hợp lệ", day.Weekday)
-			}
+	if hours.OpenTimeMinutes < 0 || hours.OpenTimeMinutes >= 24*60 {
+		return errors.New("Giờ mở cửa không hợp lệ")
+	}
+	if hours.CloseTimeMinutes <= 0 || hours.CloseTimeMinutes > 24*60 {
+		return errors.New("Giờ đóng cửa không hợp lệ")
+	}
+	if hours.OpenTimeMinutes >= hours.CloseTimeMinutes {
+		return errors.New("Giờ đóng cửa phải sau giờ mở cửa")
+	}
+
+	if (hours.BreakStartMinutes == nil) != (hours.BreakEndMinutes == nil) {
+		return errors.New("Giờ nghỉ phải có đủ bắt đầu và kết thúc")
+	}
+	if hours.BreakStartMinutes != nil && hours.BreakEndMinutes != nil {
+		start, end := *hours.BreakStartMinutes, *hours.BreakEndMinutes
+		if start < hours.OpenTimeMinutes || end > hours.CloseTimeMinutes || start >= end {
+			return errors.New("Giờ nghỉ phải nằm trong giờ mở cửa và bắt đầu trước khi kết thúc")
 		}
 	}
 	return nil

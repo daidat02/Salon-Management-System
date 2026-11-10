@@ -3,7 +3,8 @@ export type Weekday = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 export type WorkingHours = {
   openTime: string;
   closeTime: string;
-  breakNote: string;
+  breakStart: string;
+  breakEnd: string;
   days: Weekday[];
 };
 
@@ -50,7 +51,8 @@ export function createDefaultSettings(): GeneralSettings {
     workingHours: {
       openTime: '08:30',
       closeTime: '20:30',
-      breakNote: '12:30 - 13:30',
+      breakStart: '12:30',
+      breakEnd: '13:30',
       days: [...WEEKDAYS],
     },
   };

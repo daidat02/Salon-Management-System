@@ -458,7 +458,7 @@ func TestCustomerUsecase_GetCustomerDetail(t *testing.T) {
 			Return(details, nil)
 		mockHistory := new(MockHistoryStore)
 		mockHistory.On("GetAppointmentsByCustomerID", mock.Anything, "org-123", "cus-1", mock.Anything, mock.Anything).
-			Return([]*appointmentDomain.Appointment{}, nil)
+			Return([]*appointmentDomain.AppointmentResponse{}, nil)
 		mockHistory.On("CountAppointmentsByCustomerID", mock.Anything, "org-123", "cus-1").
 			Return(int64(0), nil)
 		mockOrders := new(MockOrderHistoryStore)

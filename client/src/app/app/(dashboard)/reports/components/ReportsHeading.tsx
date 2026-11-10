@@ -12,27 +12,27 @@ import { downloadReportCsv } from '../lib/report-data';
 export default function ReportsHeading() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const data = useReportData();
+  const { data, range, isLoading, isError } = useReportData();
 
   const dateRange = React.useMemo<DateRange>(
-    () => ({ from: data.range.from, to: data.range.to }),
-    [data.range.from, data.range.to],
+    () => ({ from: range.from, to: range.to }),
+    [range.from, range.to],
   );
 
-  const handleDateRangeChange = (range: DateRange | undefined) => {
+  const handleDateRangeChange = (nextRange: DateRange | undefined) => {
     const params = new URLSearchParams(searchParams.toString());
     params.delete('page');
 
-    if (range?.from) {
-      const from = new Date(range.from);
+    if (nextRange?.from) {
+      const from = new Date(nextRange.from);
       from.setHours(0, 0, 0, 0);
       params.set('date_from', from.toISOString());
     } else {
       params.delete('date_from');
     }
 
-    if (range?.to) {
-      const to = new Date(range.to);
+    if (nextRange?.to) {
+      const to = new Date(nextRange.to);
       to.setHours(23, 59, 59, 999);
       params.set('date_to', to.toISOString());
     } else {
@@ -64,7 +64,10 @@ export default function ReportsHeading() {
           label: 'Xuất CSV',
           icon: Download,
           variant: 'outline',
-          onClick: () => downloadReportCsv(data),
+          disabled: !data || isLoading || isError,
+          onClick: () => {
+            if (data) downloadReportCsv(data);
+          },
         },
         {
           label: 'Tải báo cáo',

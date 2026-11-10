@@ -144,25 +144,36 @@ func (m *MockOrderRepository) ApplyCancel(ctx context.Context, orgID, orderID, n
 	return args.Error(0)
 }
 
-func (m *MockOrderRepository) CompleteOrderWithSlip(ctx context.Context, orgID, orderID string, appointmentID *string, lines []domain.SaleSlipLine, fundID string) (domain.SaleSlipResult, error) {
-	args := m.Called(ctx, orgID, orderID, appointmentID, lines, fundID)
+func (m *MockOrderRepository) CompleteOrderWithSlip(ctx context.Context, orgID, orderID string, appointmentID *string, lines []domain.SaleSlipLine, fundID string, confirmation *domain.PaymentCompletion) (domain.SaleSlipResult, error) {
+	args := m.Called(ctx, orgID, orderID, appointmentID, lines, fundID, confirmation)
 	if args.Get(0) == nil {
 		return domain.SaleSlipResult{}, args.Error(1)
 	}
 	return args.Get(0).(domain.SaleSlipResult), args.Error(1)
 }
 
-func (m *MockOrderRepository) FindPaymentByProviderTxn(ctx context.Context, provider, txnID string) (*domain.Payment, error) {
-	args := m.Called(ctx, provider, txnID)
+func (m *MockOrderRepository) InitPayment(ctx context.Context, orgID, orderID string, amount float64) (*domain.Payment, error) {
+	args := m.Called(ctx, orgID, orderID, amount)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(*domain.Payment), args.Error(1)
 }
 
-func (m *MockOrderRepository) CreatePayment(ctx context.Context, payment *domain.Payment) error {
-	args := m.Called(ctx, payment)
-	return args.Error(0)
+func (m *MockOrderRepository) GetPaymentByID(ctx context.Context, orgID, orderID, paymentID string) (*domain.Payment, error) {
+	args := m.Called(ctx, orgID, orderID, paymentID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*domain.Payment), args.Error(1)
+}
+
+func (m *MockOrderRepository) GetSaleSlipByOrder(ctx context.Context, orgID, orderID string) (domain.SaleSlipResult, error) {
+	args := m.Called(ctx, orgID, orderID)
+	if args.Get(0) == nil {
+		return domain.SaleSlipResult{}, args.Error(1)
+	}
+	return args.Get(0).(domain.SaleSlipResult), args.Error(1)
 }
 
 func (m *MockOrderRepository) GetTotalPaidByOrder(ctx context.Context, orgID, orderID string) (float64, error) {

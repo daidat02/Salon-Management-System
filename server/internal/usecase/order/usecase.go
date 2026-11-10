@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"strings"
-	"time"
 
 	customerdomain "github.com/daidat02/server/internal/domain/customer"
 	domain "github.com/daidat02/server/internal/domain/order"
@@ -472,9 +471,9 @@ func (u *OrderUsecase) GetOrderDetail(ctx context.Context, id string) (*domain.O
 // ---------- 3. Hoàn tất / hủy / hoàn ----------
 
 // completeWithSlip chốt 1 đơn đã load sẵn: gom lines SP + vật tư rồi gọi
-// repo chạy 1 tx (flip completed + trừ kho + nhả giữ chỗ + sổ sale + phiếu).
-// Dùng chung cho nút chốt tay và auto-chốt khi thu đủ tiền.
-func (u *OrderUsecase) completeWithSlip(ctx context.Context, orgID string, order *domain.Order, fundID string) (*domain.OrderCompleteResponse, error) {
+// repo chạy 1 tx (cập nhật payment + giảm giá/total + flip completed + trừ kho
+// + nhả giữ chỗ + sổ sale + phiếu).
+func (u *OrderUsecase) completeWithSlip(ctx context.Context, orgID string, order *domain.Order, fundID string, confirmation *domain.PaymentCompletion) (*domain.OrderCompleteResponse, error) {
 	items, materials, err := u.loadItemsAndMaterials(ctx, orgID, order.ID)
 	if err != nil {
 		return nil, err
@@ -503,11 +502,21 @@ func (u *OrderUsecase) completeWithSlip(ctx context.Context, orgID string, order
 		return nil, err
 	}
 
-	slip, err := u.repo.CompleteOrderWithSlip(ctx, orgID, order.ID, order.AppointmentID, lines, fundID)
+	log.Println("Completing order with slip:", order.ID, "lines:", len(lines))
+	slip, err := u.repo.CompleteOrderWithSlip(ctx, orgID, order.ID, order.AppointmentID, lines, fundID, confirmation)
 	if err != nil {
 		log.Println("Error completing order:", err)
 		if errors.Is(err, domain.ErrOrderNotFound) {
 			return nil, apperror.New(404, "Không tìm thấy đơn hàng", err)
+		}
+		if errors.Is(err, domain.ErrPaymentNotFound) {
+			return nil, apperror.New(404, "Không tìm thấy thanh toán", err)
+		}
+		if errors.Is(err, domain.ErrPaymentNotPending) {
+			return nil, apperror.New(400, "Thanh toán đã được xác nhận trước đó", err)
+		}
+		if errors.Is(err, domain.ErrDiscountExceedsRemaining) {
+			return nil, apperror.New(400, "Giảm giá vượt quá số tiền còn thiếu", err)
 		}
 		if errors.Is(err, domain.ErrOrderNotReady) {
 			return nil, apperror.New(400, "Đơn không ở trạng thái chờ/xác nhận/giao hàng nên không thể chốt", err)
@@ -553,7 +562,6 @@ func (u *OrderUsecase) CompleteOrder(ctx context.Context, id string) (*domain.Or
 	return nil, nil
 	// return u.completeWithSlip(ctx, orgID, order)
 }
-
 
 // CancelOrder hủy đơn chưa chốt (pending/confirm/delivery), chỉ nhả giữ chỗ kho.
 func (u *OrderUsecase) CancelOrder(ctx context.Context, id string) (*domain.OrderResponse, error) {
@@ -913,95 +921,156 @@ func (u *OrderUsecase) closeOrder(ctx context.Context, id, newStatus string, all
 
 // ---------- 4. Thanh toán ----------
 
-// CreatePayment ghi nhận thanh toán, idempotent theo cặp provider/txn.
-// Thu đủ tổng thì đơn tự chốt sang completed (trừ kho + phiếu bán hàng).
-func (u *OrderUsecase) CreatePayment(ctx context.Context, orderID string, req *domain.CreatePaymentRequest) (*domain.PaymentResponse, error) {
+// InitPayment tạo (hoặc trả lại) payment pending duy nhất của đơn để client
+// mở dialog xác nhận. Không ghi nhận tiền ở bước này.
+func (u *OrderUsecase) InitPayment(ctx context.Context, orderID string) (*domain.InitPaymentResponse, error) {
 	orderID, err := shared.RequireID(orderID, "Thiếu id đơn hàng")
 	if err != nil {
 		return nil, err
 	}
-
 	orgID, err := shared.RequireOrgID(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	method, err := u.settings.GetPaymentMethodByID(ctx, orgID, req.MethodPaymentID)
+	order, err := u.loadOrder(ctx, orgID, orderID)
 	if err != nil {
 		return nil, err
 	}
-
-	payment := &domain.Payment{
-		ID:             utils.NewID(),
-		OrganizationID: orgID,
-		OrderID:        orderID,
-		Method:         strings.TrimSpace(req.Method),
-		Provider:       req.Provider,
-		ProviderTxnID:  req.ProviderTxnID,
-		Amount:         req.Amount,
-		Status:         domain.PaymentStatusSucceeded,
-	}
-	paidAt := time.Now()
-	payment.PaidAt = &paidAt
-	if err := payment.Validate(); err != nil {
-		return nil, apperror.New(400, err.Error(), err)
+	if order.Status != domain.StatusPending && order.Status != domain.StatusConfirm && order.Status != domain.StatusDelivery {
+		return nil, apperror.New(400, "Đơn không ở trạng thái có thể thanh toán", nil)
 	}
 
-	order, err := u.loadOrder(ctx, orgID, payment.OrderID)
-	if err != nil {
-		return nil, err
-	}
-	if order.Status == domain.StatusCancelled || order.Status == domain.StatusRefunded {
-		return nil, apperror.New(400, "Không thể thanh toán đơn đã hủy/hoàn", nil)
-	}
-	if order.Status == domain.StatusCompleted {
-		return nil, apperror.New(400, "Đơn hàng đã chốt, không thu thêm", nil)
-	}
-
-	// Idempotency: cùng cổng + mã giao dịch thì trả về bản ghi cũ.
-	if payment.Provider != nil && strings.TrimSpace(*payment.Provider) != "" &&
-		payment.ProviderTxnID != nil && strings.TrimSpace(*payment.ProviderTxnID) != "" {
-		existing, err := u.repo.FindPaymentByProviderTxn(ctx, strings.TrimSpace(*payment.Provider), strings.TrimSpace(*payment.ProviderTxnID))
-		if err != nil {
-			return nil, apperror.New(500, "Lỗi khi kiểm tra thanh toán", err)
-		}
-		if existing != nil {
-			return toPaymentResponse(existing), nil
-		}
-	}
-
-	if err := u.repo.CreatePayment(ctx, payment); err != nil {
-		log.Println("Error creating payment:", err)
-		if isUniqueViolation(err) {
-			if payment.Provider != nil && payment.ProviderTxnID != nil {
-				existing, findErr := u.repo.FindPaymentByProviderTxn(ctx, strings.TrimSpace(*payment.Provider), strings.TrimSpace(*payment.ProviderTxnID))
-				if findErr == nil && existing != nil {
-					return toPaymentResponse(existing), nil
-				}
-			}
-			return nil, apperror.New(400, "Giao dịch thanh toán đã tồn tại", err)
-		}
-		if errors.Is(err, domain.ErrOrderNotFound) {
-			return nil, apperror.New(404, "Không tìm thấy đơn hàng", err)
-		}
-		return nil, apperror.New(500, "Lỗi khi tạo thanh toán", err)
-	}
-
-	totalPaid, err := u.repo.GetTotalPaidByOrder(ctx, orgID, order.ID)
+	paidAmount, err := u.repo.GetTotalPaidByOrder(ctx, orgID, order.ID)
 	if err != nil {
 		return nil, apperror.New(500, "Lỗi khi tính tổng đã thu", err)
 	}
-	if totalPaid >= order.TotalAmount {
-		// Thu đủ thì chốt đơn luôn: trừ kho + nhả giữ chỗ + sổ sale + phiếu bán hàng.
-		// NOTE: thanh toán ở trên đã ghi nhận; nếu chốt lỗi (vd hết kho) thì đơn
-		// ở lại trạng thái cũ để nhân viên xử lý, tiền đã thu không mất.
-		if _, err := u.completeWithSlip(ctx, orgID, order, method.FundID); err != nil {
-			log.Println("Error auto-completing paid order:", err)
-			return nil, err
-		}
+	remaining := order.TotalAmount - paidAmount
+	if remaining < 0 {
+		remaining = 0
+	}
+	if remaining <= 0 {
+		return nil, apperror.New(400, "Đơn đã được thanh toán đủ", nil)
 	}
 
-	return toPaymentResponse(payment), nil
+	payment, err := u.repo.InitPayment(ctx, orgID, order.ID, remaining)
+	if err != nil {
+		log.Println("Error initializing payment:", err)
+		if errors.Is(err, domain.ErrOrderNotFound) {
+			return nil, apperror.New(404, "Không tìm thấy đơn hàng", err)
+		}
+		if errors.Is(err, domain.ErrOrderNotReady) {
+			return nil, apperror.New(400, "Đơn không ở trạng thái có thể thanh toán", err)
+		}
+		if errors.Is(err, domain.ErrPaymentNotPending) {
+			return nil, apperror.New(400, "Thanh toán đã được xác nhận trước đó", err)
+		}
+		return nil, apperror.New(500, "Lỗi khi khởi tạo thanh toán", err)
+	}
+
+	return &domain.InitPaymentResponse{
+		Payment:         toPaymentResponse(payment),
+		RemainingAmount: remaining,
+		TotalAmount:     order.TotalAmount,
+		PaidAmount:      paidAmount,
+		DiscountAmount:  order.DiscountAmount,
+	}, nil
+}
+
+// ConfirmPayment xác nhận payment đang chờ: server tự tính số tiền thu,
+// cộng giảm giá vào đơn và chốt đơn trong cùng transaction.
+func (u *OrderUsecase) ConfirmPayment(ctx context.Context, orderID, paymentID string, req *domain.ConfirmPaymentRequest) (*domain.ConfirmPaymentResponse, error) {
+	orderID, err := shared.RequireID(orderID, "Thiếu id đơn hàng")
+	if err != nil {
+		return nil, err
+	}
+	paymentID, err = shared.RequireID(paymentID, "Thiếu id thanh toán")
+	if err != nil {
+		return nil, err
+	}
+	orgID, err := shared.RequireOrgID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if req == nil {
+		return nil, apperror.New(400, "Thiếu dữ liệu xác nhận thanh toán", nil)
+	}
+	method := strings.TrimSpace(req.Method)
+	switch method {
+	case domain.PaymentMethodCash, domain.PaymentMethodBankTransfer, domain.PaymentMethodCard, domain.PaymentMethodGateway:
+	default:
+		return nil, apperror.New(400, "Phương thức thanh toán không hợp lệ (cash | bank_transfer | card | gateway)", nil)
+	}
+	if req.DiscountAmount < 0 {
+		return nil, apperror.New(400, "Giảm giá không được âm", nil)
+	}
+
+	order, err := u.loadOrder(ctx, orgID, orderID)
+	if err != nil {
+		return nil, err
+	}
+	payment, err := u.repo.GetPaymentByID(ctx, orgID, order.ID, paymentID)
+	if err != nil {
+		if errors.Is(err, domain.ErrPaymentNotFound) {
+			return nil, apperror.New(404, "Không tìm thấy thanh toán", err)
+		}
+		return nil, apperror.New(500, "Lỗi khi lấy thanh toán", err)
+	}
+
+	// Retry mạng sau khi đã chốt: trả lại kết quả cũ, không chốt lần 2.
+	if payment.Status == domain.PaymentStatusSucceeded {
+		if order.Status != domain.StatusCompleted {
+			return nil, apperror.New(400, "Thanh toán đã ghi nhận nhưng đơn chưa chốt", nil)
+		}
+		slip, err := u.repo.GetSaleSlipByOrder(ctx, orgID, order.ID)
+		if err != nil {
+			return nil, apperror.New(500, "Lỗi khi lấy phiếu bán hàng", err)
+		}
+		return &domain.ConfirmPaymentResponse{
+			Payment:      toPaymentResponse(payment),
+			Order:        toResponse(order),
+			DocumentID:   slip.DocumentID,
+			DocumentCode: slip.DocumentCode,
+		}, nil
+	}
+	if payment.Status != domain.PaymentStatusPending {
+		return nil, apperror.New(400, "Thanh toán không ở trạng thái chờ xác nhận", nil)
+	}
+	if order.Status != domain.StatusPending && order.Status != domain.StatusConfirm && order.Status != domain.StatusDelivery {
+		return nil, apperror.New(400, "Đơn không ở trạng thái có thể thanh toán", nil)
+	}
+
+	methodConfig, err := u.settings.GetPaymentMethodByID(ctx, orgID, req.MethodPaymentID)
+	if err != nil {
+		return nil, apperror.New(400, "Phương thức thanh toán không hợp lệ", err)
+	}
+
+	result, err := u.completeWithSlip(ctx, orgID, order, methodConfig.FundID, &domain.PaymentCompletion{
+		PaymentID:      payment.ID,
+		Method:         method,
+		Provider:       req.Provider,
+		ProviderTxnID:  req.ProviderTxnID,
+		DiscountAmount: req.DiscountAmount,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	updatedOrder, err := u.loadOrder(ctx, orgID, order.ID)
+	if err != nil {
+		return nil, apperror.New(500, "Lỗi khi lấy đơn hàng sau thanh toán", err)
+	}
+	updatedPayment, err := u.repo.GetPaymentByID(ctx, orgID, order.ID, payment.ID)
+	if err != nil {
+		return nil, apperror.New(500, "Lỗi khi lấy thanh toán sau xác nhận", err)
+	}
+
+	return &domain.ConfirmPaymentResponse{
+		Payment:      toPaymentResponse(updatedPayment),
+		Order:        toResponse(updatedOrder),
+		DocumentID:   result.DocumentID,
+		DocumentCode: result.DocumentCode,
+	}, nil
 }
 
 // ---------- 5. Gán lại NV thực hiện / vật tư tiêu hao ----------

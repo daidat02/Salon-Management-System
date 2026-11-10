@@ -18,6 +18,15 @@ var ErrOrderNotReady = errors.New("order not ready to serve")
 // ErrInsufficientStock dùng để usecase map 400 khi bán vượt tồn.
 var ErrInsufficientStock = errors.New("insufficient stock")
 
+// ErrPaymentNotFound dùng khi payment không thuộc đơn/tổ chức.
+var ErrPaymentNotFound = errors.New("payment not found")
+
+// ErrPaymentNotPending dùng khi payment đã được xác nhận trước đó.
+var ErrPaymentNotPending = errors.New("payment not pending")
+
+// ErrDiscountExceedsRemaining dùng khi giảm giá vượt số tiền còn thiếu.
+var ErrDiscountExceedsRemaining = errors.New("discount exceeds remaining amount")
+
 // StockDeduction lượng tồn cần trừ (số dương), repo tự đổi dấu khi ghi sổ bán.
 type StockDeduction struct {
 	ProductID string
@@ -33,8 +42,8 @@ type SaleSlipLine struct {
 
 // SaleSlipResult phiếu xuất vừa sinh cho đơn.
 type SaleSlipResult struct {
-	DocumentID   string
-	DocumentCode string
+	DocumentID   string `db:"document_id"`
+	DocumentCode string `db:"document_code"`
 }
 
 // ProductPricing giá tại thời điểm bán, đọc từ bảng products.
@@ -114,14 +123,18 @@ type OrderRepository interface {
 	// Hủy đơn chưa phục vụ: restores rỗng, chỉ nhả giữ chỗ.
 	ApplyCancel(ctx context.Context, orgID, orderID, newStatus string, restores []StockDeduction, releases []StockDeduction) error
 	// CompleteOrderWithSlip chốt đơn (pending/confirm/delivery -> completed):
-	// trừ kho thật + nhả giữ chỗ + ghi sổ sale + sinh phiếu bán hàng,
-	// tất cả 1 tx. appointmentID khác nil/rỗng thì lịch hẹn của đơn cũng được
-	// chuyển completed trong cùng tx. Trả về mã phiếu vừa sinh.
-	CompleteOrderWithSlip(ctx context.Context, orgID, orderID string, appointmentID *string, lines []SaleSlipLine, fundID string) (SaleSlipResult, error)
+	// cập nhật payment pending + giảm giá/total đơn + trừ kho thật + nhả giữ chỗ
+	// + ghi sổ sale + sinh phiếu bán hàng, tất cả 1 tx. appointmentID khác
+	// nil/rỗng thì lịch hẹn của đơn cũng được chuyển completed trong cùng tx.
+	// Trả về mã phiếu vừa sinh.
+	CompleteOrderWithSlip(ctx context.Context, orgID, orderID string, appointmentID *string, lines []SaleSlipLine, fundID string, confirmation *PaymentCompletion) (SaleSlipResult, error)
 	// 5. Thanh toán.
-	// FindPaymentByProviderTxn tìm theo cặp cổng/mã GD (idempotency), không thấy -> (nil, nil).
-	FindPaymentByProviderTxn(ctx context.Context, provider, txnID string) (*Payment, error)
-	CreatePayment(ctx context.Context, payment *Payment) error
+	// InitPayment tạo (hoặc trả lại) payment pending duy nhất của đơn.
+	InitPayment(ctx context.Context, orgID, orderID string, amount float64) (*Payment, error)
+	// GetPaymentByID tìm payment thuộc đúng đơn/tổ chức.
+	GetPaymentByID(ctx context.Context, orgID, orderID, paymentID string) (*Payment, error)
+	// GetSaleSlipByOrder trả phiếu bán hàng đã sinh cho đơn (nếu có).
+	GetSaleSlipByOrder(ctx context.Context, orgID, orderID string) (SaleSlipResult, error)
 	GetTotalPaidByOrder(ctx context.Context, orgID, orderID string) (float64, error)
 	UpdateOrderStatus(ctx context.Context, orgID, orderID, status string) error
 	// UpdateOrderCustomer gán/đổi khách hàng của đơn (customer_id nullable).

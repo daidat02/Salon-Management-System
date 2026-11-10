@@ -8,6 +8,7 @@ export const API_ENDPOINTS = {
     LOGIN: `${API_BASE}/login`,
     REGISTER: `${API_BASE}/register`,
     FORGOT_PASSWORD: `${API_BASE}/forgot-password`,
+    LOGOUT: `${API_BASE}/logout`,
   },
 
   CUSTOMERS: {
@@ -60,6 +61,8 @@ export const API_ENDPOINTS = {
     GET_WEEKLY_SCHEDULE: `${API_BASE}/appointments/weekly`,
     GET_APPOINTMENT_DETAIL: (id: string) => `${API_BASE}/appointments/${id}`,
     UPDATE_APPOINTMENT: (id: string) => `${API_BASE}/appointments/${id}`,
+    RESCHEDULE_APPOINTMENT: (id: string) => `${API_BASE}/appointments/${id}/reschedule`,
+    CANCEL_APPOINTMENT: (id: string) => `${API_BASE}/appointments/${id}/cancel`,
   },
 
   SETTINGS: {
@@ -85,6 +88,14 @@ export const API_ENDPOINTS = {
     GET_FUND_HISTORY: `${API_BASE}/funds/history`,
   },
 
+  REPORTS: {
+    GET_REVENUE: `${API_BASE}/reports/revenue`,
+  },
+
+  ANALYTICS: {
+    GET_OVERVIEW: `${API_BASE}/overview`,
+  },
+
   ORDERS: {
     GET_ORDERS: `${API_BASE}/orders`,
     GET_ORDER_STATS: `${API_BASE}/orders/stats`,
@@ -100,7 +111,9 @@ export const API_ENDPOINTS = {
     SAVE_ORDER_MATERIALS: `${API_BASE}/orders/materials`,
     UPDATE_ORDER_CUSTOMER: (orderId: string) => `${API_BASE}/orders/${orderId}/customer`,
 
-    CREATE_PAYMENT: (orderId: string) => `${API_BASE}/orders/${orderId}/payments`,
+    INIT_PAYMENT: (orderId: string) => `${API_BASE}/orders/${orderId}/payments/init`,
+    CONFIRM_PAYMENT: (orderId: string, paymentId: string) =>
+      `${API_BASE}/orders/${orderId}/payments/${paymentId}/confirm`,
     CANCEL_ORDER: (orderId: string) => `${API_BASE}/orders/${orderId}/cancel`,
     REFUND_ORDER: (orderId: string) => `${API_BASE}/orders/${orderId}/refund`,
   },

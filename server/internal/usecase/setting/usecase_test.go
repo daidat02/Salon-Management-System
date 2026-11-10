@@ -30,7 +30,7 @@ func TestSettingUseCase_GetGeneralSettings(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.Equal(t, "Salon A", res.Organization.Name)
-		assert.Len(t, res.WorkingHours, 7)
+		assert.Len(t, res.WorkingHours.Days, 7)
 		repo.AssertExpectations(t)
 	})
 
@@ -462,7 +462,7 @@ func TestSettingUseCase_UpdateGeneralSettings(t *testing.T) {
 	t.Run("Thất bại - thiếu ngày làm việc", func(t *testing.T) {
 		uc := NewSettingUseCase(new(MockSettingRepository))
 		req := valid()
-		req.WorkingHours = req.WorkingHours[:6]
+		req.WorkingHours.Days = req.WorkingHours.Days[:6]
 
 		res, err := uc.UpdateGeneralSettings(withOrgCtx("org-123"), req)
 
@@ -475,8 +475,8 @@ func TestSettingUseCase_UpdateGeneralSettings(t *testing.T) {
 	t.Run("Thất bại - giờ đóng trước giờ mở", func(t *testing.T) {
 		uc := NewSettingUseCase(new(MockSettingRepository))
 		req := valid()
-		req.WorkingHours[0].OpenTime = "20:00"
-		req.WorkingHours[0].CloseTime = "08:00"
+		req.WorkingHours.OpenTimeMinutes = 20 * 60
+		req.WorkingHours.CloseTimeMinutes = 8 * 60
 
 		res, err := uc.UpdateGeneralSettings(withOrgCtx("org-123"), req)
 

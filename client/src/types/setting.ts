@@ -16,16 +16,20 @@ export type OrganizationInfo = {
 export type WorkingHourDay = {
   weekday: number;
   is_open: boolean;
-  open_time: string;
-  close_time: string;
-  break_start: string | null;
-  break_end: string | null;
-  note: string | null;
+};
+
+/** Khung giờ dùng chung; các mốc tính bằng số phút từ 00:00. */
+export type WorkingHours = {
+  open_time_minutes: number;
+  close_time_minutes: number;
+  break_start_minutes: number | null;
+  break_end_minutes: number | null;
+  days: WorkingHourDay[];
 };
 
 export type GeneralSettingsResponse = {
   organization: OrganizationInfo;
-  working_hours: WorkingHourDay[];
+  working_hours: WorkingHours;
 };
 
 export type ReceiptSettings = {

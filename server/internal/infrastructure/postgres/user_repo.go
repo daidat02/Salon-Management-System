@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 
 	userDomain "github.com/daidat02/server/internal/domain/user"
 	"github.com/jackc/pgx/v5"
@@ -41,13 +40,17 @@ func (r *PostgresUserRepository) CreateUser(ctx context.Context, orgID string, u
 }
 
 func (r *PostgresUserRepository) FindUserByPhoneNumber(ctx context.Context, phoneNumber string) (*userDomain.User, error) {
+	return r.findOne(ctx, findUserByPhoneNumberQuery, phoneNumber)
+}
+
+func (r *PostgresUserRepository) FindUserByID(ctx context.Context, userID string) (*userDomain.User, error) {
+	return r.findOne(ctx, findUserByIDQuery, userID)
+}
+
+func (r *PostgresUserRepository) findOne(ctx context.Context, query string, arg string) (*userDomain.User, error) {
 	u := &userDomain.User{}
 	var email sql.NullString
-	err := r.db.QueryRow(
-		ctx,
-		findUserByPhoneNumberQuery,
-		phoneNumber,
-	).Scan(
+	err := r.db.QueryRow(ctx, query, arg).Scan(
 		&u.ID,
 		&u.OrganizationID,
 		&email,
@@ -64,7 +67,6 @@ func (r *PostgresUserRepository) FindUserByPhoneNumber(ctx context.Context, phon
 		u.Email = email.String
 	}
 	if err != nil {
-		fmt.Printf("DEBUG SQL ERROR: %+v\n", err)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}

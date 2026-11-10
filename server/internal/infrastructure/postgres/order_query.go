@@ -79,7 +79,7 @@ const (
 	listOrderPaymentsQuery = `
 		SELECT id, organization_id, order_id, method, provider, provider_txn_id, amount, status, paid_at, created_at
 		FROM payments
-		WHERE organization_id = $1 AND order_id = $2
+		WHERE organization_id = $1 AND order_id = $2 AND status = 'succeeded'
 		ORDER BY created_at ASC
 	`
 
@@ -195,14 +195,66 @@ const (
 	`
 
 	// ---------- 5. Thanh toán ----------
-	findPaymentByProviderTxnQuery = `
-		SELECT id, organization_id, order_id, method, provider, provider_txn_id, amount, status, paid_at, created_at
-		FROM payments
-		WHERE provider = $1 AND provider_txn_id = $2
-	`
 	createPaymentQuery = `
 		INSERT INTO payments (id, organization_id, order_id, method, provider, provider_txn_id, amount, status, paid_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+	`
+	findPendingPaymentByOrderQuery = `
+		SELECT id, organization_id, order_id, method, provider, provider_txn_id, amount, status, paid_at, created_at
+		FROM payments
+		WHERE organization_id = $1 AND order_id = $2 AND status = 'pending'
+		ORDER BY created_at DESC
+		LIMIT 1
+	`
+	findLatestFailedPaymentByOrderQuery = `
+		SELECT id, organization_id, order_id, method, provider, provider_txn_id, amount, status, paid_at, created_at
+		FROM payments
+		WHERE organization_id = $1 AND order_id = $2 AND status = 'failed'
+		ORDER BY created_at DESC
+		LIMIT 1
+	`
+	getPaymentByIDQuery = `
+		SELECT id, organization_id, order_id, method, provider, provider_txn_id, amount, status, paid_at, created_at
+		FROM payments
+		WHERE organization_id = $1 AND order_id = $2 AND id = $3
+	`
+	resetPaymentToPendingQuery = `
+		UPDATE payments
+		SET method = 'cash', provider = NULL, provider_txn_id = NULL,
+		    amount = $4, status = 'pending', paid_at = NULL
+		WHERE organization_id = $1 AND order_id = $2 AND id = $3
+		  AND status IN ('pending', 'failed')
+	`
+	lockPaymentRowQuery = `
+		SELECT status
+		FROM payments
+		WHERE organization_id = $1 AND order_id = $2 AND id = $3
+		FOR UPDATE
+	`
+	orderAmountsQuery = `
+		SELECT subtotal_amount, discount_amount, total_amount
+		FROM orders
+		WHERE organization_id = $1 AND id = $2
+	`
+	updateOrderDiscountQuery = `
+		UPDATE orders
+		SET discount_amount = $3, total_amount = $4, updated_at = now()
+		WHERE organization_id = $1 AND id = $2
+	`
+	confirmPaymentQuery = `
+		UPDATE payments
+		SET method = $4, provider = $5, provider_txn_id = $6, amount = $7,
+		    status = 'succeeded', paid_at = now()
+		WHERE organization_id = $1 AND order_id = $2 AND id = $3
+		  AND status = 'pending'
+	`
+	getSaleSlipByOrderQuery = `
+		SELECT id AS document_id, document_code
+		FROM inventory_documents
+		WHERE organization_id = $1 AND order_id = $2
+		  AND type = 'sale' AND status = 'completed'
+		ORDER BY created_at DESC
+		LIMIT 1
 	`
 	totalPaidByOrderQuery = `
 		SELECT COALESCE(SUM(amount), 0)

@@ -12,7 +12,7 @@ import {
   YAxis,
 } from 'recharts';
 import { formatVND } from '@/lib/format';
-import type { MonthlyReportPoint } from '../lib/report-data';
+import type { MonthlyReportPoint } from '@/types/report';
 
 type RevenueProfitChartProps = {
   points: MonthlyReportPoint[];

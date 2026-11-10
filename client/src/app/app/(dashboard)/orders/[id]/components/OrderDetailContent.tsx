@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
-import { Link, Pencil, Printer, Undo2, X } from 'lucide-react';
+import { Pencil, Printer, Undo2, X } from 'lucide-react';
 import PageHeading from '@/components/dashboard/PageHeading';
 import { DashDialog } from '@/components/dashboard/DashDialog';
 import { Button } from '@/components/ui/button';
@@ -22,6 +22,10 @@ import {
   type SaveOrderMaterialPayload,
 } from '@/services/order';
 import useOrderDetail from '@/hooks/use-order-detail';
+import { useGeneralSettings, usePaymentSettings } from '@/hooks/use-settings';
+import { useAppSelector } from '@/store/hook';
+import { selectAuthUser } from '@/store/slices/authSlice';
+import { printInvoice } from '@/lib/invoice';
 import useCustomer from '@/hooks/use-customer';
 import useService from '@/hooks/use-service';
 import useProduct from '@/hooks/use-product';
@@ -75,6 +79,9 @@ export default function OrderDetailContent() {
   const { data: serviceData } = useService({ page: 1, pageSize: 100 });
   const { data: productData } = useProduct({ page: 1, pageSize: 100 });
   const { data: staffData } = useStaff({ page: 1, pageSize: 100 });
+  const { data: generalSettings } = useGeneralSettings();
+  const { data: paymentSettings } = usePaymentSettings();
+  const authUser = useAppSelector(selectAuthUser);
 
   const services = React.useMemo(() => toMap<Service>(serviceData?.data ?? []), [serviceData]);
   const products = React.useMemo(() => toMap<Product>(productData?.data ?? []), [productData]);
@@ -529,6 +536,42 @@ export default function OrderDetailContent() {
   // Chỉ đơn chờ/xác nhận mới sửa được (thêm món qua POS) — khớp guard backend.
   const canEditOrder = order.status === 'pending' || order.status === 'confirm';
 
+  const handlePrintInvoice = () => {
+    const lines = detail.items.map((item) => {
+      const service = item.service_id ? services.get(item.service_id) : undefined;
+      const product = item.product_id ? products.get(item.product_id) : undefined;
+      return {
+        name:
+          service?.name ??
+          product?.name ??
+          (item.item_type === 'service' ? 'Dịch vụ' : 'Sản phẩm'),
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        line_total: item.line_total,
+      };
+    });
+
+    const opened = printInvoice({
+      order,
+      lines,
+      payments: detail.payments,
+      organization: generalSettings?.organization,
+      receipt: paymentSettings?.receipt,
+      customer: enriched.customer
+        ? { full_name: enriched.customer.full_name, phone: enriched.customer.phone }
+        : undefined,
+      cashierName: authUser?.full_name,
+    });
+
+    if (!opened) {
+      toast.add({
+        title: 'Không mở được cửa sổ in',
+        description: 'Trình duyệt đang chặn popup. Vui lòng cho phép popup rồi thử lại.',
+        type: 'error',
+      });
+    }
+  };
+
   return (
     <div className="space-y-4">
       <PageHeading
@@ -547,7 +590,7 @@ export default function OrderDetailContent() {
           </p>
         }
         actions={[
-          { label: 'In hóa đơn', icon: Printer, variant: 'outline', onClick: () => window.print() },
+          { label: 'In hóa đơn', icon: Printer, variant: 'outline', onClick: handlePrintInvoice },
           ...(order.status === 'pending' || order.status === 'confirm'
             ? [
                 {

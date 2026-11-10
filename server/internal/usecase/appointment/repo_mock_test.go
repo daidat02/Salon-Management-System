@@ -109,6 +109,24 @@ func (m *MockSettingsRepository) CountCustomerNoShows(ctx context.Context, orgID
 	return args.Get(0).(int), args.Error(1)
 }
 
+func (m *MockSettingsRepository) GetBusinessHours(ctx context.Context, orgID string) (*domain.BusinessHours, error) {
+	args := m.Called(ctx, orgID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*domain.BusinessHours), args.Error(1)
+}
+
+func (m *MockSettingsRepository) CountActiveAppointmentsInSlot(ctx context.Context, orgID string, start, end time.Time, excludeAppointmentID string) (int, error) {
+	args := m.Called(ctx, orgID, start, end, excludeAppointmentID)
+	return args.Get(0).(int), args.Error(1)
+}
+
+func (m *MockSettingsRepository) CountCustomerCancellations(ctx context.Context, orgID, customerID string, since time.Time) (int, error) {
+	args := m.Called(ctx, orgID, customerID, since)
+	return args.Get(0).(int), args.Error(1)
+}
+
 // MockCustomerFinder giả lập CustomerFinder (find-or-create customer theo phone).
 type MockCustomerFinder struct {
 	mock.Mock

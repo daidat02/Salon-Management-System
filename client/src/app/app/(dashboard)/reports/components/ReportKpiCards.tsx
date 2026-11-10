@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { cn } from 'cn';
 import { formatPlain } from '@/lib/format';
-import type { ReportKpi } from '../lib/report-data';
+import type { ReportKpi } from '@/types/report';
 
 type ReportKpiCardsProps = {
   kpi: ReportKpi;

@@ -311,39 +311,64 @@ func (h *OrderHandler) CompleteOrder(c *gin.Context) {
 	response.Success(c, 200, "Chốt đơn hàng thành công", result)
 }
 
-// CreatePayment godoc
-// @Summary      Ghi nhận thanh toán cho đơn (idempotent theo mã giao dịch)
+// InitPayment godoc
+// @Summary      Khởi tạo (hoặc lấy lại) payment đang chờ của đơn
+// @Tags         Orders
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id    path      string  true  "ID đơn hàng"
+// @Success      200   {object}  response.SuccessResponse  "Payment đang chờ xác nhận"
+// @Failure      400   {object}  response.ErrorResponse    "Đơn không thể thanh toán / đã thanh toán đủ"
+// @Failure      401   {object}  response.ErrorResponse    "Thiếu token / token không hợp lệ"
+// @Failure      404   {object}  response.ErrorResponse    "Không tìm thấy đơn hàng"
+// @Router       /orders/{id}/payments/init [post]
+func (h *OrderHandler) InitPayment(c *gin.Context) {
+	id := c.Param("id")
+
+	result, err := h.uc.InitPayment(c.Request.Context(), id)
+	if err != nil {
+		log.Println("Error initializing payment:", err)
+		response.Error(c, err)
+		c.Abort()
+		return
+	}
+	response.Success(c, 200, "Khởi tạo thanh toán thành công", result)
+}
+
+// ConfirmPayment godoc
+// @Summary      Xác nhận thanh toán và chốt đơn trong 1 transaction
 // @Tags         Orders
 // @Accept       json
 // @Produce      json
 // @Security     BearerAuth
-// @Param        id    path      string                      true  "ID đơn hàng"
-// @Param        body  body      domain.CreatePaymentRequest  true  "Thông tin thanh toán"
-// @Success      200   {object}  response.SuccessResponse     "Ghi nhận thanh toán thành công"
-// @Failure      400   {object}  response.ErrorResponse       "Dữ liệu không hợp lệ / đơn đã hủy"
-// @Failure      401   {object}  response.ErrorResponse       "Thiếu token / token không hợp lệ"
-// @Failure      404   {object}  response.ErrorResponse       "Không tìm thấy đơn hàng"
-// @Router       /orders/{id}/payments [post]
-func (h *OrderHandler) CreatePayment(c *gin.Context) {
+// @Param        id         path      string                          true  "ID đơn hàng"
+// @Param        paymentId  path      string                          true  "ID payment đang chờ"
+// @Param        body       body      domain.ConfirmPaymentRequest    true  "Phương thức, giảm giá"
+// @Success      200        {object}  response.SuccessResponse        "Đã thu tiền và chốt đơn"
+// @Failure      400        {object}  response.ErrorResponse          "Dữ liệu không hợp lệ / giảm giá vượt số còn thiếu"
+// @Failure      401        {object}  response.ErrorResponse          "Thiếu token / token không hợp lệ"
+// @Failure      404        {object}  response.ErrorResponse          "Không tìm thấy đơn hàng / thanh toán"
+// @Router       /orders/{id}/payments/{paymentId}/confirm [post]
+func (h *OrderHandler) ConfirmPayment(c *gin.Context) {
 	id := c.Param("id")
+	paymentID := c.Param("paymentId")
 
-	var req domain.CreatePaymentRequest
+	var req domain.ConfirmPaymentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		log.Println("Error creating payment:", err)
-
+		log.Println("Error confirming payment:", err)
 		response.Error(c, apperror.New(400, "Dữ liệu không hợp lệ", err))
 		c.Abort()
 		return
 	}
 
-	result, err := h.uc.CreatePayment(c.Request.Context(), id, &req)
+	result, err := h.uc.ConfirmPayment(c.Request.Context(), id, paymentID, &req)
 	if err != nil {
-		log.Println("Error creating payment:", err)
+		log.Println("Error confirming payment:", err)
 		response.Error(c, err)
 		c.Abort()
 		return
 	}
-	response.Success(c, 200, "Ghi nhận thanh toán thành công", result)
+	response.Success(c, 200, "Thu tiền và chốt đơn thành công", result)
 }
 
 // ReplaceStaffOrderItems godoc

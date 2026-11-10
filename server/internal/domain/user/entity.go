@@ -6,31 +6,31 @@ import (
 
 	apperror "github.com/daidat02/server/pkg/apperror"
 )
+
 const (
-	StatusActive = "active"
+	StatusActive   = "active"
 	StatusInactive = "inactive"
 	// Roles
-	RoleOwner = "owner"
-	RoleManager = "manager"
+	RoleOwner        = "owner"
+	RoleManager      = "manager"
 	RoleReceptionist = "receptionist"
 )
 
-type User struct{
-	ID string
+type User struct {
+	ID             string
 	OrganizationID string
-	Email string
-	Password string
-	FullName string
-	Phone string
-	Role string
-	Status string
-	LastLoginAt *time.Time
-	CreatedAt *time.Time
-	UpdatedAt *time.Time
+	Email          string
+	Password       string
+	FullName       string
+	Phone          string
+	Role           string
+	Status         string
+	LastLoginAt    *time.Time
+	CreatedAt      *time.Time
+	UpdatedAt      *time.Time
 }
 
-
-func (user *User) Validate( ) error {
+func (user *User) Validate() error {
 	if user.Password == "" {
 		return apperror.New(http.StatusBadRequest, "Mật khẩu không được để trống", nil)
 	}
@@ -47,4 +47,17 @@ func (user *User) Validate( ) error {
 		return apperror.New(http.StatusBadRequest, "Lỗi: Trạng thái không hợp lệ", nil)
 	}
 	return nil
+}
+
+type RefreshToken struct {
+	ID           string     `json:"id" db:"id"`
+	UserID       string     `json:"user_id" db:"user_id"`
+	FamilyID     string     `json:"family_id" db:"family_id"`
+	TokenHash    string     `json:"token_hash" db:"token_hash"`
+	ExpiresAt    time.Time  `json:"expires_at" db:"expires_at"`
+	CreatedAt    *time.Time `json:"created_at" db:"created_at"`
+	RevokedAt    *time.Time `json:"revoked_at,omitempty" db:"revoked_at"`
+	ReplacedByID *string    `json:"replaced_by_id,omitempty" db:"replaced_by_id"`
+	UserAgent    *string    `json:"user_agent,omitempty" db:"user_agent"`
+	IP           *string    `json:"ip,omitempty" db:"ip"`
 }

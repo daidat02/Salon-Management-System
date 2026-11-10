@@ -46,12 +46,21 @@ func NewAppointmentUseCase(repo domain.AppoimentRepository, customerFinder domai
 
 // parseAppointmentTime chấp nhận ISO8601 và 2 format phổ biến của client.
 func parseAppointmentTime(s string) (time.Time, bool) {
-	for _, layout := range []string{
-		time.RFC3339,
-		"2006-01-02 15:04:05",
-		"2006-01-02",
-	} {
-		if t, err := time.Parse(layout, strings.TrimSpace(s)); err == nil {
+	return parseAppointmentTimeIn(s, time.Local)
+}
+
+// parseAppointmentTimeIn giữ nguyên thời điểm tuyệt đối cho input có Z/offset;
+// input thiếu offset được hiểu theo timezone của salon.
+func parseAppointmentTimeIn(s string, loc *time.Location) (time.Time, bool) {
+	s = strings.TrimSpace(s)
+	if t, err := time.Parse(time.RFC3339, s); err == nil {
+		return t, true
+	}
+	if loc == nil {
+		loc = time.Local
+	}
+	for _, layout := range []string{"2006-01-02 15:04:05", "2006-01-02"} {
+		if t, err := time.ParseInLocation(layout, s, loc); err == nil {
 			return t, true
 		}
 	}
@@ -72,14 +81,24 @@ func (u *AppointmentUseCase) CreateAppointment(ctx context.Context, req *domain.
 	}
 
 	// Giá trị mặc định theo schema khi client không gửi.
-	if strings.TrimSpace(req.Status) == "" {
-		req.Status = "pending"
-	}
 	if strings.TrimSpace(req.Source) == "" {
 		req.Source = "online"
 	}
 	if strings.TrimSpace(req.DepositStatus) == "" {
 		req.DepositStatus = "none"
+	}
+
+	// Đọc cấu hình sớm để quyết định trạng thái ban đầu + cưỡng chế quy tắc đặt lịch.
+	settings, err := u.loadAppointmentSettings(ctx, orgId)
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(req.Status) == "" {
+		if settings != nil && settings.AutoConfirm {
+			req.Status = "confirmed"
+		} else {
+			req.Status = "pending"
+		}
 	}
 
 	// Validate request trước mọi tác động DB để không tạo customer mồ côi.
@@ -92,16 +111,27 @@ func (u *AppointmentUseCase) CreateAppointment(ctx context.Context, req *domain.
 		return nil, apperror.New(400, "Số điện thoại khách hàng không được để trống", nil)
 	}
 
-	start, ok := parseAppointmentTime(req.StartTime)
+	hours, err := u.loadBusinessHours(ctx, orgId)
+	if err != nil {
+		return nil, err
+	}
+	loc, _ := hours.Location()
+
+	start, ok := parseAppointmentTimeIn(req.StartTime, loc)
 	if !ok {
 		return nil, apperror.New(400, "Thời gian bắt đầu không hợp lệ (dùng ISO8601)", nil)
 	}
-	end, ok := parseAppointmentTime(req.EndTime)
+	end, ok := parseAppointmentTimeIn(req.EndTime, loc)
 	if !ok {
 		return nil, apperror.New(400, "Thời gian kết thúc không hợp lệ (dùng ISO8601)", nil)
 	}
 	if !end.After(start) {
 		return nil, apperror.New(400, "Thời gian kết thúc phải sau thời gian bắt đầu", nil)
+	}
+
+	if err := u.enforceBookingRules(ctx, orgId, settings, hours, start, end, time.Now(), ""); err != nil {
+		log.Println("Error enforcing booking rules:", err)
+		return nil, err
 	}
 
 	items, err := u.buildAppointmentItems(orgId, "", req.Items)
@@ -150,7 +180,7 @@ func (u *AppointmentUseCase) CreateAppointment(ctx context.Context, req *domain.
 		item.AppointmentID = appointment.ID
 	}
 
-	if err := u.applyDepositRule(ctx, orgId, customerID, total, appointment); err != nil {
+	if err := u.applyDepositRule(ctx, orgId, customerID, total, appointment, settings); err != nil {
 		return nil, err
 	}
 
@@ -205,16 +235,35 @@ func (u *AppointmentUseCase) UpdateAppointment(ctx context.Context, id string, r
 		return nil, apperror.New(400, "Số điện thoại khách hàng không được để trống", nil)
 	}
 
-	start, ok := parseAppointmentTime(req.StartTime)
+	hours, err := u.loadBusinessHours(ctx, orgID)
+	if err != nil {
+		return nil, err
+	}
+	loc, _ := hours.Location()
+
+	start, ok := parseAppointmentTimeIn(req.StartTime, loc)
 	if !ok {
 		return nil, apperror.New(400, "Thời gian bắt đầu không hợp lệ (dùng ISO8601)", nil)
 	}
-	end, ok := parseAppointmentTime(req.EndTime)
+	end, ok := parseAppointmentTimeIn(req.EndTime, loc)
 	if !ok {
 		return nil, apperror.New(400, "Thời gian kết thúc không hợp lệ (dùng ISO8601)", nil)
 	}
 	if !end.After(start) {
 		return nil, apperror.New(400, "Thời gian kết thúc phải sau thời gian bắt đầu", nil)
+	}
+
+	// Chỉ cưỡng chế quy tắc thời gian khi giờ hẹn thực sự đổi, tránh chặn sửa
+	// lịch cũ đã qua giờ.
+	previousStart, hasPrevious := parseAppointmentTime(existing.StartTime)
+	if !hasPrevious || !start.Equal(previousStart) {
+		settings, err := u.loadAppointmentSettings(ctx, orgID)
+		if err != nil {
+			return nil, err
+		}
+		if err := u.enforceBookingRules(ctx, orgID, settings, hours, start, end, time.Now(), id); err != nil {
+			return nil, err
+		}
 	}
 
 	items, err := u.buildAppointmentItems(orgID, id, req.Items)
@@ -377,23 +426,68 @@ func (u *AppointmentUseCase) resolveCustomerID(ctx context.Context, orgID, name,
 	return newCustomer.ID, nil
 }
 
-// applyDepositRule buộc khách có nhiều lần no_show phải cọc cho lần đặt kế tiếp.
-// Số tiền cọc do server tính từ cấu hình, không tin client gửi lên.
-func (u *AppointmentUseCase) applyDepositRule(ctx context.Context, orgID, customerID string, total float64, appointment *domain.Appointment) error {
+// loadAppointmentSettings đọc cấu hình đặt lịch; chưa có thì dùng default.
+// Trả nil khi usecase không được cấu hình settingsRepo (vd test cũ).
+func (u *AppointmentUseCase) loadAppointmentSettings(ctx context.Context, orgID string) (*domain.AppointmentSettings, error) {
 	if u.settingsRepo == nil {
-		return nil
+		return nil, nil
 	}
 
 	settings, err := u.settingsRepo.GetAppointmentSettings(ctx, orgID)
 	if err != nil {
 		if errors.Is(err, domain.ErrAppointmentSettingsNotFound) {
-			settings = domain.DefaultAppointmentSettings(orgID)
-		} else {
-			log.Println("Error getting appointment settings:", err)
-			return apperror.New(500, "Lỗi khi lấy cấu hình đặt lịch", err)
+			return domain.DefaultAppointmentSettings(orgID), nil
+		}
+		log.Println("Error getting appointment settings:", err)
+		return nil, apperror.New(500, "Lỗi khi lấy cấu hình đặt lịch", err)
+	}
+	if settings == nil {
+		return domain.DefaultAppointmentSettings(orgID), nil
+	}
+	return settings, nil
+}
+
+// loadBusinessHours đọc giờ làm việc + timezone salon. Trả nil khi usecase
+// không có settingsRepo (test cũ) hoặc org chưa cấu hình.
+func (u *AppointmentUseCase) loadBusinessHours(ctx context.Context, orgID string) (*domain.BusinessHours, error) {
+	if u.settingsRepo == nil {
+		return nil, nil
+	}
+	hours, err := u.settingsRepo.GetBusinessHours(ctx, orgID)
+	if err != nil {
+		log.Println("Error getting business hours:", err)
+		return nil, apperror.New(500, "Lỗi khi lấy giờ làm việc", err)
+	}
+	return hours, nil
+}
+
+// enforceBookingRules kiểm tra giờ làm việc, hạn đặt lịch và sức chứa khung giờ.
+func (u *AppointmentUseCase) enforceBookingRules(ctx context.Context, orgID string, settings *domain.AppointmentSettings, hours *domain.BusinessHours, start, end, now time.Time, excludeAppointmentID string) error {
+	if settings == nil {
+		return nil
+	}
+
+	if err := settings.ValidateBookingTime(start, end, now, hours); err != nil {
+		return apperror.New(400, err.Error(), err)
+	}
+
+	if settings.MaxPerSlot > 0 {
+		count, err := u.settingsRepo.CountActiveAppointmentsInSlot(ctx, orgID, start, end, excludeAppointmentID)
+		if err != nil {
+			log.Println("Error counting appointments in slot:", err)
+			return apperror.New(500, "Lỗi khi kiểm tra khung giờ", err)
+		}
+		if count >= settings.MaxPerSlot {
+			return apperror.New(400, fmt.Sprintf("Khung giờ này đã đủ %d lịch hẹn", settings.MaxPerSlot), nil)
 		}
 	}
 
+	return nil
+}
+
+// applyDepositRule buộc khách có nhiều lần no_show phải cọc cho lần đặt kế tiếp.
+// Số tiền cọc do server tính từ cấu hình, không tin client gửi lên.
+func (u *AppointmentUseCase) applyDepositRule(ctx context.Context, orgID, customerID string, total float64, appointment *domain.Appointment, settings *domain.AppointmentSettings) error {
 	if settings == nil || !settings.DepositEnabled {
 		return nil
 	}
@@ -467,16 +561,16 @@ func (u *AppointmentUseCase) GetAppointments(ctx context.Context, page, pageSize
 // weekDayLabels nhãn thứ theo thứ tự từ Thứ 2 đến Chủ nhật.
 var weekDayLabels = []string{"Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "Chủ nhật"}
 
-// parseWeekStart chấp nhận YYYY-MM-DD (giờ server) hoặc ISO8601 (giữ offset client gửi).
-func parseWeekStart(raw string) (time.Time, *time.Location, bool) {
+// parseWeekStart chấp nhận YYYY-MM-DD hoặc ISO8601; luôn quy về timezone salon.
+func parseWeekStart(raw string, loc *time.Location) (time.Time, bool) {
 	raw = strings.TrimSpace(raw)
-	if t, err := time.Parse("2006-01-02", raw); err == nil {
-		return t, time.Local, true
+	if t, err := time.ParseInLocation("2006-01-02", raw, loc); err == nil {
+		return t, true
 	}
 	if t, err := time.Parse(time.RFC3339, raw); err == nil {
-		return t, t.Location(), true
+		return t.In(loc), true
 	}
-	return time.Time{}, nil, false
+	return time.Time{}, false
 }
 
 // GetWeeklySchedule trả lịch hẹn của tuần, tách theo 7 ngày (luôn đủ 7 phần tử).
@@ -486,14 +580,18 @@ func (u *AppointmentUseCase) GetWeeklySchedule(ctx context.Context, weekStartRaw
 		return nil, err
 	}
 
-	loc := time.Local
+	hours, err := u.loadBusinessHours(ctx, orgID)
+	if err != nil {
+		return nil, err
+	}
+	loc, _ := hours.Location()
+
 	base := time.Now().In(loc)
 	if strings.TrimSpace(weekStartRaw) != "" {
-		t, parsedLoc, ok := parseWeekStart(weekStartRaw)
+		t, ok := parseWeekStart(weekStartRaw, loc)
 		if !ok {
 			return nil, apperror.New(400, "week_start không hợp lệ (dùng YYYY-MM-DD hoặc ISO8601)", nil)
 		}
-		loc = parsedLoc
 		base = t
 	}
 
@@ -584,11 +682,17 @@ func (u *AppointmentUseCase) RescheduleAppointment(ctx context.Context, id, star
 		return nil, err
 	}
 
-	start, ok := parseAppointmentTime(startTime)
+	hours, err := u.loadBusinessHours(ctx, orgID)
+	if err != nil {
+		return nil, err
+	}
+	loc, _ := hours.Location()
+
+	start, ok := parseAppointmentTimeIn(startTime, loc)
 	if !ok {
 		return nil, apperror.New(400, "Thời gian bắt đầu không hợp lệ (dùng ISO8601)", nil)
 	}
-	end, ok := parseAppointmentTime(endTime)
+	end, ok := parseAppointmentTimeIn(endTime, loc)
 	if !ok {
 		return nil, apperror.New(400, "Thời gian kết thúc không hợp lệ (dùng ISO8601)", nil)
 	}
@@ -605,6 +709,27 @@ func (u *AppointmentUseCase) RescheduleAppointment(ctx context.Context, id, star
 	}
 	if !domain.ReschedulableStatuses[appointment.Status] {
 		return nil, apperror.New(400, fmt.Sprintf("Không thể đổi lịch đang ở trạng thái %s", appointment.Status), nil)
+	}
+
+	settings, err := u.loadAppointmentSettings(ctx, orgID)
+	if err != nil {
+		return nil, err
+	}
+	if settings != nil {
+		if !settings.AllowReschedule {
+			return nil, apperror.New(400, "Salon không cho phép đổi lịch", nil)
+		}
+		if settings.RescheduleBeforeHrs > 0 {
+			if previousStart, ok := parseAppointmentTime(appointment.StartTime); ok {
+				cutoff := previousStart.Add(-time.Duration(settings.RescheduleBeforeHrs) * time.Hour)
+				if time.Now().After(cutoff) {
+					return nil, apperror.New(400, fmt.Sprintf("Chỉ được đổi lịch trước ít nhất %d giờ", settings.RescheduleBeforeHrs), nil)
+				}
+			}
+		}
+		if err := u.enforceBookingRules(ctx, orgID, settings, hours, start, end, time.Now(), id); err != nil {
+			return nil, err
+		}
 	}
 
 	if err := u.repo.UpdateAppointmentTimes(ctx, orgID, id, startTime, endTime); err != nil {
@@ -638,6 +763,41 @@ func (u *AppointmentUseCase) CancelAppointment(ctx context.Context, id, reason s
 	}
 	if !domain.CancellableStatuses[appointment.Status] {
 		return nil, apperror.New(400, fmt.Sprintf("Không thể hủy lịch đang ở trạng thái %s", appointment.Status), nil)
+	}
+
+	settings, err := u.loadAppointmentSettings(ctx, orgID)
+	if err != nil {
+		return nil, err
+	}
+	if settings != nil {
+		if !settings.AllowCancel {
+			return nil, apperror.New(400, "Salon không cho phép hủy lịch", nil)
+		}
+		if settings.CancelBeforeHours > 0 {
+			if startAt, ok := parseAppointmentTime(appointment.StartTime); ok {
+				cutoff := startAt.Add(-time.Duration(settings.CancelBeforeHours) * time.Hour)
+				if time.Now().After(cutoff) {
+					return nil, apperror.New(400, fmt.Sprintf("Chỉ được hủy lịch trước ít nhất %d giờ", settings.CancelBeforeHours), nil)
+				}
+			}
+		}
+		if settings.MaxCancellations > 0 && strings.TrimSpace(appointment.CustomerID) != "" {
+			hours, err := u.loadBusinessHours(ctx, orgID)
+			if err != nil {
+				return nil, err
+			}
+			loc, _ := hours.Location()
+			nowLocal := time.Now().In(loc)
+			monthStart := time.Date(nowLocal.Year(), nowLocal.Month(), 1, 0, 0, 0, 0, loc)
+			cancelCount, err := u.settingsRepo.CountCustomerCancellations(ctx, orgID, appointment.CustomerID, monthStart)
+			if err != nil {
+				log.Println("Error counting customer cancellations:", err)
+				return nil, apperror.New(500, "Lỗi khi kiểm tra số lần hủy lịch", err)
+			}
+			if cancelCount >= settings.MaxCancellations {
+				return nil, apperror.New(400, fmt.Sprintf("Khách đã đạt số lần hủy lịch tối đa trong tháng (%d)", settings.MaxCancellations), nil)
+			}
+		}
 	}
 
 	if err := u.repo.UpdateAppointmentStatus(ctx, orgID, id, "cancelled", strings.TrimSpace(reason)); err != nil {

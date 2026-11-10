@@ -1,7 +1,7 @@
 import { cn } from 'cn';
 import { Tag } from '@/components/ui/tag';
 import { formatVND } from '@/lib/format';
-import type { ProfitBreakdownItem } from '../lib/report-data';
+import type { ProfitBreakdownItem } from '@/types/report';
 
 type ProfitBreakdownProps = {
   items: ProfitBreakdownItem[];

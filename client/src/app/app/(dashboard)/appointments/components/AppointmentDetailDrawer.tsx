@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import {
+  CalendarClock,
   CalendarDays,
   Clock3,
   MessageCircle,
@@ -14,14 +15,19 @@ import {
   Trash2,
   Wallet,
 } from "lucide-react";
+import { DashDialog, DashDialogFooter } from "@/components/dashboard/DashDialog";
 import { DashDrawer } from "@/components/dashboard/DashDrawer";
 import { Button } from "@/components/ui/button";
 import { Tag } from "@/components/ui/tag";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
 import useAppointmentDetail from "@/hooks/use-appointment-detail";
+import { useCancelAppointment } from "@/hooks/use-cancel-appointment";
+import { useBookingSettings } from "@/hooks/use-settings";
 import { formatDateTime, formatVND } from "@/lib/format";
 import type { Appointment, AppointmentStatus } from "@/types/appointment";
 import { AppointmentCreateDialog } from "./AppointmentCreateDialog";
+import { AppointmentRescheduleDialog } from "./AppointmentRescheduleDialog";
 
 type Props = {
   open: boolean;
@@ -50,6 +56,8 @@ const PAYMENT_BLOCKED_REASON: Partial<Record<AppointmentStatus, string>> = {
   cancelled: "Lịch đã hủy — không thể tạo đơn.",
   no_show: "Khách không đến — không thể tạo đơn.",
 };
+
+const CANCELLABLE_STATUSES: AppointmentStatus[] = ["pending", "confirmed"];
 
 const SOURCE_LABEL: Record<string, string> = {
   online: "Đặt online",
@@ -124,11 +132,17 @@ export function AppointmentDetailDrawer({ open, onOpenChange, appointment }: Pro
   const router = useRouter();
   const [editOpen, setEditOpen] = React.useState(false);
   const [editSession, setEditSession] = React.useState(0);
+  const [rescheduleOpen, setRescheduleOpen] = React.useState(false);
+  const [cancelOpen, setCancelOpen] = React.useState(false);
+  const [cancelReason, setCancelReason] = React.useState("");
+  const [cancelError, setCancelError] = React.useState("");
   const {
     data: detail,
     isLoading: isDetailLoading,
     isError: isDetailError,
   } = useAppointmentDetail(appointment?.id);
+  const { data: bookingSettings } = useBookingSettings();
+  const cancelAppointment = useCancelAppointment();
 
   const current = detail?.appointment ?? appointment;
   const items = detail?.items ?? [];
@@ -145,6 +159,34 @@ export function AppointmentDetailDrawer({ open, onOpenChange, appointment }: Pro
   const note = current?.note || "Không có ghi chú";
   const paymentBlockReason = current ? PAYMENT_BLOCKED_REASON[current.status] : undefined;
   const canStartPayment = !!current && !paymentBlockReason && !isDetailLoading;
+  const cancellableByStatus = current
+    ? CANCELLABLE_STATUSES.includes(current.status)
+    : false;
+  const canCancel = !!current && cancellableByStatus && bookingSettings?.allow_cancel !== false;
+  const canReschedule =
+    !!current && cancellableByStatus && bookingSettings?.allow_reschedule !== false;
+
+  const handleCancel = async () => {
+    if (!current || !canCancel) return;
+    setCancelError("");
+    try {
+      await cancelAppointment.mutateAsync({
+        id: current.id,
+        reason: cancelReason.trim() || undefined,
+      });
+      toast.add({
+        title: "Đã hủy lịch hẹn",
+        description: `${current.customer_name || "Khách"} • ${current.code}`,
+        type: "success",
+      });
+      setCancelOpen(false);
+      setCancelReason("");
+    } catch (err) {
+      setCancelError(
+        err instanceof Error ? err.message : "Không thể hủy lịch hẹn. Vui lòng thử lại.",
+      );
+    }
+  };
 
   const startPayment = () => {
     if (!current || !canStartPayment) return;
@@ -200,9 +242,25 @@ export function AppointmentDetailDrawer({ open, onOpenChange, appointment }: Pro
           <Button
             variant="outline"
             size="icon"
+            aria-label="Đổi lịch"
+            title={canReschedule ? "Đổi lịch hẹn" : "Lịch này không thể đổi"}
+            className="border-outline text-slate-700"
+            disabled={!canReschedule}
+            onClick={() => setRescheduleOpen(true)}
+          >
+            <CalendarClock className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
             aria-label="Hủy lịch"
+            title={canCancel ? "Hủy lịch hẹn" : "Lịch này không thể hủy"}
             className="border-red-200 text-error hover:bg-red-50"
-            onClick={() => mockAction("Hủy lịch hẹn")}
+            disabled={!canCancel}
+            onClick={() => {
+              setCancelError("");
+              setCancelOpen(true);
+            }}
           >
             <Trash2 className="h-4 w-4" />
           </Button>
@@ -390,6 +448,54 @@ export function AppointmentDetailDrawer({ open, onOpenChange, appointment }: Pro
         customerPhone={current?.customer_phone}
         items={items}
       />
+
+      {current && (
+        <AppointmentRescheduleDialog
+          open={rescheduleOpen}
+          onOpenChange={setRescheduleOpen}
+          appointment={current}
+        />
+      )}
+
+      <DashDialog
+        open={cancelOpen}
+        onOpenChange={setCancelOpen}
+        title="Hủy lịch hẹn"
+        description={`${current?.customer_name || "Khách"} • ${current?.code ?? ""}`}
+        maxWidth="max-w-[460px]"
+        footer={
+          <DashDialogFooter
+            onCancel={() => setCancelOpen(false)}
+            onConfirm={() => void handleCancel()}
+            confirmText="Xác nhận hủy"
+            loadingText="Đang hủy..."
+            isLoading={cancelAppointment.isPending}
+          />
+        }
+      >
+        <div className="space-y-3 py-4">
+          <p className="text-xs text-on-surface-variant">
+            Lịch hẹn sẽ chuyển sang trạng thái đã hủy. Thao tác này không thể hoàn tác.
+          </p>
+          <div>
+            <label
+              htmlFor="cancel-reason"
+              className="mb-1.5 block text-xs font-semibold text-on-surface"
+            >
+              Lý do hủy (không bắt buộc)
+            </label>
+            <Textarea
+              id="cancel-reason"
+              value={cancelReason}
+              onChange={(event) => setCancelReason(event.target.value)}
+              placeholder="Ví dụ: Khách bận, đổi sang tuần sau..."
+              rows={2}
+              className="text-sm"
+            />
+          </div>
+          {cancelError && <p className="text-[11px] text-error">{cancelError}</p>}
+        </div>
+      </DashDialog>
     </>
   );
 }

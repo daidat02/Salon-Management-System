@@ -190,12 +190,27 @@ export const getOrderStats = async (): Promise<OrderStats> => {
 
 export type PaymentMethod = 'cash' | 'bank_transfer' | 'card' | 'gateway';
 
-export type CreatePaymentPayload = {
+export type InitPaymentResponse = {
+  payment: OrderDetailPayment;
+  remaining_amount: number;
+  total_amount: number;
+  paid_amount: number;
+  discount_amount: number;
+};
+
+export type ConfirmPaymentPayload = {
   method: PaymentMethod;
   method_payment_id?: string | null;
   provider?: string | null;
   provider_txn_id?: string | null;
-  amount: number;
+  discount_amount: number;
+};
+
+export type ConfirmPaymentResponse = {
+  payment: OrderDetailPayment;
+  order: Order;
+  document_id: string;
+  document_code: string;
 };
 
 export type ItemStaffType = 'percent' | 'fixed' | 'profit';
@@ -262,15 +277,26 @@ export const updateOrderCustomer = async (orderId: string, payload: UpdateOrderC
   return res.data.data;
 };
 
-export const createPayment = async (orderId: string, payload: CreatePaymentPayload) => {
-  const res = await apiClient.post<ApiResponse<OrderDetailPayment>>(
-    ORDERS_ENDPOINT.CREATE_PAYMENT(orderId),
+export const initPayment = async (orderId: string) => {
+  const res = await apiClient.post<ApiResponse<InitPaymentResponse>>(
+    ORDERS_ENDPOINT.INIT_PAYMENT(orderId),
+  );
+  return res.data.data;
+};
+
+export const confirmPayment = async (
+  orderId: string,
+  paymentId: string,
+  payload: ConfirmPaymentPayload,
+) => {
+  const res = await apiClient.post<ApiResponse<ConfirmPaymentResponse>>(
+    ORDERS_ENDPOINT.CONFIRM_PAYMENT(orderId, paymentId),
     {
       method: payload.method,
       method_payment_id: payload.method_payment_id ?? null,
       provider: payload.provider ?? null,
       provider_txn_id: payload.provider_txn_id ?? null,
-      amount: payload.amount,
+      discount_amount: payload.discount_amount,
     },
   );
   return res.data.data;

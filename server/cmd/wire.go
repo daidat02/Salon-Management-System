@@ -7,6 +7,7 @@ import (
 
 	config "github.com/daidat02/server/configs"
 	_ "github.com/daidat02/server/docs"
+	analyticshttp "github.com/daidat02/server/internal/delivery/http/analytics"
 	appointmenthttp "github.com/daidat02/server/internal/delivery/http/appointment"
 	cashflowhttp "github.com/daidat02/server/internal/delivery/http/cashflow"
 	categoryhttp "github.com/daidat02/server/internal/delivery/http/category"
@@ -47,7 +48,7 @@ func NewRouter(cfg *config.Config, dbPool *pgxpool.Pool) *gin.Engine {
 
 	basePath := cfg.App.BasePath
 
-	userDeps := userhttp.NewDependencies(dbPool)
+	userDeps := userhttp.NewDependencies(dbPool, cfg)
 	userhttp.RegisterUserRoutes(r, userDeps.Handler, basePath)
 
 	staffDeps := staffhttp.NewDependencies(dbPool)
@@ -85,5 +86,8 @@ func NewRouter(cfg *config.Config, dbPool *pgxpool.Pool) *gin.Engine {
 
 	cashflowDeps := cashflowhttp.NewDependencies(dbPool)
 	cashflowhttp.RegisterCashFlowRoutes(r, cashflowDeps.Handler, basePath)
+
+	analyticsDeps := analyticshttp.NewDependencies(dbPool)
+	analyticshttp.RegisterAnalyticsRoutes(r, analyticsDeps.Handler, basePath)
 	return r
 }

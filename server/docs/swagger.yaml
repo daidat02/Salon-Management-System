@@ -250,6 +250,19 @@ definitions:
           $ref: '#/definitions/github_com_daidat02_server_internal_domain_order.OrderItemInput'
         type: array
     type: object
+  github_com_daidat02_server_internal_domain_order.ConfirmPaymentRequest:
+    properties:
+      discount_amount:
+        type: number
+      method:
+        type: string
+      method_payment_id:
+        type: string
+      provider:
+        type: string
+      provider_txn_id:
+        type: string
+    type: object
   github_com_daidat02_server_internal_domain_order.CreateOrderRequest:
     properties:
       appointment_id:
@@ -268,19 +281,6 @@ definitions:
         description: |-
           Khách mới ghi tại POS: server tự tìm theo SĐT (dùng luôn nếu có),
           chưa có thì tạo mới rồi gán vào đơn.
-    type: object
-  github_com_daidat02_server_internal_domain_order.CreatePaymentRequest:
-    properties:
-      amount:
-        type: number
-      method:
-        type: string
-      method_payment_id:
-        type: string
-      provider:
-        type: string
-      provider_txn_id:
-        type: string
     type: object
   github_com_daidat02_server_internal_domain_order.ItemMaterialInput:
     properties:
@@ -549,9 +549,7 @@ definitions:
       organization:
         $ref: '#/definitions/github_com_daidat02_server_internal_domain_setting.OrganizationInfo'
       working_hours:
-        items:
-          $ref: '#/definitions/github_com_daidat02_server_internal_domain_setting.WorkingHourDay'
-        type: array
+        $ref: '#/definitions/github_com_daidat02_server_internal_domain_setting.WorkingHours'
     type: object
   github_com_daidat02_server_internal_domain_setting.NotificationSettings:
     properties:
@@ -668,19 +666,24 @@ definitions:
     type: object
   github_com_daidat02_server_internal_domain_setting.WorkingHourDay:
     properties:
-      break_end:
-        type: string
-      break_start:
-        type: string
-      close_time:
-        type: string
       is_open:
         type: boolean
-      note:
-        type: string
-      open_time:
-        type: string
       weekday:
+        type: integer
+    type: object
+  github_com_daidat02_server_internal_domain_setting.WorkingHours:
+    properties:
+      break_end_minutes:
+        type: integer
+      break_start_minutes:
+        type: integer
+      close_time_minutes:
+        type: integer
+      days:
+        items:
+          $ref: '#/definitions/github_com_daidat02_server_internal_domain_setting.WorkingHourDay'
+        type: array
+      open_time_minutes:
         type: integer
     type: object
   github_com_daidat02_server_internal_domain_staff.CreateStaffLeaveRequest:
@@ -2354,6 +2357,24 @@ paths:
       summary: Đăng nhập
       tags:
       - Auth
+  /logout:
+    post:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Đăng xuất thành công
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+        "401":
+          description: Access token không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Đăng xuất
+      tags:
+      - Auth
   /orders:
     get:
       parameters:
@@ -2680,7 +2701,7 @@ paths:
       summary: Đổi số lượng 1 dòng đơn (chỉ đơn chờ/xác nhận)
       tags:
       - Orders
-  /orders/{id}/payments:
+  /orders/{id}/payments/{paymentId}/confirm:
     post:
       consumes:
       - application/json
@@ -2690,21 +2711,58 @@ paths:
         name: id
         required: true
         type: string
-      - description: Thông tin thanh toán
+      - description: ID payment đang chờ
+        in: path
+        name: paymentId
+        required: true
+        type: string
+      - description: Phương thức, giảm giá
         in: body
         name: body
         required: true
         schema:
-          $ref: '#/definitions/github_com_daidat02_server_internal_domain_order.CreatePaymentRequest'
+          $ref: '#/definitions/github_com_daidat02_server_internal_domain_order.ConfirmPaymentRequest'
       produces:
       - application/json
       responses:
         "200":
-          description: Ghi nhận thanh toán thành công
+          description: Đã thu tiền và chốt đơn
           schema:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
         "400":
-          description: Dữ liệu không hợp lệ / đơn đã hủy
+          description: Dữ liệu không hợp lệ / giảm giá vượt số còn thiếu
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "401":
+          description: Thiếu token / token không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "404":
+          description: Không tìm thấy đơn hàng / thanh toán
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Xác nhận thanh toán và chốt đơn trong 1 transaction
+      tags:
+      - Orders
+  /orders/{id}/payments/init:
+    post:
+      parameters:
+      - description: ID đơn hàng
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Payment đang chờ xác nhận
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+        "400":
+          description: Đơn không thể thanh toán / đã thanh toán đủ
           schema:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
         "401":
@@ -2717,7 +2775,7 @@ paths:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Ghi nhận thanh toán cho đơn (idempotent theo mã giao dịch)
+      summary: Khởi tạo (hoặc lấy lại) payment đang chờ của đơn
       tags:
       - Orders
   /orders/{id}/refund:
@@ -2938,6 +2996,30 @@ paths:
       summary: Tạo tổ chức mới kèm tài khoản owner và settings mặc định
       tags:
       - Organizations
+  /overview:
+    get:
+      description: Trả KPI hôm nay, doanh thu 7 ngày, cảnh báo tồn kho, lịch hẹn hôm
+        nay và đơn hàng gần đây.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Tổng quan vận hành trong ngày
+      tags:
+      - Reports
   /products:
     get:
       parameters:
@@ -3214,6 +3296,37 @@ paths:
       summary: Đăng ký người dùng
       tags:
       - Auth
+  /reports/revenue:
+    get:
+      parameters:
+      - description: Từ ngày (RFC3339 hoặc yyyy-MM-dd), mặc định đầu tháng
+        in: query
+        name: date_from
+        type: string
+      - description: Đến ngày (RFC3339 hoặc yyyy-MM-dd), mặc định cuối tháng
+        in: query
+        name: date_to
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Báo cáo doanh thu và lợi nhuận theo kỳ
+      tags:
+      - Reports
   /services:
     get:
       parameters:

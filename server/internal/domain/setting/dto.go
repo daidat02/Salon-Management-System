@@ -24,21 +24,28 @@ type OrganizationInfo struct {
 	Status   string  `json:"status"`
 }
 
-// WorkingHourDay là lịch làm việc của 1 thứ trong tuần (1=T2 .. 7=CN).
+// WorkingHourDay chỉ còn trạng thái mở/đóng của 1 thứ (1=T2 .. 7=CN).
+// Khung giờ dùng chung được lưu ở WorkingHours.
 type WorkingHourDay struct {
-	Weekday    int     `json:"weekday"`
-	IsOpen     bool    `json:"is_open"`
-	OpenTime   string  `json:"open_time"`
-	CloseTime  string  `json:"close_time"`
-	BreakStart *string `json:"break_start"`
-	BreakEnd   *string `json:"break_end"`
-	Note       *string `json:"note"`
+	Weekday int  `json:"weekday"`
+	IsOpen  bool `json:"is_open"`
+}
+
+// WorkingHours là khung giờ làm việc dùng chung cho mọi ngày mở cửa.
+// Các mốc thời gian tính bằng số phút kể từ 00:00 để so trực tiếp với dữ liệu
+// giờ hẹn gửi lên (không phụ thuộc timezone).
+type WorkingHours struct {
+	OpenTimeMinutes   int              `json:"open_time_minutes"`
+	CloseTimeMinutes  int              `json:"close_time_minutes"`
+	BreakStartMinutes *int             `json:"break_start_minutes"`
+	BreakEndMinutes   *int             `json:"break_end_minutes"`
+	Days              []WorkingHourDay `json:"days"`
 }
 
 // GeneralSettingsResponse là dữ liệu tab Cài đặt chung.
 type GeneralSettingsResponse struct {
 	Organization OrganizationInfo `json:"organization"`
-	WorkingHours []WorkingHourDay `json:"working_hours"`
+	WorkingHours WorkingHours     `json:"working_hours"`
 }
 
 type SettingRepository interface {

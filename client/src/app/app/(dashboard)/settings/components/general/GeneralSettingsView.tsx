@@ -24,7 +24,7 @@ import { Tag } from '@/components/ui/tag';
 import { toast } from '@/components/ui/toast';
 import useGeneralSettings from '@/hooks/use-general-settings';
 import { useUpdateGeneralSettings } from '@/hooks/use-settings';
-import type { GeneralSettingsResponse, WorkingHourDay } from '@/types/setting';
+import type { GeneralSettingsResponse, WorkingHours as ApiWorkingHours } from '@/types/setting';
 import {
   createDefaultSettings,
   WEEKDAY_LABELS,
@@ -76,6 +76,19 @@ function validate(settings: GeneralSettings): FormErrors {
     errors.workingHours = 'Vui lòng nhập đầy đủ giờ mở và giờ đóng.';
   } else if (workingHours.openTime >= workingHours.closeTime) {
     errors.workingHours = 'Giờ đóng phải sau giờ mở.';
+  } else if (
+    (workingHours.breakStart && !workingHours.breakEnd) ||
+    (!workingHours.breakStart && workingHours.breakEnd)
+  ) {
+    errors.workingHours = 'Giờ nghỉ phải có đủ bắt đầu và kết thúc.';
+  } else if (
+    workingHours.breakStart &&
+    workingHours.breakEnd &&
+    (workingHours.breakStart < workingHours.openTime ||
+      workingHours.breakEnd > workingHours.closeTime ||
+      workingHours.breakStart >= workingHours.breakEnd)
+  ) {
+    errors.workingHours = 'Giờ nghỉ phải nằm trong giờ mở cửa và bắt đầu trước khi kết thúc.';
   }
 
   if (workingHours.days.length === 0) {
@@ -370,7 +383,7 @@ function BusinessHoursCard({
         </Tag>
       }
     >
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div>
           <Label htmlFor="working-open-time" className={labelClass}>
             Giờ mở cửa <span className="text-error">*</span>
@@ -396,14 +409,27 @@ function BusinessHoursCard({
           />
         </div>
         <div>
-          <Label htmlFor="working-break-note" className={labelClass}>
-            Nghỉ ca / Trưa
+          <Label htmlFor="working-break-start" className={labelClass}>
+            Nghỉ bắt đầu
           </Label>
           <DashInput
-            id="working-break-note"
-            value={value.breakNote}
-            onChange={(event) => onChange({ breakNote: event.target.value })}
-            placeholder="VD: 12:30 - 13:30"
+            id="working-break-start"
+            type="time"
+            value={value.breakStart}
+            onChange={(event) => onChange({ breakStart: event.target.value })}
+            aria-invalid={Boolean(errors.workingHours) || undefined}
+          />
+        </div>
+        <div>
+          <Label htmlFor="working-break-end" className={labelClass}>
+            Nghỉ kết thúc
+          </Label>
+          <DashInput
+            id="working-break-end"
+            type="time"
+            value={value.breakEnd}
+            onChange={(event) => onChange({ breakEnd: event.target.value })}
+            aria-invalid={Boolean(errors.workingHours) || undefined}
           />
         </div>
       </div>
@@ -468,22 +494,32 @@ function BusinessHoursCard({
   );
 }
 
+function timeToMinutes(value?: string | null): number {
+  if (!value) return 0;
+  const [hours, minutes] = value.split(':').map(Number);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return 0;
+  return hours * 60 + minutes;
+}
+
+function minutesToTime(value?: number | null): string {
+  if (value == null || !Number.isFinite(value)) return '';
+  const clamped = Math.max(0, Math.min(Math.round(value), 24 * 60));
+  const hours = Math.floor(clamped / 60);
+  const minutes = clamped % 60;
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+}
+
 function mapGeneralSettings(data: GeneralSettingsResponse): GeneralSettings {
   const defaults = createDefaultSettings();
   const org = data.organization;
-  const workingHours = data.working_hours ?? [];
-  const openDay = workingHours.find((day) => day.is_open) ?? workingHours[0];
+  const workingHours = data.working_hours;
+  const apiDays = workingHours?.days ?? [];
 
-  const days = workingHours
+  const days = apiDays
     .filter((day) => day.is_open)
     .map((day) => day.weekday)
     .filter((weekday): weekday is Weekday => WEEKDAYS.includes(weekday as Weekday))
     .sort((a, b) => a - b);
-
-  const breakNote =
-    openDay?.break_start && openDay?.break_end
-      ? `${openDay.break_start} - ${openDay.break_end}`
-      : '';
 
   return {
     ...defaults,
@@ -498,29 +534,30 @@ function mapGeneralSettings(data: GeneralSettingsResponse): GeneralSettings {
       logoUrl: org.logo_url ?? '',
     },
     workingHours: {
-      openTime: openDay?.open_time || defaults.workingHours.openTime,
-      closeTime: openDay?.close_time || defaults.workingHours.closeTime,
-      breakNote,
+      openTime:
+        minutesToTime(workingHours?.open_time_minutes) || defaults.workingHours.openTime,
+      closeTime:
+        minutesToTime(workingHours?.close_time_minutes) || defaults.workingHours.closeTime,
+      breakStart: minutesToTime(workingHours?.break_start_minutes),
+      breakEnd: minutesToTime(workingHours?.break_end_minutes),
       days: days.length > 0 ? days : defaults.workingHours.days,
     },
   };
 }
 
-const BREAK_PATTERN = /^\s*(\d{1,2}:\d{2})\s*[-–]\s*(\d{1,2}:\d{2})\s*$/;
-
-function buildWorkingHours(settings: GeneralSettings): WorkingHourDay[] {
+function buildWorkingHours(settings: GeneralSettings): ApiWorkingHours {
   const value = settings.workingHours;
-  const match = value.breakNote.match(BREAK_PATTERN);
 
-  return WEEKDAYS.map((weekday) => ({
-    weekday,
-    is_open: value.days.includes(weekday),
-    open_time: value.openTime,
-    close_time: value.closeTime,
-    break_start: match ? match[1] : null,
-    break_end: match ? match[2] : null,
-    note: null,
-  }));
+  return {
+    open_time_minutes: timeToMinutes(value.openTime),
+    close_time_minutes: timeToMinutes(value.closeTime),
+    break_start_minutes: value.breakStart ? timeToMinutes(value.breakStart) : null,
+    break_end_minutes: value.breakEnd ? timeToMinutes(value.breakEnd) : null,
+    days: WEEKDAYS.map((weekday) => ({
+      weekday,
+      is_open: value.days.includes(weekday),
+    })),
+  };
 }
 
 function toGeneralPayload(
