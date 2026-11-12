@@ -8,6 +8,7 @@ export { API_BASE };
 
 export type AuthUser = {
   id: string;
+  organization_id?: string;
   email?: string;
   full_name?: string;
   phone_number: string;

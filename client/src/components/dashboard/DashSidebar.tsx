@@ -31,6 +31,8 @@ import {
   SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { cn } from 'cn';
+import useAuth from '@/hooks/use-auth';
+import type { Permission } from '@/lib/permissions';
 
 type NavItem = {
   key: string;
@@ -41,6 +43,7 @@ type NavItem = {
   badge?: string;
   /** Chữ mờ bên phải, vd. "1.2k" ở Khách hàng */
   meta?: string;
+  permission?: Permission;
 };
 
 // Nav chính — bám preview/admin_preview/index.html (dòng 164–223)
@@ -62,7 +65,13 @@ const MAIN_NAV: NavItem[] = [
   { key: 'inventory', label: 'Kho hàng', href: '/app/inventory', icon: Archive },
   { key: 'staff', label: 'Nhân viên', href: '/app/staff', icon: UserCheck },
   { key: 'cashflow', label: 'Thu & Chi', href: '/app/cashflow', icon: Wallet },
-  { key: 'reports', label: 'Báo cáo', href: '/app/reports', icon: ChartColumn },
+  {
+    key: 'reports',
+    label: 'Báo cáo',
+    href: '/app/reports',
+    icon: ChartColumn,
+    permission: 'reports:view',
+  },
 ];
 
 type DashSidebarProps = {
@@ -83,10 +92,12 @@ export default function DashSidebar({
   onLogout,
 }: DashSidebarProps) {
   const pathname = usePathname();
+  const { can } = useAuth();
+  const visibleNav = MAIN_NAV.filter((item) => !item.permission || can(item.permission));
 
   // Sửa lại logic nhận diện active theo prefix (startsWith) để support các trang con (create, [id],...)
   const activeKey =
-    [...MAIN_NAV, { key: 'settings', href: '/app/settings' }]
+    [...visibleNav, { key: 'settings', href: '/app/settings' }]
       .sort((a, b) => b.href.length - a.href.length) // Ưu tiên match đường dẫn dài hơn trước
       .find((item) => pathname === item.href || pathname.startsWith(item.href + '/'))?.key ??
     defaultActiveKey;
@@ -109,7 +120,7 @@ export default function DashSidebar({
 
         {/* Navigation Links */}
         <SidebarMenu className="gap-1">
-          {MAIN_NAV.map((item) => {
+          {visibleNav.map((item) => {
             const Icon = item.icon;
             const isActive = item.key === activeKey;
             return (
@@ -143,16 +154,18 @@ export default function DashSidebar({
       {/* Footer Menu */}
       <SidebarFooter className="shrink-0 gap-1 border-t border-border p-4">
         <SidebarMenu className="gap-1">
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              isActive={activeKey === 'settings'}
-              render={<Link href="/app/settings" />}
-              className="h-auto rounded-xl px-3.5 py-2 text-xs font-medium text-slate-600 hover:text-slate-900 [&_svg]:size-4 [&_svg]:text-slate-400"
-            >
-              <Settings />
-              <span className="flex-1">Cài đặt salon</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
+          {can('settings:view') && (
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                isActive={activeKey === 'settings'}
+                render={<Link href="/app/settings" />}
+                className="h-auto rounded-xl px-3.5 py-2 text-xs font-medium text-slate-600 hover:text-slate-900 [&_svg]:size-4 [&_svg]:text-slate-400"
+              >
+                <Settings />
+                <span className="flex-1">Cài đặt salon</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
           <SidebarMenuItem>
             <SidebarMenuButton
               onClick={onLogout}

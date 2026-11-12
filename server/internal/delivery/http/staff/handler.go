@@ -50,6 +50,7 @@ func parseHireDate(raw *string) (time.Time, error) {
 
 // CreateStaff godoc
 // @Summary      Tạo nhân viên
+// @Description  Yêu cầu vai trò: owner hoặc manager.
 // @Tags         Staff
 // @Accept       json
 // @Produce      json
@@ -59,6 +60,7 @@ func parseHireDate(raw *string) (time.Time, error) {
 // @Failure      400   {object}  response.ErrorResponse     "Dữ liệu không hợp lệ / thiếu organization"
 // @Failure      401   {object}  response.ErrorResponse     "Thiếu token / token không hợp lệ"
 // @Failure      500   {object}  response.ErrorResponse     "Lỗi server"
+// @Failure      403  {object}  response.ErrorResponse  "Không có quyền truy cập"
 // @Router       /staff [post]
 func (h *StaffHandler) CreateStaff(c *gin.Context) {
 	var req domain.CreateStaffRequest
@@ -164,6 +166,7 @@ func (h *StaffHandler) GetStaffByID(c *gin.Context) {
 
 // UpdateStaff godoc
 // @Summary      Cập nhật nhân viên
+// @Description  Yêu cầu vai trò: owner hoặc manager.
 // @Tags         Staff
 // @Accept       json
 // @Produce      json
@@ -174,6 +177,7 @@ func (h *StaffHandler) GetStaffByID(c *gin.Context) {
 // @Failure      400   {object}  response.ErrorResponse     "Thiếu id / dữ liệu không hợp lệ"
 // @Failure      401   {object}  response.ErrorResponse     "Thiếu token / token không hợp lệ"
 // @Failure      404   {object}  response.ErrorResponse     "Không tìm thấy nhân viên"
+// @Failure      403  {object}  response.ErrorResponse  "Không có quyền truy cập"
 // @Router       /staff/{id} [put]
 func (h *StaffHandler) UpdateStaff(c *gin.Context) {
 	id := c.Param("id")
@@ -234,6 +238,7 @@ type CreatePayrollRequest struct {
 
 // CreatePayroll godoc
 // @Summary      Tạo bảng lương nhân viên
+// @Description  Yêu cầu vai trò: owner.
 // @Tags         Staff
 // @Produce      json
 // @Security     BearerAuth
@@ -245,6 +250,7 @@ type CreatePayrollRequest struct {
 // @Failure      404           {object}  response.ErrorResponse    "Không tìm thấy nhân viên"
 // @Failure      409           {object}  response.ErrorResponse    "Đã tồn tại bảng lương của nhân viên trong kỳ này"
 // @Failure      500           {object}  response.ErrorResponse    "Lỗi server"
+// @Failure      403  {object}  response.ErrorResponse  "Không có quyền truy cập"
 // @Router       /staff/{id}/payroll [post]
 func (h *StaffHandler) CreatePayroll(c *gin.Context) {
 	var req CreatePayrollRequest
@@ -272,6 +278,7 @@ func (h *StaffHandler) CreatePayroll(c *gin.Context) {
 
 // GetStaffPayroll godoc
 // @Summary      Lấy bảng lương nhân viên theo kỳ
+// @Description  Yêu cầu vai trò: owner.
 // @Tags         Staff
 // @Produce      json
 // @Security     BearerAuth
@@ -284,6 +291,7 @@ func (h *StaffHandler) CreatePayroll(c *gin.Context) {
 // @Failure      401  {object}  response.ErrorResponse    "Thiếu token / token không hợp lệ"
 // @Failure      404  {object}  response.ErrorResponse    "Không tìm thấy nhân viên"
 // @Failure      500  {object}  response.ErrorResponse    "Lỗi server"
+// @Failure      403  {object}  response.ErrorResponse  "Không có quyền truy cập"
 // @Router       /staff/{id}/payroll [get]
 func (h *StaffHandler) GetStaffPayroll(c *gin.Context) {
 	standardWorkingDays := 0
@@ -352,6 +360,7 @@ func (h *StaffHandler) GetStaffServiceHistory(c *gin.Context) {
 
 // DeleteStaff godoc
 // @Summary      Xóa mềm nhân viên
+// @Description  Yêu cầu vai trò: owner.
 // @Tags         Staff
 // @Produce      json
 // @Security     BearerAuth
@@ -360,6 +369,7 @@ func (h *StaffHandler) GetStaffServiceHistory(c *gin.Context) {
 // @Failure      400  {object}  response.ErrorResponse    "Thiếu id"
 // @Failure      401  {object}  response.ErrorResponse    "Thiếu token / token không hợp lệ"
 // @Failure      404  {object}  response.ErrorResponse    "Không tìm thấy nhân viên"
+// @Failure      403  {object}  response.ErrorResponse  "Không có quyền truy cập"
 // @Router       /staff/{id} [delete]
 func (h *StaffHandler) DeleteStaff(c *gin.Context) {
 	id := c.Param("id")
@@ -375,6 +385,7 @@ func (h *StaffHandler) DeleteStaff(c *gin.Context) {
 
 // CreateSalaryAdjustment godoc
 // @Summary      Tạo điều chỉnh lương nhân viên
+// @Description  Yêu cầu vai trò: owner.
 // @Tags         Staff
 // @Accept       json
 // @Produce      json
@@ -384,6 +395,7 @@ func (h *StaffHandler) DeleteStaff(c *gin.Context) {
 // @Failure      400   {object}  response.ErrorResponse     "Dữ liệu không hợp lệ / thiếu organization"
 // @Failure      401   {object}  response.ErrorResponse     "Thiếu token / token không hợp lệ"
 // @Failure      500   {object}  response.ErrorResponse     "Lỗi server"
+// @Failure      403  {object}  response.ErrorResponse  "Không có quyền truy cập"
 // @Router       /staff/salary-adjustment [post]
 func (h *StaffHandler) CreateSalaryAdjustment(c *gin.Context) {
 	req := &domain.SalaryAdjustmentRequest{}
@@ -404,6 +416,7 @@ func (h *StaffHandler) CreateSalaryAdjustment(c *gin.Context) {
 
 // GetSalaryAdjustments godoc
 // @Summary      Lấy danh sách điều chỉnh lương của nhân viên
+// @Description  Yêu cầu vai trò: owner.
 // @Tags         Staff
 // @Produce      json
 // @Security     BearerAuth
@@ -413,6 +426,7 @@ func (h *StaffHandler) CreateSalaryAdjustment(c *gin.Context) {
 // @Failure      400  {object}  response.ErrorResponse    "Thiếu id"
 // @Failure      401  {object}  response.ErrorResponse    "Thiếu token / token không hợp lệ"
 // @Failure      500  {object}  response.ErrorResponse    "Lỗi server"
+// @Failure      403  {object}  response.ErrorResponse  "Không có quyền truy cập"
 // @Router       /staff/{id}/salary-adjustments [get]
 func (h *StaffHandler) GetSalaryAdjustments(c *gin.Context) {
 	staffID := c.Param("id")
@@ -429,6 +443,7 @@ func (h *StaffHandler) GetSalaryAdjustments(c *gin.Context) {
 
 // DeleteSalaryAdjustment godoc
 // @Summary      Xóa điều chỉnh lương nhân viên
+// @Description  Yêu cầu vai trò: owner.
 // @Tags         Staff
 // @Produce      json
 // @Security     BearerAuth
@@ -437,6 +452,7 @@ func (h *StaffHandler) GetSalaryAdjustments(c *gin.Context) {
 // @Failure      400  {object}  response.ErrorResponse    "Thiếu id"
 // @Failure      401  {object}  response.ErrorResponse    "Thiếu token / token không hợp lệ"
 // @Failure      404  {object}  response.ErrorResponse    "Không tìm thấy điều chỉnh lương hoặc đã bị khóa"
+// @Failure      403  {object}  response.ErrorResponse  "Không có quyền truy cập"
 // @Router       /staff/salary-adjustment/{id} [delete]
 func (h *StaffHandler) DeleteSalaryAdjustment(c *gin.Context) {
 	adjustmentID := c.Param("id")
@@ -474,6 +490,7 @@ func (h *StaffHandler) GetStaffLeaves(c *gin.Context) {
 
 // CreateStaffLeave godoc
 // @Summary      Tạo ngày nghỉ cho nhân viên
+// @Description  Yêu cầu vai trò: owner hoặc manager.
 // @Tags         Staff
 // @Accept       json
 // @Produce      json
@@ -486,6 +503,7 @@ func (h *StaffHandler) GetStaffLeaves(c *gin.Context) {
 // @Failure      404   {object}  response.ErrorResponse         "Không tìm thấy nhân viên"
 // @Failure      409   {object}  response.ErrorResponse         "Khoảng ngày đã được chốt trong bảng lương"
 // @Failure      500   {object}  response.ErrorResponse         "Lỗi server"
+// @Failure      403  {object}  response.ErrorResponse  "Không có quyền truy cập"
 // @Router       /staff/{id}/leaves [post]
 func (h *StaffHandler) CreateStaffLeave(c *gin.Context) {
 	var req domain.CreateStaffLeaveRequest

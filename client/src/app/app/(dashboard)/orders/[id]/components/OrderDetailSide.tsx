@@ -58,6 +58,7 @@ export default function OrderDetailSide({
   cashierName,
   services,
   retail,
+  canViewProfit,
 }: {
   customer: Customer | undefined;
   commissions: StaffCommission[];
@@ -67,6 +68,7 @@ export default function OrderDetailSide({
   cashierName: string;
   services: EnrichedServiceLine[];
   retail: EnrichedRetailLine[];
+  canViewProfit: boolean;
 }) {
   const totalCommission = commissions.reduce((s, c) => s + c.amount, 0);
   const succeededPayments = payments.filter((p) => p.status === 'succeeded');
@@ -303,6 +305,7 @@ export default function OrderDetailSide({
         </div>
       </SideCard>
 
+      {canViewProfit && (
       <div className="relative space-y-4 overflow-hidden rounded-xl border-2 border-primary/40 bg-gradient-to-b from-[#F5F8FC] to-surface p-5 shadow-sm">
         <div className="flex items-center justify-between">
           <h3 className="flex items-center gap-2 text-sm font-bold text-on-surface">
@@ -370,6 +373,7 @@ export default function OrderDetailSide({
           </div>
         </div>
       </div>
+      )}
     </>
   );
 }

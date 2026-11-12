@@ -121,6 +121,7 @@ func (h *OrderHandler) GetOrderDetail(c *gin.Context) {
 
 // CancelOrder godoc
 // @Summary      Hủy đơn chưa phục vụ (nhả giữ chỗ kho, không hoàn tồn)
+// @Description  Yêu cầu vai trò: owner hoặc manager.
 // @Tags         Orders
 // @Produce      json
 // @Security     BearerAuth
@@ -129,6 +130,7 @@ func (h *OrderHandler) GetOrderDetail(c *gin.Context) {
 // @Failure      400  {object}  response.ErrorResponse    "Trạng thái không cho hủy"
 // @Failure      401  {object}  response.ErrorResponse    "Thiếu token / token không hợp lệ"
 // @Failure      404  {object}  response.ErrorResponse    "Không tìm thấy đơn hàng"
+// @Failure      403  {object}  response.ErrorResponse  "Không có quyền truy cập"
 // @Router       /orders/{id}/cancel [post]
 func (h *OrderHandler) CancelOrder(c *gin.Context) {
 	id := c.Param("id")
@@ -144,6 +146,7 @@ func (h *OrderHandler) CancelOrder(c *gin.Context) {
 
 // RefundOrder godoc
 // @Summary      Hoàn đơn đang phục vụ (hoàn kho + vô hiệu phiếu xuất)
+// @Description  Yêu cầu vai trò: owner.
 // @Tags         Orders
 // @Produce      json
 // @Security     BearerAuth
@@ -152,6 +155,7 @@ func (h *OrderHandler) CancelOrder(c *gin.Context) {
 // @Failure      400  {object}  response.ErrorResponse    "Trạng thái không cho hoàn"
 // @Failure      401  {object}  response.ErrorResponse    "Thiếu token / token không hợp lệ"
 // @Failure      404  {object}  response.ErrorResponse    "Không tìm thấy đơn hàng"
+// @Failure      403  {object}  response.ErrorResponse  "Không có quyền truy cập"
 // @Router       /orders/{id}/refund [post]
 func (h *OrderHandler) RefundOrder(c *gin.Context) {
 	id := c.Param("id")
@@ -447,6 +451,7 @@ func (h *OrderHandler) ReplaceOrderMaterials(c *gin.Context) {
 // @Security     BearerAuth
 // @Param        search    query     string  false  "Tìm theo tên hoặc SKU (ILIKE)"
 // @Param        category  query     string  false  "Lọc theo ID danh mục"
+// @Param        kind      query     string  false  "Lọc loại hàng: product | service"
 // @Param        type      query     string  false  "Con trỏ phân trang: type của dòng cuối trang trước"
 // @Param        name      query     string  false  "Con trỏ phân trang: name của dòng cuối trang trước"
 // @Param        id        query     string  false  "Con trỏ phân trang: id của dòng cuối trang trước"
@@ -461,9 +466,10 @@ func (h *OrderHandler) GetPosItemsByOrgID(c *gin.Context) {
 	itemType := c.Query("type")
 	search := c.Query("search")
 	category := c.Query("category")
+	kind := c.Query("kind")
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
 
-	result, err := h.uc.GetPosItemsByOrgID(c.Request.Context(), pageSize, name, itemType, id, search, category)
+	result, err := h.uc.GetPosItemsByOrgID(c.Request.Context(), pageSize, name, itemType, id, search, category, kind)
 	if err != nil {
 		response.Error(c, err)
 		c.Abort()

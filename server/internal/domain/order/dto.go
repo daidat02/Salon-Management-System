@@ -169,6 +169,7 @@ type OrderResponse struct {
 	SubtotalAmount float64    `json:"subtotal_amount"`
 	DiscountAmount float64    `json:"discount_amount"`
 	TotalAmount    float64    `json:"total_amount"`
+	Description    string     `json:"description"`
 	Status         string     `json:"status"`
 	CreatedAt      *time.Time `json:"created_at"`
 	UpdatedAt      *time.Time `json:"updated_at"`

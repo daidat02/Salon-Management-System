@@ -5,10 +5,13 @@ import usePosItems from '@/hooks/use-pos-items';
 import useCategory from '@/hooks/use-category';
 import type { CatalogItem } from './catalogTypes';
 
+export type CatalogTypeFilter = '' | 'service' | 'product';
+
 export default function useCatalogData() {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [activeCat, setActiveCat] = useState('');
+  const [activeType, setActiveType] = useState<CatalogTypeFilter>('');
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search.trim()), 400);
@@ -16,15 +19,21 @@ export default function useCatalogData() {
   }, [search]);
 
   const { data: categoryData } = useCategory({ page: 1, pageSize: 100 });
-  const categories = useMemo(
+  const allCategories = useMemo(
     () => (categoryData?.data ?? []).filter((c) => c && c.is_active),
     [categoryData],
   );
+  const categories = useMemo(
+    () => (activeType ? allCategories.filter((c) => c.type === activeType) : allCategories),
+    [allCategories, activeType],
+  );
   const categoryNameById = useMemo(() => {
     const map = new Map<string, string>();
-    for (const c of categories) map.set(c.id, c.name);
+    for (const c of allCategories) map.set(c.id, c.name);
     return map;
-  }, [categories]);
+  }, [allCategories]);
+
+  const effectiveActiveCat = categories.some((c) => c.id === activeCat) ? activeCat : '';
 
   const {
     data: posPages,
@@ -34,7 +43,12 @@ export default function useCatalogData() {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-  } = usePosItems({ search: debouncedSearch, category: activeCat || undefined, pageSize: 24 });
+  } = usePosItems({
+    search: debouncedSearch,
+    category: effectiveActiveCat || undefined,
+    kind: activeType || undefined,
+    pageSize: 24,
+  });
 
   const posItems = useMemo(() => (posPages?.pages ?? []).flat(), [posPages]);
 
@@ -59,7 +73,9 @@ export default function useCatalogData() {
   // không cần gọi thêm services/products.
   const items: CatalogItem[] = useMemo(
     () =>
-      (posItems ?? []).map((it) => {
+      (posItems ?? [])
+        .filter((it) => !activeType || it.type === activeType)
+        .map((it) => {
         const category = (it.category_id && categoryNameById.get(it.category_id)) || 'Khác';
         if (it.type === 'service') {
           return {
@@ -84,15 +100,17 @@ export default function useCatalogData() {
           category,
         };
       }),
-    [posItems, categoryNameById],
+    [posItems, activeType, categoryNameById],
   );
 
   return {
     search,
     setSearch,
     categories,
-    activeCat,
+    activeCat: effectiveActiveCat,
     setActiveCat,
+    activeType,
+    setActiveType,
     items,
     isPosLoading,
     isPosError,

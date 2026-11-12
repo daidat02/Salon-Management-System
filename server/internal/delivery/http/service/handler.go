@@ -29,6 +29,7 @@ func boolOrDefault(v *bool, def bool) bool {
 
 // CreateService godoc
 // @Summary      Tạo dịch vụ
+// @Description  Yêu cầu vai trò: owner hoặc manager.
 // @Tags         Services
 // @Accept       json
 // @Produce      json
@@ -38,6 +39,7 @@ func boolOrDefault(v *bool, def bool) bool {
 // @Failure      400   {object}  response.ErrorResponse       "Dữ liệu không hợp lệ / thiếu organization"
 // @Failure      401   {object}  response.ErrorResponse       "Thiếu token / token không hợp lệ"
 // @Failure      500   {object}  response.ErrorResponse       "Lỗi server"
+// @Failure      403  {object}  response.ErrorResponse  "Không có quyền truy cập"
 // @Router       /services [post]
 func (h *ServiceHandler) CreateService(c *gin.Context) {
 	var req domain.CreateServiceRequest
@@ -129,6 +131,7 @@ func (h *ServiceHandler) GetServiceStats(c *gin.Context) {
 
 // UpdateService godoc
 // @Summary      Cập nhật dịch vụ
+// @Description  Yêu cầu vai trò: owner hoặc manager.
 // @Tags         Services
 // @Accept       json
 // @Produce      json
@@ -139,6 +142,7 @@ func (h *ServiceHandler) GetServiceStats(c *gin.Context) {
 // @Failure      400   {object}  response.ErrorResponse       "Thiếu id / dữ liệu không hợp lệ"
 // @Failure      401   {object}  response.ErrorResponse       "Thiếu token / token không hợp lệ"
 // @Failure      404   {object}  response.ErrorResponse       "Không tìm thấy dịch vụ"
+// @Failure      403  {object}  response.ErrorResponse  "Không có quyền truy cập"
 // @Router       /services/{id} [put]
 func (h *ServiceHandler) UpdateService(c *gin.Context) {
 	id := c.Param("id")
@@ -169,8 +173,55 @@ func (h *ServiceHandler) UpdateService(c *gin.Context) {
 	response.Success(c, 200, "Cập nhật dịch vụ thành công", result)
 }
 
+// ReplaceServiceMaterials godoc
+// @Summary      Thay định mức nguyên vật liệu của dịch vụ
+// @Description  Yêu cầu vai trò: owner hoặc manager. Thay toàn bộ định mức trong 1 transaction; mảng rỗng xóa hết. Chỉ ảnh hưởng đơn tạo sau thời điểm cập nhật.
+// @Tags         Services
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id    path      string                                  true  "ID dịch vụ"
+// @Param        body  body      domain.ReplaceServiceMaterialsRequest   true  "Danh sách định mức mới"
+// @Success      200   {object}  response.SuccessResponse                 "Cập nhật định mức thành công"
+// @Failure      400   {object}  response.ErrorResponse                   "Thiếu id / dữ liệu không hợp lệ / product_id bị trùng"
+// @Failure      401   {object}  response.ErrorResponse                   "Thiếu token / token không hợp lệ"
+// @Failure      403   {object}  response.ErrorResponse                   "Không có quyền truy cập"
+// @Failure      404   {object}  response.ErrorResponse                   "Không tìm thấy dịch vụ hoặc sản phẩm"
+// @Failure      500   {object}  response.ErrorResponse                   "Lỗi server"
+// @Router       /services/{id}/materials [put]
+func (h *ServiceHandler) ReplaceServiceMaterials(c *gin.Context) {
+	id := c.Param("id")
+
+	var req domain.ReplaceServiceMaterialsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, apperror.New(400, "Dữ liệu không hợp lệ", err))
+		c.Abort()
+		return
+	}
+
+	materials := make([]*domain.ServiceMaterialInput, len(req.Materials))
+	for i, m := range req.Materials {
+		materials[i] = &domain.ServiceMaterialInput{
+			ProductID: m.ProductID,
+			Quantity:  m.Quantity,
+			Unit:      m.Unit,
+		}
+	}
+
+	result, err := h.uc.ReplaceServiceMaterials(c.Request.Context(), id, materials)
+	if err != nil {
+		response.Error(c, err)
+		c.Abort()
+		return
+	}
+	response.Success(c, 200, "Cập nhật định mức nguyên vật liệu thành công", gin.H{
+		"materials": result,
+	})
+}
+
 // DeleteService godoc
 // @Summary      Xóa dịch vụ
+// @Description  Yêu cầu vai trò: owner hoặc manager.
 // @Tags         Services
 // @Produce      json
 // @Security     BearerAuth
@@ -179,6 +230,7 @@ func (h *ServiceHandler) UpdateService(c *gin.Context) {
 // @Failure      400  {object}  response.ErrorResponse    "Thiếu id"
 // @Failure      401  {object}  response.ErrorResponse    "Thiếu token / token không hợp lệ"
 // @Failure      404  {object}  response.ErrorResponse    "Không tìm thấy dịch vụ"
+// @Failure      403  {object}  response.ErrorResponse  "Không có quyền truy cập"
 // @Router       /services/{id} [delete]
 func (h *ServiceHandler) DeleteService(c *gin.Context) {
 	id := c.Param("id")

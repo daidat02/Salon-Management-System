@@ -51,10 +51,9 @@ export function buildOrderColumns(lookup: CustomerLookup): DashColumn<Order>[] {
       header: 'Dịch Vụ / Sản phẩm',
       className: 'min-w-[180px]',
       cell: (row) => {
-        const customer = lookup(row.customer_id);
         return (
           <div>
-            <div className="text-[11px] text-on-surface-variant">{customer?.phone ?? '—'}</div>
+            <div className="text-[11px] text-on-surface-variant">{row.description ?? '—'}</div>
           </div>
         );
       },

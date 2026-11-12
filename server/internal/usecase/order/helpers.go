@@ -78,6 +78,100 @@ func (u *OrderUsecase) loadItemsAndMaterials(ctx context.Context, orgID, orderID
 	return items, materials, nil
 }
 
+// loadOrderDescription gom tên dịch vụ/sản phẩm của các dòng đơn thành mô tả ngắn.
+// Tên lấy tại thời điểm chốt đơn (kể cả mục đã xóa mềm); ID không tìm thấy thì bỏ qua.
+// Gộp trùng theo tên đã trim, giữ lần xuất hiện đầu; dịch vụ luôn đứng trước sản phẩm.
+func (u *OrderUsecase) loadOrderDescription(ctx context.Context, orgID string, items []*domain.OrderItem) (string, error) {
+	serviceIDs := []string{}
+	productIDs := []string{}
+	seenServiceID := map[string]struct{}{}
+	seenProductID := map[string]struct{}{}
+	for _, it := range items {
+		switch it.ItemType {
+		case domain.ItemTypeService:
+			if it.ServiceID == nil || *it.ServiceID == "" {
+				continue
+			}
+			if _, ok := seenServiceID[*it.ServiceID]; ok {
+				continue
+			}
+			seenServiceID[*it.ServiceID] = struct{}{}
+			serviceIDs = append(serviceIDs, *it.ServiceID)
+		case domain.ItemTypeProduct:
+			if it.ProductID == nil || *it.ProductID == "" {
+				continue
+			}
+			if _, ok := seenProductID[*it.ProductID]; ok {
+				continue
+			}
+			seenProductID[*it.ProductID] = struct{}{}
+			productIDs = append(productIDs, *it.ProductID)
+		}
+	}
+
+	serviceNames := map[string]string{}
+	productNames := map[string]string{}
+	if len(serviceIDs) > 0 {
+		names, err := u.services.GetServiceNames(ctx, orgID, serviceIDs)
+		if err != nil {
+			return "", apperror.New(500, "Lỗi khi lấy tên dịch vụ", err)
+		}
+		serviceNames = names
+	}
+	if len(productIDs) > 0 {
+		names, err := u.products.GetProductNames(ctx, orgID, productIDs)
+		if err != nil {
+			return "", apperror.New(500, "Lỗi khi lấy tên sản phẩm", err)
+		}
+		productNames = names
+	}
+
+	services := collectItemNames(items, domain.ItemTypeService, serviceNames)
+	products := collectItemNames(items, domain.ItemTypeProduct, productNames)
+
+	parts := make([]string, 0, 2)
+	if len(services) > 0 {
+		parts = append(parts, "Dịch vụ: "+strings.Join(services, ", "))
+	}
+	if len(products) > 0 {
+		parts = append(parts, "Sản phẩm: "+strings.Join(products, ", "))
+	}
+	return strings.Join(parts, "; "), nil
+}
+
+// collectItemNames lấy tên theo thứ tự dòng đơn, gộp trùng tên đã trim.
+func collectItemNames(items []*domain.OrderItem, itemType string, names map[string]string) []string {
+	out := make([]string, 0, len(names))
+	seen := map[string]struct{}{}
+	for _, it := range items {
+		if it.ItemType != itemType {
+			continue
+		}
+		var id string
+		if itemType == domain.ItemTypeService {
+			if it.ServiceID == nil {
+				continue
+			}
+			id = *it.ServiceID
+		} else {
+			if it.ProductID == nil {
+				continue
+			}
+			id = *it.ProductID
+		}
+		name := strings.TrimSpace(names[id])
+		if name == "" {
+			continue
+		}
+		if _, ok := seen[name]; ok {
+			continue
+		}
+		seen[name] = struct{}{}
+		out = append(out, name)
+	}
+	return out
+}
+
 // ---------- Catalog / pricing dùng chung ----------
 
 // fetchPricingUnits lấy giá + đơn vị các SP, thiếu SP nào thì 404.
@@ -544,6 +638,7 @@ func toResponse(o *domain.Order) *domain.OrderResponse {
 		SubtotalAmount: o.SubtotalAmount,
 		DiscountAmount: o.DiscountAmount,
 		TotalAmount:    o.TotalAmount,
+		Description:    o.Description,
 		Status:         o.Status,
 		CreatedAt:      o.CreatedAt,
 		UpdatedAt:      o.UpdatedAt,

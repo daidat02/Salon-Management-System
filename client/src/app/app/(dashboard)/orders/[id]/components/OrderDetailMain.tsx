@@ -26,7 +26,7 @@ import type {
   EnrichedServiceLine,
   StaffAssignment,
 } from './orderDetailUtils';
-import { formatPlain, formatVND } from '@/lib/format';
+import { formatPlain, formatStockQuantity, formatVND } from '@/lib/format';
 import StaffUpdateDialog from './StaffUpdateDialog';
 
 // Ô nhập số lượng inline (giống bảng vật tư) + tích xác nhận / X hủy.
@@ -223,6 +223,7 @@ type MaterialTableCtx = {
   services: EnrichedServiceLine[];
   productById: Map<string, Product>;
   canEdit: boolean;
+  canViewProfit: boolean;
   editing: MaterialDraft | null;
   onStartEdit: (row: MaterialRow) => void;
   onDraft: (patch: { unit?: string; quantity?: number; orderItemId?: string | null }) => void;
@@ -421,7 +422,7 @@ function materialColumns(ctx: MaterialTableCtx): DashColumn<MaterialRow>[] {
                 className="w-16 rounded bg-surface-container px-1.5 py-1 text-center text-xs font-semibold focus:ring-1 focus:ring-primary focus:outline-none"
               />
               <span className="text-[10px] text-on-surface-variant">
-                Tồn: {(p?.stock_quantity ?? 0).toLocaleString('vi-VN')} {p?.unit ?? ''}
+                Tồn: {formatStockQuantity(p?.stock_quantity || 0, p?.net_amount || 0, row.unit)}
               </span>
             </div>
           );
@@ -441,7 +442,7 @@ function materialColumns(ctx: MaterialTableCtx): DashColumn<MaterialRow>[] {
                 className="w-16 rounded bg-surface-container px-1.5 py-1 text-center text-xs font-semibold focus:ring-1 focus:ring-primary focus:outline-none"
               />
               <span className="text-[10px] text-on-surface-variant">
-                Tồn: {(p?.stock_quantity ?? 0).toLocaleString('vi-VN')} {p?.unit ?? ''}
+                Tồn: {formatStockQuantity(p?.stock_quantity || 0, p?.net_amount || 0, p?.unit)}
               </span>
             </div>
           );
@@ -458,18 +459,22 @@ function materialColumns(ctx: MaterialTableCtx): DashColumn<MaterialRow>[] {
         );
       },
     },
-    {
-      id: 'unitCost',
-      header: 'Đơn giá (đ)',
-      className: 'text-right font-medium',
-      cell: (row) => formatPlain(row.unitCost),
-    },
-    {
-      id: 'lineCost',
-      header: 'Thành tiền (đ)',
-      className: 'text-right font-semibold text-on-surface',
-      cell: (row) => formatPlain(row.lineCost),
-    },
+    ...(ctx.canViewProfit
+      ? [
+          {
+            id: 'unitCost',
+            header: 'Đơn giá (đ)',
+            className: 'text-right font-medium',
+            cell: (row: MaterialRow) => formatPlain(row.unitCost),
+          },
+          {
+            id: 'lineCost',
+            header: 'Thành tiền (đ)',
+            className: 'text-right font-semibold text-on-surface',
+            cell: (row: MaterialRow) => formatPlain(row.lineCost),
+          },
+        ]
+      : []),
     {
       id: 'actions',
       header: '',
@@ -510,6 +515,7 @@ function materialColumns(ctx: MaterialTableCtx): DashColumn<MaterialRow>[] {
 
 type RetailTableCtx = {
   canEdit: boolean;
+  canViewProfit: boolean;
   editingId: string | null;
   saving: boolean;
   onStartEdit: (id: string) => void;
@@ -521,95 +527,101 @@ type RetailTableCtx = {
 
 function retailColumns(ctx: RetailTableCtx): DashColumn<EnrichedRetailLine>[] {
   return [
-  {
-    id: 'name',
-    header: 'Tên sản phẩm',
-    className: 'min-w-[200px]',
-    cell: (row) => (
-      <div>
-        <div className="font-medium text-on-surface">{row.name}</div>
-        {row.desc && <div className="text-xs text-on-surface-variant">{row.desc}</div>}
-      </div>
-    ),
-  },
-  {
-    id: 'sku',
-    header: 'Mã SKU',
-    className: 'min-w-[110px] whitespace-nowrap',
-    cell: (row) => <span className="font-mono text-xs text-on-surface-variant">{row.sku}</span>,
-  },
-  {
-    id: 'staff',
-    header: 'NV bán hàng',
-    className: 'min-w-[180px]',
-    cell: (row) => (
-      <div className="flex items-center gap-1.5 whitespace-nowrap">
-        <div className="text-xs text-on-surface">{row.staffName}</div>
+    {
+      id: 'name',
+      header: 'Tên sản phẩm',
+      className: 'min-w-[200px]',
+      cell: (row) => (
+        <div>
+          <div className="font-medium text-on-surface">{row.name}</div>
+          {row.desc && <div className="text-xs text-on-surface-variant">{row.desc}</div>}
+        </div>
+      ),
+    },
+    {
+      id: 'sku',
+      header: 'Mã SKU',
+      className: 'min-w-[110px] whitespace-nowrap',
+      cell: (row) => <span className="font-mono text-xs text-on-surface-variant">{row.sku}</span>,
+    },
+    {
+      id: 'staff',
+      header: 'NV bán hàng',
+      className: 'min-w-[180px]',
+      cell: (row) => (
+        <div className="flex items-center gap-1.5 whitespace-nowrap">
+          <div className="text-xs text-on-surface">{row.staffName}</div>
           {ctx.canEdit && (
             <TextButton title="Cập nhật nhân viên" onClick={() => ctx.onEditStaff(row)}>
               Chỉnh sửa
             </TextButton>
           )}
-      </div>
-    ),
-  },
-  {
-    id: 'qtyText',
-    header: 'Số lượng',
-    className: 'min-w-[170px] text-center whitespace-nowrap',
-    cell: (row) =>
-      ctx.editingId === row.id ? (
-        <QtyEditor
-          key={row.id}
-          initial={row.quantity}
-          unit={row.unit}
-          saving={ctx.saving}
-          onConfirm={(q) => ctx.onConfirm(row.id, q)}
-          onCancel={ctx.onCancel}
-        />
-      ) : (
-        <span className="inline-flex items-center gap-1 font-medium text-on-surface">
-          {row.qtyText}
+        </div>
+      ),
+    },
+    {
+      id: 'qtyText',
+      header: 'Số lượng',
+      className: 'min-w-[170px] text-center whitespace-nowrap',
+      cell: (row) =>
+        ctx.editingId === row.id ? (
+          <QtyEditor
+            key={row.id}
+            initial={row.quantity}
+            unit={row.unit}
+            saving={ctx.saving}
+            onConfirm={(q) => ctx.onConfirm(row.id, q)}
+            onCancel={ctx.onCancel}
+          />
+        ) : (
+          <span className="inline-flex items-center gap-1 font-medium text-on-surface">
+            {row.qtyText}
             {ctx.canEdit && (
               <TextButton title="Đổi số lượng" onClick={() => ctx.onStartEdit(row.id)}>
                 Chỉnh sửa
               </TextButton>
             )}
-        </span>
+          </span>
+        ),
+    },
+    {
+      id: 'sellTotal',
+      header: 'Giá bán lẻ',
+      className: 'min-w-[140px] text-right whitespace-nowrap',
+      cell: (row) => (
+        <div>
+          <div className="font-medium text-on-surface">{formatVND(row.sellTotal)}</div>
+          <div className="text-[11px] text-on-surface-variant">({formatVND(row.sellUnit)}/đv)</div>
+        </div>
       ),
-  },
-  {
-    id: 'sellTotal',
-    header: 'Giá bán lẻ',
-    className: 'min-w-[140px] text-right whitespace-nowrap',
-    cell: (row) => (
-      <div>
-        <div className="font-medium text-on-surface">{formatVND(row.sellTotal)}</div>
-        <div className="text-[11px] text-on-surface-variant">({formatVND(row.sellUnit)}/đv)</div>
-      </div>
-    ),
-  },
-  {
-    id: 'costTotal',
-    header: 'Giá vốn nhập',
-    className: 'min-w-[140px] text-right whitespace-nowrap',
-    cell: (row) => (
-      <div className="text-xs text-on-surface-variant">
-        <div>{formatVND(row.costTotal)}</div>
-        <div className="text-[11px]">({formatVND(row.costUnit)}/đv)</div>
-      </div>
-    ),
-  },
-  {
-    id: 'profit',
-    header: 'Lợi nhuận gộp',
-    className: 'min-w-[130px] text-right whitespace-nowrap',
-    cell: (row) => <span className="font-semibold text-success">+{formatVND(row.profit)}</span>,
-  },
-  {
-    id: 'actions',
-    header: '',
-    className: 'w-[52px] text-right',
+    },
+    ...(ctx.canViewProfit
+      ? [
+          {
+            id: 'costTotal',
+            header: 'Giá vốn nhập',
+            className: 'min-w-[140px] text-right whitespace-nowrap',
+            cell: (row: EnrichedRetailLine) => (
+              <div className="text-xs text-on-surface-variant">
+                <div>{formatVND(row.costTotal)}</div>
+                <div className="text-[11px]">({formatVND(row.costUnit)}/đv)</div>
+              </div>
+            ),
+          },
+          {
+            id: 'profit',
+            header: 'Lợi nhuận gộp',
+            className: 'min-w-[130px] text-right whitespace-nowrap',
+            cell: (row: EnrichedRetailLine) => (
+              <span className="font-semibold text-success">+{formatVND(row.profit)}</span>
+            ),
+          },
+        ]
+      : []),
+    {
+      id: 'actions',
+      header: '',
+      className: 'w-[52px] text-right',
       cell: (row) =>
         ctx.canEdit ? (
           <TextButton
@@ -644,6 +656,7 @@ export default function OrderDetailMain({
   onDeleteService,
   onUpdateRetailQty,
   onDeleteRetail,
+  canViewProfit,
 }: {
   services: EnrichedServiceLine[];
   materials: EnrichedMaterialLine[];
@@ -666,6 +679,7 @@ export default function OrderDetailMain({
   onDeleteService: (line: { id: string; name: string }) => void;
   onUpdateRetailQty: (itemId: string, quantity: number, unit: string) => Promise<void>;
   onDeleteRetail: (line: { id: string; name: string }) => void;
+  canViewProfit: boolean;
 }) {
   const [updateTarget, setUpdateTarget] = React.useState<{
     id: string;
@@ -843,46 +857,46 @@ export default function OrderDetailMain({
             {canEditMaterials && (
               <div className="relative w-full">
                 <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-on-surface-variant" />
-              <input
-                value={matQuery}
-                onChange={(e) => setMatQuery(e.target.value)}
-                onFocus={() => setMatFocused(true)}
-                onBlur={() => setTimeout(() => setMatFocused(false), 150)}
-                placeholder="Thêm vật tư: tìm theo tên, SKU..."
-                className="w-full rounded-lg bg-surface-container py-2 pr-3 pl-9 text-xs text-on-surface shadow-inner placeholder:text-on-surface-variant focus:ring-1 focus:ring-primary focus:outline-none"
-              />
-              {matFocused && (
-                <div className="absolute inset-x-0 top-full z-10 mt-1 overflow-hidden rounded-lg border border-outline bg-surface shadow-md">
-                  {matSuggestions.length === 0 ? (
-                    <div className="px-3 py-2 text-xs text-on-surface-variant">
-                      Không tìm thấy vật tư phù hợp.
-                    </div>
-                  ) : (
-                    matSuggestions.map((p) => (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => {
-                          onAddMaterial(p.id);
-                          setMatQuery('');
-                        }}
-                        className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-xs transition-colors hover:bg-surface-container"
-                      >
-                        <span className="min-w-0">
-                          <span className="block truncate font-semibold text-on-surface">
-                            {p.name}
+                <input
+                  value={matQuery}
+                  onChange={(e) => setMatQuery(e.target.value)}
+                  onFocus={() => setMatFocused(true)}
+                  onBlur={() => setTimeout(() => setMatFocused(false), 150)}
+                  placeholder="Thêm vật tư: tìm theo tên, SKU..."
+                  className="w-full rounded-lg bg-surface-container py-2 pr-3 pl-9 text-xs text-on-surface shadow-inner placeholder:text-on-surface-variant focus:ring-1 focus:ring-primary focus:outline-none"
+                />
+                {matFocused && (
+                  <div className="absolute inset-x-0 top-full z-10 mt-1 overflow-hidden rounded-lg border border-outline bg-surface shadow-md">
+                    {matSuggestions.length === 0 ? (
+                      <div className="px-3 py-2 text-xs text-on-surface-variant">
+                        Không tìm thấy vật tư phù hợp.
+                      </div>
+                    ) : (
+                      matSuggestions.map((p) => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => {
+                            onAddMaterial(p.id);
+                            setMatQuery('');
+                          }}
+                          className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-xs transition-colors hover:bg-surface-container"
+                        >
+                          <span className="min-w-0">
+                            <span className="block truncate font-semibold text-on-surface">
+                              {p.name}
+                            </span>
+                            <span className="font-mono text-[11px] text-on-surface-variant">
+                              SKU: {p.sku} • {formatPlain(p.cost_price ?? 0)}đ
+                            </span>
                           </span>
-                          <span className="font-mono text-[11px] text-on-surface-variant">
-                            SKU: {p.sku} • {formatPlain(p.cost_price ?? 0)}đ
-                          </span>
-                        </span>
-                        <PlusCircle className="h-4 w-4 shrink-0 text-primary" />
-                      </button>
-                    ))
-                  )}
-                </div>
-              )}
+                          <PlusCircle className="h-4 w-4 shrink-0 text-primary" />
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -892,6 +906,7 @@ export default function OrderDetailMain({
             services,
             productById,
             canEdit: canEditMaterials,
+            canViewProfit,
             editing: editingMat,
             onStartEdit: startMatEdit,
             onDraft: draftMatEdit,
@@ -906,12 +921,14 @@ export default function OrderDetailMain({
           emptyText="Đơn không tiêu hao vật tư."
           rowClassName={(row) => (row.stripe ? 'bg-surface-container/20' : undefined)}
           footer={
-            <div className="flex w-full items-center justify-between">
-              <span className="text-xs font-medium text-on-surface-variant">
-                Tổng chi phí vật tư tiêu hao:
-              </span>
-              <div className="text-sm font-bold text-on-surface">{formatVND(materialTotal)}</div>
-            </div>
+            canViewProfit ? (
+              <div className="flex w-full items-center justify-between">
+                <span className="text-xs font-medium text-on-surface-variant">
+                  Tổng chi phí vật tư tiêu hao:
+                </span>
+                <div className="text-sm font-bold text-on-surface">{formatVND(materialTotal)}</div>
+              </div>
+            ) : undefined
           }
         />
         {hasPendingChanges && (
@@ -944,6 +961,7 @@ export default function OrderDetailMain({
         <DashTable
           columns={retailColumns({
             canEdit: canEditItems,
+            canViewProfit,
             editingId: editingQtyId,
             saving: savingQtyId !== null,
             onStartEdit: (id) => setEditingQtyId(id),
@@ -962,14 +980,18 @@ export default function OrderDetailMain({
                 Doanh thu bán lẻ:{' '}
                 <span className="font-semibold text-on-surface">{formatVND(retailRevenue)}</span>
               </div>
-              <div className="text-on-surface-variant">
-                Tổng giá vốn:{' '}
-                <span className="font-semibold text-on-surface">{formatVND(retailCost)}</span>
-              </div>
-              <div className="flex items-center gap-1 font-semibold text-success">
-                <TrendingUp className="h-3.5 w-3.5" />
-                Lãi gộp sản phẩm: {formatVND(retailProfit)}
-              </div>
+              {canViewProfit && (
+                <>
+                  <div className="text-on-surface-variant">
+                    Tổng giá vốn:{' '}
+                    <span className="font-semibold text-on-surface">{formatVND(retailCost)}</span>
+                  </div>
+                  <div className="flex items-center gap-1 font-semibold text-success">
+                    <TrendingUp className="h-3.5 w-3.5" />
+                    Lãi gộp sản phẩm: {formatVND(retailProfit)}
+                  </div>
+                </>
+              )}
             </div>
           }
         />

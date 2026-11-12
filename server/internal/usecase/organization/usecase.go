@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	domain "github.com/daidat02/server/internal/domain/organization"
+	"github.com/daidat02/server/internal/usecase/shared"
 	"github.com/daidat02/server/pkg/apperror"
 	"github.com/daidat02/server/pkg/utils"
 )
@@ -33,6 +34,7 @@ func (u *OrganizationUseCase) CreateOrganization(ctx context.Context, req *domai
 		TaxCode:  strings.TrimSpace(req.TaxCode),
 		Slogan:   strings.TrimSpace(req.Slogan),
 		LogoURL:  strings.TrimSpace(req.LogoURL),
+		IsDemo:   true,
 	}
 
 	if err := org.Validate(); err != nil {
@@ -74,5 +76,28 @@ func (u *OrganizationUseCase) CreateOrganization(ctx context.Context, req *domai
 		return nil, apperror.New(500, "Lỗi khi tạo tổ chức", err)
 	}
 
+	return result, nil
+}
+
+// UpdateDemoStatus chuyển org khỏi chế độ dữ liệu mẫu. API hiện chỉ hỗ trợ
+// tắt demo; bật lại phải tạo organization mới.
+func (u *OrganizationUseCase) UpdateDemoStatus(ctx context.Context, isDemo bool) (*domain.OrganizationResponse, error) {
+	if isDemo {
+		return nil, apperror.New(400, "Không thể bật lại dữ liệu mẫu", nil)
+	}
+
+	orgID, err := shared.RequireOrgID(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := u.repo.DisableDemo(ctx, orgID)
+	if err != nil {
+		if errors.Is(err, domain.ErrOrganizationNotFound) {
+			return nil, apperror.New(404, "Không tìm thấy tổ chức", err)
+		}
+		log.Println("Error disabling demo data:", err)
+		return nil, apperror.New(500, "Lỗi khi xóa dữ liệu mẫu", err)
+	}
 	return result, nil
 }

@@ -2,6 +2,7 @@ package order
 
 import (
 	"github.com/daidat02/server/internal/delivery/http/middlewares"
+	userDomain "github.com/daidat02/server/internal/domain/user"
 	"github.com/gin-gonic/gin"
 )
 
@@ -18,8 +19,8 @@ func RegisterOrderRoutes(r *gin.Engine, h *OrderHandler, basePath string) {
 		group.DELETE("/:id/items/:itemId", h.DeleteOrderItem)
 		group.GET("/:id", h.GetOrderDetail)
 
-		group.POST("/:id/cancel", h.CancelOrder)
-		group.POST("/:id/refund", h.RefundOrder)
+		group.POST("/:id/cancel", middlewares.VertifyRole(userDomain.RoleOwner, userDomain.RoleManager), h.CancelOrder)
+		group.POST("/:id/refund", middlewares.VertifyRole(userDomain.RoleOwner), h.RefundOrder)
 		group.POST("/:id/complete", h.CompleteOrder)
 		group.POST("/:id/payments/init", h.InitPayment)
 		group.POST("/:id/payments/:paymentId/confirm", h.ConfirmPayment)

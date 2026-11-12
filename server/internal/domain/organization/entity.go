@@ -22,6 +22,7 @@ type Organization struct {
 	TaxCode  string
 	Slogan   string
 	LogoURL  string
+	IsDemo   bool
 }
 
 // OwnerAccount là tài khoản chủ salon tạo kèm organization.

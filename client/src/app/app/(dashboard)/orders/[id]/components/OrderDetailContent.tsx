@@ -30,6 +30,7 @@ import useCustomer from '@/hooks/use-customer';
 import useService from '@/hooks/use-service';
 import useProduct from '@/hooks/use-product';
 import useStaff from '@/hooks/use-staff';
+import useAuth from '@/hooks/use-auth';
 import type { Customer } from '@/types/customer';
 import type { Product } from '@/types/product';
 import type { Service } from '@/types/service';
@@ -82,6 +83,8 @@ export default function OrderDetailContent() {
   const { data: generalSettings } = useGeneralSettings();
   const { data: paymentSettings } = usePaymentSettings();
   const authUser = useAppSelector(selectAuthUser);
+  const { can } = useAuth();
+  const canViewProfit = can('reports:profit-view');
 
   const services = React.useMemo(() => toMap<Service>(serviceData?.data ?? []), [serviceData]);
   const products = React.useMemo(() => toMap<Product>(productData?.data ?? []), [productData]);
@@ -585,13 +588,16 @@ export default function OrderDetailContent() {
         badge={meta.label}
         badgeVariant="soft"
         description={
-          <p className="mt-0.5 flex items-center gap-2 text-xs text-on-surface-variant">
-            <span>Thời gian tạo đơn: {formatDateTime(order.created_at)}</span>
-          </p>
+          <div className="mt-0.5 space-y-1 text-xs text-on-surface-variant">
+            <p>Thời gian tạo đơn: {formatDateTime(order.created_at)}</p>
+            {order.description && (
+              <p className="max-w-3xl text-on-surface">{order.description}</p>
+            )}
+          </div>
         }
         actions={[
           { label: 'In hóa đơn', icon: Printer, variant: 'outline', onClick: handlePrintInvoice },
-          ...(order.status === 'pending' || order.status === 'confirm'
+          ...((order.status === 'pending' || order.status === 'confirm') && can('order:cancel')
             ? [
                 {
                   label: 'Hủy đơn',
@@ -601,7 +607,7 @@ export default function OrderDetailContent() {
                 },
               ]
             : []),
-          ...(order.status === 'completed'
+          ...(order.status === 'completed' && can('order:refund')
             ? [
                 {
                   label: 'Hoàn đơn',
@@ -655,6 +661,7 @@ export default function OrderDetailContent() {
             onDeleteService={handleDeleteLine}
             onUpdateRetailQty={handleUpdateRetailQty}
             onDeleteRetail={handleDeleteLine}
+            canViewProfit={canViewProfit}
           />
         </div>
         <div className="space-y-6 lg:col-span-4">
@@ -667,6 +674,7 @@ export default function OrderDetailContent() {
             cashierName="Thu ngân"
             services={enriched.serviceLines}
             retail={enriched.retailLines}
+            canViewProfit={canViewProfit}
           />
         </div>
       </div>

@@ -131,6 +131,60 @@ func (u *ServiceUsecase) validateMaterials(ctx context.Context, orgID string, ma
 	return nil
 }
 
+// ReplaceServiceMaterials thay toàn bộ định mức vật tư của dịch vụ trong 1
+// transaction. Mảng rỗng xóa hết định mức; chỉ ảnh hưởng các đơn tạo sau này
+// vì đơn cũ đã giữ snapshot vật tư riêng.
+func (u *ServiceUsecase) ReplaceServiceMaterials(ctx context.Context, serviceID string, materials []*domain.ServiceMaterialInput) ([]*domain.ServiceMaterial, error) {
+	serviceID = strings.TrimSpace(serviceID)
+	if serviceID == "" {
+		return nil, apperror.New(400, "Thiếu id dịch vụ", nil)
+	}
+
+	orgID, err := shared.RequireOrgID(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	seen := make(map[string]struct{}, len(materials))
+	for i, m := range materials {
+		if m == nil {
+			continue
+		}
+		productID := strings.TrimSpace(m.ProductID)
+		if productID == "" {
+			continue
+		}
+		if _, ok := seen[productID]; ok {
+			return nil, apperror.New(400, fmt.Sprintf("Nguyên vật liệu thứ %d: product_id bị trùng", i+1), nil)
+		}
+		seen[productID] = struct{}{}
+	}
+
+	if err := u.validateMaterials(ctx, orgID, materials); err != nil {
+		return nil, err
+	}
+
+	if err := u.repo.ReplaceServiceMaterials(ctx, orgID, serviceID, materials); err != nil {
+		log.Println("Error replacing service materials:", err)
+		if errors.Is(err, domain.ErrServiceNotFound) {
+			return nil, apperror.New(404, "Không tìm thấy dịch vụ", err)
+		}
+		return nil, apperror.New(500, "Lỗi khi cập nhật định mức nguyên vật liệu", err)
+	}
+
+	_, result, err := u.repo.GetServiceDetails(ctx, orgID, serviceID)
+	if err != nil {
+		if errors.Is(err, domain.ErrServiceNotFound) {
+			return nil, apperror.New(404, "Không tìm thấy dịch vụ", err)
+		}
+		return nil, apperror.New(500, "Lỗi khi lấy định mức nguyên vật liệu", err)
+	}
+	if result == nil {
+		result = []*domain.ServiceMaterial{}
+	}
+	return result, nil
+}
+
 // netHint gợi ý net_unit trong message lỗi.
 func netHint(nu string) string {
 	if nu == "" {

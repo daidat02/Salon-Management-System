@@ -22,7 +22,7 @@ const (
 		VALUES
 	`
 	// ---------- 2. Đọc đơn ----------
-	orderColumns      = `id, organization_id, code, customer_id, appointment_id, subtotal_amount, discount_amount, total_amount, status, created_by, created_at, updated_at`
+	orderColumns      = `id, organization_id, code, customer_id, appointment_id, subtotal_amount, discount_amount, total_amount, description, status, created_by, created_at, updated_at`
 	getOrderByIDQuery = `
 		SELECT ` + orderColumns + `
 		FROM orders
@@ -159,6 +159,12 @@ const (
 		SET status = 'completed', updated_at = now()
 		WHERE organization_id = $1 AND id = $2 AND status IN ('pending', 'confirm', 'delivery')
 	`
+	// Ghi tóm tắt dịch vụ/sản phẩm trong cùng tx chốt đơn.
+	updateOrderDescriptionQuery = `
+		UPDATE orders
+		SET description = $3, updated_at = now()
+		WHERE organization_id = $1 AND id = $2
+	`
 	// Lịch hẹn của đơn chuyển completed cùng tx khi chốt đơn.
 	completeAppointmentQuery = `
 		UPDATE appointments
@@ -265,7 +271,13 @@ const (
 	// ---------- 6. POS (danh mục bán hàng; giá/định mức nằm ở product/service repo) ----------
 	listItemPosQuery = `
         SELECT * FROM (
-            SELECT id, organization_id, category_id, 'product' AS type, name, NULL AS description, NULL AS duration_minutes, unit, sell_price AS price, stock_quantity, is_active
+            SELECT id, organization_id, category_id, 'product' AS type, name, NULL AS description, NULL AS duration_minutes, unit, sell_price AS price, 
+			CASE 
+				WHEN net_amount IS NOT NULL AND net_amount > 0 
+				THEN TRUNC(stock_quantity / net_amount)
+				ELSE stock_quantity 
+			END AS stock_quantity
+			, is_active
             FROM products p
             WHERE p.organization_id = $1 AND p.is_active = true
             AND (product_type = $2 OR product_type = $3)
@@ -283,15 +295,16 @@ const (
 
 	filterItemPosQuery = `
         AND ($5 = '' OR category_id::text = $5)
+        AND ($6 = '' OR type = $6)
     `
 
 	// Sắp xếp lại thứ tự con trỏ khớp với ORDER BY: (type, name, id)
 	// NULLIF + cast ::uuid để so sánh đúng kiểu UUID khi phân trang;
-	// nhánh $6 = '' short-circuit nên không bao giờ cast chuỗi rỗng.
+	// nhánh $7 = '' short-circuit nên không bao giờ cast chuỗi rỗng.
 	paginateItemPosQuery = `
-        AND ($6 = '' OR (type, name, id) > ($6, $7, NULLIF($8, '')::uuid))
+        AND ($7 = '' OR (type, name, id) > ($7, $8, NULLIF($9, '')::uuid))
         ORDER BY type ASC, name ASC, id ASC
-        LIMIT $9
+        LIMIT $10
     `
 
 	// ---------- 7. Thống kê 4 thẻ đơn hàng (1 query aggregate) ----------

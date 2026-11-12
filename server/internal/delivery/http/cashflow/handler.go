@@ -27,6 +27,7 @@ func NewCashFlowHandler(uc *uc.CashflowUsecase) *CashFlowHandler {
 
 // CreateCashFlow godoc
 // @Summary      Tạo phiếu thu/chi
+// @Description  Mọi vai trò đã đăng nhập đều có thể tạo phiếu; phiếu mới ở trạng thái chờ duyệt.
 // @Tags         Cashflows
 // @Accept       json
 // @Produce      json
@@ -128,6 +129,7 @@ func (h *CashFlowHandler) GetCashFlowByID(c *gin.Context) {
 
 // ApproveCashFlow godoc
 // @Summary      Duyệt phiếu thu/chi
+// @Description  Yêu cầu vai trò: owner hoặc manager.
 // @Tags         Cashflows
 // @Produce      json
 // @Security     BearerAuth
@@ -135,6 +137,7 @@ func (h *CashFlowHandler) GetCashFlowByID(c *gin.Context) {
 // @Success      200  {object}  response.SuccessResponse
 // @Failure      400  {object}  response.ErrorResponse "Quỹ không đủ số dư"
 // @Failure      404  {object}  response.ErrorResponse
+// @Failure      403  {object}  response.ErrorResponse  "Không có quyền truy cập"
 // @Router       /cashflows/{id}/approve [post]
 func (h *CashFlowHandler) ApproveCashFlow(c *gin.Context) {
 	approvedBy := c.GetString("userId")
@@ -147,12 +150,14 @@ func (h *CashFlowHandler) ApproveCashFlow(c *gin.Context) {
 
 // CancelCashFlow godoc
 // @Summary      Hủy phiếu thu/chi (chỉ phiếu pending)
+// @Description  Yêu cầu vai trò: owner hoặc manager.
 // @Tags         Cashflows
 // @Produce      json
 // @Security     BearerAuth
 // @Param        id   path      string  true  "ID phiếu"
 // @Success      200  {object}  response.SuccessResponse
 // @Failure      404  {object}  response.ErrorResponse
+// @Failure      403  {object}  response.ErrorResponse  "Không có quyền truy cập"
 // @Router       /cashflows/{id}/cancel [post]
 func (h *CashFlowHandler) CancelCashFlow(c *gin.Context) {
 	if err := h.uc.CancelCashFlow(c.Request.Context(), c.Param("id")); err != nil {
@@ -168,6 +173,7 @@ func (h *CashFlowHandler) CancelCashFlow(c *gin.Context) {
 
 // CreateFund godoc
 // @Summary      Tạo quỹ
+// @Description  Yêu cầu vai trò: owner hoặc manager.
 // @Tags         Funds
 // @Accept       json
 // @Produce      json
@@ -175,6 +181,7 @@ func (h *CashFlowHandler) CancelCashFlow(c *gin.Context) {
 // @Param        body  body      domain.CreateFundRequest  true  "Thông tin quỹ"
 // @Success      200   {object}  response.SuccessResponse
 // @Failure      400   {object}  response.ErrorResponse
+// @Failure      403  {object}  response.ErrorResponse  "Không có quyền truy cập"
 // @Router       /funds [post]
 func (h *CashFlowHandler) CreateFund(c *gin.Context) {
 	var req domain.CreateFundRequest
@@ -247,6 +254,7 @@ func (h *CashFlowHandler) GetFundByID(c *gin.Context) {
 
 // UpdateFund godoc
 // @Summary      Cập nhật quỹ
+// @Description  Yêu cầu vai trò: owner hoặc manager.
 // @Tags         Funds
 // @Accept       json
 // @Produce      json
@@ -255,6 +263,7 @@ func (h *CashFlowHandler) GetFundByID(c *gin.Context) {
 // @Param        body  body      domain.UpdateFundRequest    true  "Thông tin cập nhật"
 // @Success      200   {object}  response.SuccessResponse
 // @Failure      404   {object}  response.ErrorResponse
+// @Failure      403  {object}  response.ErrorResponse  "Không có quyền truy cập"
 // @Router       /funds/{id} [put]
 func (h *CashFlowHandler) UpdateFund(c *gin.Context) {
 	var req domain.UpdateFundRequest
@@ -273,12 +282,14 @@ func (h *CashFlowHandler) UpdateFund(c *gin.Context) {
 
 // DeactivateFund godoc
 // @Summary      Ngừng sử dụng quỹ
+// @Description  Yêu cầu vai trò: owner hoặc manager.
 // @Tags         Funds
 // @Produce      json
 // @Security     BearerAuth
 // @Param        id   path      string  true  "ID quỹ"
 // @Success      200  {object}  response.SuccessResponse
 // @Failure      404  {object}  response.ErrorResponse
+// @Failure      403  {object}  response.ErrorResponse  "Không có quyền truy cập"
 // @Router       /funds/{id} [delete]
 func (h *CashFlowHandler) DeactivateFund(c *gin.Context) {
 	if err := h.uc.DeactivateFund(c.Request.Context(), c.Param("id")); err != nil {
@@ -294,6 +305,7 @@ func (h *CashFlowHandler) DeactivateFund(c *gin.Context) {
 
 // CreateCashFlowCategory godoc
 // @Summary      Tạo danh mục thu/chi
+// @Description  Yêu cầu vai trò: owner hoặc manager.
 // @Tags         CashflowCategories
 // @Accept       json
 // @Produce      json
@@ -301,6 +313,7 @@ func (h *CashFlowHandler) DeactivateFund(c *gin.Context) {
 // @Param        body  body      domain.CreateCashFlowCategoryRequest  true  "Thông tin danh mục"
 // @Success      200   {object}  response.SuccessResponse
 // @Failure      400   {object}  response.ErrorResponse
+// @Failure      403  {object}  response.ErrorResponse  "Không có quyền truy cập"
 // @Router       /cashflow-categories [post]
 func (h *CashFlowHandler) CreateCashFlowCategory(c *gin.Context) {
 	var req domain.CreateCashFlowCategoryRequest
@@ -336,6 +349,7 @@ func (h *CashFlowHandler) GetCashFlowCategories(c *gin.Context) {
 
 // UpdateCashFlowCategory godoc
 // @Summary      Cập nhật danh mục thu/chi
+// @Description  Yêu cầu vai trò: owner hoặc manager.
 // @Tags         CashflowCategories
 // @Accept       json
 // @Produce      json
@@ -344,6 +358,7 @@ func (h *CashFlowHandler) GetCashFlowCategories(c *gin.Context) {
 // @Param        body  body      domain.UpdateCashFlowCategoryRequest  true  "Thông tin cập nhật"
 // @Success      200   {object}  response.SuccessResponse
 // @Failure      404   {object}  response.ErrorResponse
+// @Failure      403  {object}  response.ErrorResponse  "Không có quyền truy cập"
 // @Router       /cashflow-categories/{id} [put]
 func (h *CashFlowHandler) UpdateCashFlowCategory(c *gin.Context) {
 	var req domain.UpdateCashFlowCategoryRequest
@@ -362,12 +377,14 @@ func (h *CashFlowHandler) UpdateCashFlowCategory(c *gin.Context) {
 
 // DeleteCashFlowCategory godoc
 // @Summary      Xóa danh mục thu/chi (không xóa danh mục hệ thống)
+// @Description  Yêu cầu vai trò: owner hoặc manager.
 // @Tags         CashflowCategories
 // @Produce      json
 // @Security     BearerAuth
 // @Param        id   path      string  true  "ID danh mục"
 // @Success      200  {object}  response.SuccessResponse
 // @Failure      404  {object}  response.ErrorResponse
+// @Failure      403  {object}  response.ErrorResponse  "Không có quyền truy cập"
 // @Router       /cashflow-categories/{id} [delete]
 func (h *CashFlowHandler) DeleteCashFlowCategory(c *gin.Context) {
 	deletedID, err := h.uc.DeleteCashFlowCategory(c.Request.Context(), c.Param("id"))

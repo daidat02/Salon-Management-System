@@ -20,6 +20,7 @@ func NewSupplierHandler(uc *uc.SupplierUsecase) *SupplierHandler {
 
 // CreateSupplier godoc
 // @Summary      Tạo nhà cung cấp
+// @Description  Yêu cầu vai trò: owner hoặc manager.
 // @Tags         Suppliers
 // @Accept       json
 // @Produce      json
@@ -28,6 +29,7 @@ func NewSupplierHandler(uc *uc.SupplierUsecase) *SupplierHandler {
 // @Success      200   {object}  response.SuccessResponse      "Tạo nhà cung cấp thành công"
 // @Failure      400   {object}  response.ErrorResponse        "Dữ liệu không hợp lệ / thiếu organization"
 // @Failure      401   {object}  response.ErrorResponse        "Thiếu token / token không hợp lệ"
+// @Failure      403  {object}  response.ErrorResponse  "Không có quyền truy cập"
 // @Router       /suppliers [post]
 func (h *SupplierHandler) CreateSupplier(c *gin.Context) {
 	var req domain.CreateSupplierRequest

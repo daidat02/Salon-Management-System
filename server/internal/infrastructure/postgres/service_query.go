@@ -117,6 +117,15 @@ const (
 		DELETE FROM services
 		WHERE id = $1 AND organization_id = $2
 	`
+	lockServiceQuery = `
+		SELECT id FROM services
+		WHERE id = $1 AND organization_id = $2
+		FOR UPDATE
+	`
+	deleteServiceMaterialsQuery = `
+		DELETE FROM service_materials
+		WHERE service_id = $1 AND organization_id = $2
+	`
 
 	bulkInsertServiceMaterialsQuery = `
 		INSERT INTO service_materials (id, organization_id, service_id, product_id, quantity, unit)
@@ -142,6 +151,12 @@ const (
 	`
 	servicePricesQuery = `
 		SELECT id, price
+		FROM services
+		WHERE organization_id = $1 AND id = ANY($2)
+	`
+	// Không lọc deleted_at để vẫn lấy được tên DV đã xóa mềm khi chốt đơn.
+	serviceNamesQuery = `
+		SELECT id, name
 		FROM services
 		WHERE organization_id = $1 AND id = ANY($2)
 	`

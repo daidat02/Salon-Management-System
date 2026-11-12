@@ -1,4 +1,9 @@
-import { Service, ServiceDetailResult, ServiceStats } from '@/types/service';
+import {
+  Service,
+  ServiceDetailResult,
+  ServiceMaterial,
+  ServiceStats,
+} from '@/types/service';
 import { ApiResponse, PaginationResult } from '@/types/response';
 import apiClient from './apiClient';
 import { API_ENDPOINTS } from '@/constants';
@@ -70,4 +75,22 @@ export type UpdateServicePayload = CreateServicePayload;
 export const updateService = async (id: string, payload: UpdateServicePayload) => {
   const res = await apiClient.put<ApiResponse<Service>>(SERVICES_ENDPOINT.UPDATE(id), payload);
   return res.data.data;
+};
+
+export type ReplaceServiceMaterialPayload = {
+  product_id: string;
+  quantity: number;
+  unit?: string;
+};
+
+/** Thay toàn bộ định mức vật tư của dịch vụ; mảng rỗng xóa hết. */
+export const replaceServiceMaterials = async (
+  id: string,
+  materials: ReplaceServiceMaterialPayload[],
+) => {
+  const res = await apiClient.put<ApiResponse<{ materials: ServiceMaterial[] }>>(
+    SERVICES_ENDPOINT.REPLACE_MATERIALS(id),
+    { materials },
+  );
+  return res.data.data.materials;
 };

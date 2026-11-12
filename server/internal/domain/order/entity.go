@@ -34,18 +34,20 @@ const (
 )
 
 type Order struct {
-	ID             string     `json:"id" db:"id"`
-	OrganizationID string     `json:"organization_id" db:"organization_id"`
-	Code           string     `json:"code" db:"code"`
-	CustomerID     *string    `json:"customer_id" db:"customer_id"`
-	AppointmentID  *string    `json:"appointment_id" db:"appointment_id"`
-	SubtotalAmount float64    `json:"subtotal_amount" db:"subtotal_amount"`
-	DiscountAmount float64    `json:"discount_amount" db:"discount_amount"`
-	TotalAmount    float64    `json:"total_amount" db:"total_amount"`
-	Status         string     `json:"status" db:"status"`
-	CreatedBy      *string    `json:"created_by" db:"created_by"`
-	CreatedAt      *time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt      *time.Time `json:"updated_at" db:"updated_at"`
+	ID             string  `json:"id" db:"id"`
+	OrganizationID string  `json:"organization_id" db:"organization_id"`
+	Code           string  `json:"code" db:"code"`
+	CustomerID     *string `json:"customer_id" db:"customer_id"`
+	AppointmentID  *string `json:"appointment_id" db:"appointment_id"`
+	SubtotalAmount float64 `json:"subtotal_amount" db:"subtotal_amount"`
+	DiscountAmount float64 `json:"discount_amount" db:"discount_amount"`
+	TotalAmount    float64 `json:"total_amount" db:"total_amount"`
+	// Description tóm tắt tên dịch vụ/sản phẩm, chốt lúc thanh toán thành công.
+	Description string     `json:"description" db:"description"`
+	Status      string     `json:"status" db:"status"`
+	CreatedBy   *string    `json:"created_by" db:"created_by"`
+	CreatedAt   *time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt   *time.Time `json:"updated_at" db:"updated_at"`
 }
 
 func (o *Order) Validate() error {

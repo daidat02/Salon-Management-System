@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	domain "github.com/daidat02/server/internal/domain/customer"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
@@ -145,6 +146,20 @@ func (r *PostgresCustomerRepository) UpdateCustomer(ctx context.Context, custome
 		return fmt.Errorf("cập nhật khách hàng %s: %w", customer.ID, domain.ErrCustomerNotFound)
 	}
 
+	return nil
+}
+
+// UpdateCustomerSpendingTx cộng dồn thống kê khách hàng trong transaction có sẵn
+// (dùng chung tx chốt đơn): +1 lần ghé, +totalSpent tổng chi và +điểm tích lũy.
+func UpdateCustomerSpendingTx(ctx context.Context, tx pgx.Tx, orgID, customerID string, totalSpent float64) error {
+	points := domain.RewardPointsForAmount(totalSpent)
+	tag, err := tx.Exec(ctx, updateCustomerSpendingQuery, orgID, customerID, totalSpent, points)
+	if err != nil {
+		return fmt.Errorf("lỗi khi cập nhật chi tiêu khách hàng: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("cập nhật chi tiêu khách hàng %s: %w", customerID, domain.ErrCustomerNotFound)
+	}
 	return nil
 }
 

@@ -397,6 +397,13 @@ definitions:
     - owner_phone
     - slug
     type: object
+  github_com_daidat02_server_internal_domain_organization.UpdateDemoStatusRequest:
+    properties:
+      is_demo:
+        type: boolean
+    required:
+    - is_demo
+    type: object
   github_com_daidat02_server_internal_domain_product.CreateProductRequest:
     properties:
       category_id:
@@ -475,6 +482,13 @@ definitions:
         type: string
       price:
         type: number
+    type: object
+  github_com_daidat02_server_internal_domain_service.ReplaceServiceMaterialsRequest:
+    properties:
+      materials:
+        items:
+          $ref: '#/definitions/github_com_daidat02_server_internal_domain_service.ServiceMaterialInput'
+        type: array
     type: object
   github_com_daidat02_server_internal_domain_service.ServiceMaterialInput:
     properties:
@@ -578,6 +592,8 @@ definitions:
         type: string
       id:
         type: string
+      is_demo:
+        type: boolean
       logo_url:
         type: string
       name:
@@ -946,6 +962,7 @@ paths:
       - Appointments
   /appointments/{id}:
     delete:
+      description: 'Yêu cầu vai trò: owner hoặc manager.'
       parameters:
       - description: ID lịch hẹn
         in: path
@@ -965,6 +982,10 @@ paths:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "403":
+          description: Không có quyền truy cập
           schema:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
         "404":
@@ -1224,6 +1245,7 @@ paths:
     post:
       consumes:
       - application/json
+      description: 'Yêu cầu vai trò: owner hoặc manager.'
       parameters:
       - description: Thông tin danh mục
         in: body
@@ -1242,6 +1264,10 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "403":
+          description: Không có quyền truy cập
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Tạo danh mục thu/chi
@@ -1249,6 +1275,7 @@ paths:
       - CashflowCategories
   /cashflow-categories/{id}:
     delete:
+      description: 'Yêu cầu vai trò: owner hoặc manager.'
       parameters:
       - description: ID danh mục
         in: path
@@ -1262,6 +1289,10 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+        "403":
+          description: Không có quyền truy cập
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
         "404":
           description: Not Found
           schema:
@@ -1274,6 +1305,7 @@ paths:
     put:
       consumes:
       - application/json
+      description: 'Yêu cầu vai trò: owner hoặc manager.'
       parameters:
       - description: ID danh mục
         in: path
@@ -1293,6 +1325,10 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+        "403":
+          description: Không có quyền truy cập
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
         "404":
           description: Not Found
           schema:
@@ -1364,6 +1400,8 @@ paths:
     post:
       consumes:
       - application/json
+      description: Mọi vai trò đã đăng nhập đều có thể tạo phiếu; phiếu mới ở trạng
+        thái chờ duyệt.
       parameters:
       - description: Thông tin phiếu
         in: body
@@ -1413,6 +1451,7 @@ paths:
       - Cashflows
   /cashflows/{id}/approve:
     post:
+      description: 'Yêu cầu vai trò: owner hoặc manager.'
       parameters:
       - description: ID phiếu
         in: path
@@ -1430,6 +1469,10 @@ paths:
           description: Quỹ không đủ số dư
           schema:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "403":
+          description: Không có quyền truy cập
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
         "404":
           description: Not Found
           schema:
@@ -1441,6 +1484,7 @@ paths:
       - Cashflows
   /cashflows/{id}/cancel:
     post:
+      description: 'Yêu cầu vai trò: owner hoặc manager.'
       parameters:
       - description: ID phiếu
         in: path
@@ -1454,6 +1498,10 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+        "403":
+          description: Không có quyền truy cập
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
         "404":
           description: Not Found
           schema:
@@ -1528,6 +1576,7 @@ paths:
     post:
       consumes:
       - application/json
+      description: 'Yêu cầu vai trò: owner hoặc manager.'
       parameters:
       - description: 'Thông tin danh mục (type: service | product)'
         in: body
@@ -1550,6 +1599,10 @@ paths:
           description: Thiếu token / token không hợp lệ
           schema:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "403":
+          description: Không có quyền truy cập
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
         "500":
           description: Lỗi server (vd trùng tên trong org)
           schema:
@@ -1561,6 +1614,7 @@ paths:
       - Categories
   /categories/{id}:
     delete:
+      description: 'Yêu cầu vai trò: owner hoặc manager.'
       parameters:
       - description: ID danh mục
         in: path
@@ -1582,6 +1636,10 @@ paths:
           description: Thiếu token / token không hợp lệ
           schema:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "403":
+          description: Không có quyền truy cập
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
         "404":
           description: Không tìm thấy danh mục
           schema:
@@ -1594,6 +1652,7 @@ paths:
     put:
       consumes:
       - application/json
+      description: 'Yêu cầu vai trò: owner hoặc manager.'
       parameters:
       - description: ID danh mục
         in: path
@@ -1619,6 +1678,10 @@ paths:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "403":
+          description: Không có quyền truy cập
           schema:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
         "404":
@@ -1701,6 +1764,7 @@ paths:
       - Customers
   /customers/{id}:
     delete:
+      description: 'Yêu cầu vai trò: owner hoặc manager.'
       parameters:
       - description: ID khách hàng
         in: path
@@ -1720,6 +1784,10 @@ paths:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "403":
+          description: Không có quyền truy cập
           schema:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
         "404":
@@ -1893,6 +1961,7 @@ paths:
     post:
       consumes:
       - application/json
+      description: 'Yêu cầu vai trò: owner hoặc manager.'
       parameters:
       - description: Thông tin quỹ
         in: body
@@ -1911,6 +1980,10 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "403":
+          description: Không có quyền truy cập
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Tạo quỹ
@@ -1918,6 +1991,7 @@ paths:
       - Funds
   /funds/{id}:
     delete:
+      description: 'Yêu cầu vai trò: owner hoặc manager.'
       parameters:
       - description: ID quỹ
         in: path
@@ -1931,6 +2005,10 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+        "403":
+          description: Không có quyền truy cập
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
         "404":
           description: Not Found
           schema:
@@ -1966,6 +2044,7 @@ paths:
     put:
       consumes:
       - application/json
+      description: 'Yêu cầu vai trò: owner hoặc manager.'
       parameters:
       - description: ID quỹ
         in: path
@@ -1985,6 +2064,10 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+        "403":
+          description: Không có quyền truy cập
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
         "404":
           description: Not Found
           schema:
@@ -2078,6 +2161,7 @@ paths:
     post:
       consumes:
       - application/json
+      description: 'Yêu cầu vai trò: owner hoặc manager.'
       parameters:
       - description: 'Phiếu kho: mỗi dòng gửi quantity theo unit hiển thị, server
           tự quy về đơn vị nhỏ nhất + tự quyết giá'
@@ -2099,6 +2183,10 @@ paths:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "403":
+          description: Không có quyền truy cập
           schema:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
       security:
@@ -2142,6 +2230,7 @@ paths:
     post:
       consumes:
       - application/json
+      description: 'Yêu cầu vai trò: owner hoặc manager.'
       parameters:
       - description: ID phiếu nhập
         in: path
@@ -2167,6 +2256,10 @@ paths:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "403":
+          description: Không có quyền truy cập
           schema:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
         "404":
@@ -2478,6 +2571,7 @@ paths:
       - Orders
   /orders/{id}/cancel:
     post:
+      description: 'Yêu cầu vai trò: owner hoặc manager.'
       parameters:
       - description: ID đơn hàng
         in: path
@@ -2497,6 +2591,10 @@ paths:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "403":
+          description: Không có quyền truy cập
           schema:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
         "404":
@@ -2780,6 +2878,7 @@ paths:
       - Orders
   /orders/{id}/refund:
     post:
+      description: 'Yêu cầu vai trò: owner.'
       parameters:
       - description: ID đơn hàng
         in: path
@@ -2799,6 +2898,10 @@ paths:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "403":
+          description: Không có quyền truy cập
           schema:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
         "404":
@@ -2902,6 +3005,10 @@ paths:
         in: query
         name: category
         type: string
+      - description: 'Lọc loại hàng: product | service'
+        in: query
+        name: kind
+        type: string
       - description: 'Con trỏ phân trang: type của dòng cuối trang trước'
         in: query
         name: type
@@ -2996,6 +3103,51 @@ paths:
       summary: Tạo tổ chức mới kèm tài khoản owner và settings mặc định
       tags:
       - Organizations
+  /organizations/demo:
+    patch:
+      consumes:
+      - application/json
+      description: Yêu cầu vai trò owner. Xóa toàn bộ dữ liệu nghiệp vụ của tổ chức,
+        giữ cấu hình, reset quỹ và chuyển is_demo=false.
+      parameters:
+      - description: Trạng thái dữ liệu mẫu (chỉ hỗ trợ false)
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_daidat02_server_internal_domain_organization.UpdateDemoStatusRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Đã xóa dữ liệu mẫu
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+        "400":
+          description: Dữ liệu không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "401":
+          description: Thiếu token / token không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "403":
+          description: Không có quyền truy cập
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "404":
+          description: Không tìm thấy tổ chức
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "500":
+          description: Lỗi server
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Tắt chế độ dữ liệu mẫu
+      tags:
+      - Organizations
   /overview:
     get:
       description: Trả KPI hôm nay, doanh thu 7 ngày, cảnh báo tồn kho, lịch hẹn hôm
@@ -3084,6 +3236,7 @@ paths:
     post:
       consumes:
       - application/json
+      description: 'Yêu cầu vai trò: owner hoặc manager.'
       parameters:
       - description: Thông tin sản phẩm
         in: body
@@ -3106,6 +3259,10 @@ paths:
           description: Thiếu token / token không hợp lệ
           schema:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "403":
+          description: Không có quyền truy cập
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
         "500":
           description: Lỗi server (vd trùng SKU)
           schema:
@@ -3117,6 +3274,7 @@ paths:
       - Products
   /products/{id}:
     delete:
+      description: 'Yêu cầu vai trò: owner hoặc manager.'
       parameters:
       - description: ID sản phẩm
         in: path
@@ -3136,6 +3294,10 @@ paths:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "403":
+          description: Không có quyền truy cập
           schema:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
         "404":
@@ -3188,6 +3350,7 @@ paths:
     put:
       consumes:
       - application/json
+      description: 'Yêu cầu vai trò: owner hoặc manager.'
       parameters:
       - description: ID sản phẩm
         in: path
@@ -3215,6 +3378,10 @@ paths:
           description: Thiếu token / token không hợp lệ
           schema:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "403":
+          description: Không có quyền truy cập
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
         "404":
           description: Không tìm thấy sản phẩm
           schema:
@@ -3222,6 +3389,34 @@ paths:
       security:
       - BearerAuth: []
       summary: Cập nhật sản phẩm
+      tags:
+      - Products
+  /products/materials:
+    get:
+      description: Trả sản phẩm đang hoạt động có product_type material hoặc both,
+        sắp xếp theo tên.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Danh sách sản phẩm vật tư
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+        "400":
+          description: Thiếu organization
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "401":
+          description: Thiếu token / token không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "500":
+          description: Lỗi server
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Lấy toàn bộ sản phẩm vật tư (không phân trang)
       tags:
       - Products
   /products/stats:
@@ -3298,6 +3493,7 @@ paths:
       - Auth
   /reports/revenue:
     get:
+      description: 'Yêu cầu vai trò: owner hoặc manager.'
       parameters:
       - description: Từ ngày (RFC3339 hoặc yyyy-MM-dd), mặc định đầu tháng
         in: query
@@ -3320,6 +3516,10 @@ paths:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
         "401":
           description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "403":
+          description: Không có quyền truy cập
           schema:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
       security:
@@ -3391,6 +3591,7 @@ paths:
     post:
       consumes:
       - application/json
+      description: 'Yêu cầu vai trò: owner hoặc manager.'
       parameters:
       - description: Thông tin dịch vụ
         in: body
@@ -3413,6 +3614,10 @@ paths:
           description: Thiếu token / token không hợp lệ
           schema:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "403":
+          description: Không có quyền truy cập
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
         "500":
           description: Lỗi server
           schema:
@@ -3424,6 +3629,7 @@ paths:
       - Services
   /services/{id}:
     delete:
+      description: 'Yêu cầu vai trò: owner hoặc manager.'
       parameters:
       - description: ID dịch vụ
         in: path
@@ -3445,6 +3651,10 @@ paths:
           description: Thiếu token / token không hợp lệ
           schema:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "403":
+          description: Không có quyền truy cập
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
         "404":
           description: Không tìm thấy dịch vụ
           schema:
@@ -3457,6 +3667,7 @@ paths:
     put:
       consumes:
       - application/json
+      description: 'Yêu cầu vai trò: owner hoặc manager.'
       parameters:
       - description: ID dịch vụ
         in: path
@@ -3482,6 +3693,10 @@ paths:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "403":
+          description: Không có quyền truy cập
           schema:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
         "404":
@@ -3523,6 +3738,57 @@ paths:
       security:
       - BearerAuth: []
       summary: Lấy chi tiết dịch vụ và nguyên vật liệu
+      tags:
+      - Services
+  /services/{id}/materials:
+    put:
+      consumes:
+      - application/json
+      description: 'Yêu cầu vai trò: owner hoặc manager. Thay toàn bộ định mức trong
+        1 transaction; mảng rỗng xóa hết. Chỉ ảnh hưởng đơn tạo sau thời điểm cập
+        nhật.'
+      parameters:
+      - description: ID dịch vụ
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Danh sách định mức mới
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_daidat02_server_internal_domain_service.ReplaceServiceMaterialsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Cập nhật định mức thành công
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+        "400":
+          description: Thiếu id / dữ liệu không hợp lệ / product_id bị trùng
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "401":
+          description: Thiếu token / token không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "403":
+          description: Không có quyền truy cập
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "404":
+          description: Không tìm thấy dịch vụ hoặc sản phẩm
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "500":
+          description: Lỗi server
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Thay định mức nguyên vật liệu của dịch vụ
       tags:
       - Services
   /services/stats:
@@ -3572,6 +3838,7 @@ paths:
     put:
       consumes:
       - application/json
+      description: 'Yêu cầu vai trò: owner hoặc manager.'
       parameters:
       - description: Cấu hình lịch hẹn
         in: body
@@ -3592,6 +3859,10 @@ paths:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "403":
+          description: Không có quyền truy cập
           schema:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
         "500":
@@ -3632,6 +3903,7 @@ paths:
     put:
       consumes:
       - application/json
+      description: 'Yêu cầu vai trò: owner hoặc manager.'
       parameters:
       - description: Cấu hình chung
         in: body
@@ -3652,6 +3924,10 @@ paths:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "403":
+          description: Không có quyền truy cập
           schema:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
         "404":
@@ -3692,6 +3968,7 @@ paths:
     put:
       consumes:
       - application/json
+      description: 'Yêu cầu vai trò: owner hoặc manager.'
       parameters:
       - description: Cấu hình thông báo
         in: body
@@ -3712,6 +3989,10 @@ paths:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "403":
+          description: Không có quyền truy cập
           schema:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
         "500":
@@ -3752,6 +4033,7 @@ paths:
     put:
       consumes:
       - application/json
+      description: 'Yêu cầu vai trò: owner hoặc manager.'
       parameters:
       - description: Cấu hình thanh toán
         in: body
@@ -3772,6 +4054,10 @@ paths:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "403":
+          description: Không có quyền truy cập
           schema:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
         "500":
@@ -3843,6 +4129,7 @@ paths:
     post:
       consumes:
       - application/json
+      description: 'Yêu cầu vai trò: owner hoặc manager.'
       parameters:
       - description: Thông tin nhân viên
         in: body
@@ -3865,6 +4152,10 @@ paths:
           description: Thiếu token / token không hợp lệ
           schema:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "403":
+          description: Không có quyền truy cập
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
         "500":
           description: Lỗi server
           schema:
@@ -3876,6 +4167,7 @@ paths:
       - Staff
   /staff/{id}:
     delete:
+      description: 'Yêu cầu vai trò: owner.'
       parameters:
       - description: ID nhân viên
         in: path
@@ -3895,6 +4187,10 @@ paths:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "403":
+          description: Không có quyền truy cập
           schema:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
         "404":
@@ -3944,6 +4240,7 @@ paths:
     put:
       consumes:
       - application/json
+      description: 'Yêu cầu vai trò: owner hoặc manager.'
       parameters:
       - description: ID nhân viên
         in: path
@@ -3969,6 +4266,10 @@ paths:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "403":
+          description: Không có quyền truy cập
           schema:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
         "404":
@@ -4019,6 +4320,7 @@ paths:
     post:
       consumes:
       - application/json
+      description: 'Yêu cầu vai trò: owner hoặc manager.'
       parameters:
       - description: ID nhân viên
         in: path
@@ -4046,6 +4348,10 @@ paths:
           description: Thiếu token / token không hợp lệ
           schema:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "403":
+          description: Không có quyền truy cập
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
         "404":
           description: Không tìm thấy nhân viên
           schema:
@@ -4065,6 +4371,7 @@ paths:
       - Staff
   /staff/{id}/payroll:
     get:
+      description: 'Yêu cầu vai trò: owner.'
       parameters:
       - description: ID nhân viên
         in: path
@@ -4098,6 +4405,10 @@ paths:
           description: Thiếu token / token không hợp lệ
           schema:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "403":
+          description: Không có quyền truy cập
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
         "404":
           description: Không tìm thấy nhân viên
           schema:
@@ -4112,6 +4423,7 @@ paths:
       tags:
       - Staff
     post:
+      description: 'Yêu cầu vai trò: owner.'
       parameters:
       - description: ID nhân viên
         in: path
@@ -4139,6 +4451,10 @@ paths:
           description: Thiếu token / token không hợp lệ
           schema:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "403":
+          description: Không có quyền truy cập
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
         "404":
           description: Không tìm thấy nhân viên
           schema:
@@ -4158,6 +4474,7 @@ paths:
       - Staff
   /staff/{id}/salary-adjustments:
     get:
+      description: 'Yêu cầu vai trò: owner.'
       parameters:
       - description: ID nhân viên
         in: path
@@ -4181,6 +4498,10 @@ paths:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "403":
+          description: Không có quyền truy cập
           schema:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
         "500":
@@ -4252,6 +4573,7 @@ paths:
     post:
       consumes:
       - application/json
+      description: 'Yêu cầu vai trò: owner.'
       parameters:
       - description: Thông tin điều chỉnh lương
         in: body
@@ -4274,6 +4596,10 @@ paths:
           description: Thiếu token / token không hợp lệ
           schema:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "403":
+          description: Không có quyền truy cập
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
         "500":
           description: Lỗi server
           schema:
@@ -4285,6 +4611,7 @@ paths:
       - Staff
   /staff/salary-adjustment/{id}:
     delete:
+      description: 'Yêu cầu vai trò: owner.'
       parameters:
       - description: ID điều chỉnh lương
         in: path
@@ -4304,6 +4631,10 @@ paths:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "403":
+          description: Không có quyền truy cập
           schema:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
         "404":
@@ -4353,6 +4684,7 @@ paths:
     post:
       consumes:
       - application/json
+      description: 'Yêu cầu vai trò: owner hoặc manager.'
       parameters:
       - description: Thông tin nhà cung cấp
         in: body
@@ -4373,6 +4705,10 @@ paths:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
         "401":
           description: Thiếu token / token không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "403":
+          description: Không có quyền truy cập
           schema:
             $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
       security:

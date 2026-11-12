@@ -8,6 +8,7 @@ import TextButton from '@/components/dashboard/TextButton';
 import useCashFlowStats from '@/hooks/use-cashflow-stats';
 import { formatVND } from '@/lib/format';
 import { FundSettingsDialog } from './FundSettingsDialog';
+import useAuth from '@/hooks/use-auth';
 
 function shortVND(value: number): string {
   if (Math.abs(value) >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(1)}B`;
@@ -18,6 +19,7 @@ function shortVND(value: number): string {
 export default function CashflowStats() {
   const searchParams = useSearchParams();
   const [settingsOpen, setSettingsOpen] = React.useState(false);
+  const { can } = useAuth();
   const dateFrom = searchParams.get('date_from') || undefined;
   const dateTo = searchParams.get('date_to') || undefined;
   const { data, isLoading } = useCashFlowStats({ dateFrom, dateTo });
@@ -98,13 +100,15 @@ export default function CashflowStats() {
                 <span className="text-slate-300">|</span>
               </>
             )}
-            <TextButton
-              icon={Settings}
-              onClick={() => setSettingsOpen(true)}
-              aria-haspopup="dialog"
-            >
-              Cài đặt
-            </TextButton>
+            {can('cashflow:write') && (
+              <TextButton
+                icon={Settings}
+                onClick={() => setSettingsOpen(true)}
+                aria-haspopup="dialog"
+              >
+                Cài đặt
+              </TextButton>
+            )}
           </span>
         }
         icon={Landmark}
@@ -112,7 +116,9 @@ export default function CashflowStats() {
       />
       </section>
 
-      <FundSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+      {can('cashflow:write') && (
+        <FundSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+      )}
     </>
   );
 }

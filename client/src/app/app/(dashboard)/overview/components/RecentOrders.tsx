@@ -34,12 +34,12 @@ const columns: DashColumn<OverviewOrder>[] = [
     className: 'px-4 py-3.5 font-medium text-on-surface',
     cell: (row) => row.customerName || 'Khách lẻ',
   },
-  {
-    id: 'summary',
-    header: 'Dịch vụ/Sản phẩm',
-    className: 'px-4 py-3.5 text-on-surface-variant max-w-[150px] truncate',
-    cell: (row) => row.summary || '—',
-  },
+  // {
+  //   id: 'summary',
+  //   header: 'Dịch vụ/Sản phẩm',
+  //   className: 'px-4 py-3.5 text-on-surface-variant max-w-[150px] truncate',
+  //   cell: (row) => row.summary || '—',
+  // },
   {
     id: 'total',
     header: 'Tổng tiền',

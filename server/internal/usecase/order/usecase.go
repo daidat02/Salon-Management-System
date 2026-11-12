@@ -502,8 +502,13 @@ func (u *OrderUsecase) completeWithSlip(ctx context.Context, orgID string, order
 		return nil, err
 	}
 
+	description, err := u.loadOrderDescription(ctx, orgID, items)
+	if err != nil {
+		return nil, err
+	}
+
 	log.Println("Completing order with slip:", order.ID, "lines:", len(lines))
-	slip, err := u.repo.CompleteOrderWithSlip(ctx, orgID, order.ID, order.AppointmentID, lines, fundID, confirmation)
+	slip, err := u.repo.CompleteOrderWithSlip(ctx, orgID, order.ID, order.AppointmentID, lines, description, fundID, confirmation)
 	if err != nil {
 		log.Println("Error completing order:", err)
 		if errors.Is(err, domain.ErrOrderNotFound) {
@@ -529,6 +534,7 @@ func (u *OrderUsecase) completeWithSlip(ctx context.Context, orgID string, order
 
 	completed := *order
 	completed.Status = domain.StatusCompleted
+	completed.Description = description
 	return &domain.OrderCompleteResponse{
 		Order:        toResponse(&completed),
 		DocumentID:   slip.DocumentID,
@@ -1346,7 +1352,7 @@ func (u *OrderUsecase) ReplaceOrderMaterials(ctx context.Context, inputs []*doma
 
 // GetPosItemsByOrgID lấy danh mục bán hàng POS (union sản phẩm + dịch vụ).
 // Limit clamp 1..100, còn lại (search/category/cursor) repo tự xử.
-func (u *OrderUsecase) GetPosItemsByOrgID(ctx context.Context, limit int, name, itemType string, id string, search string, categoryFilter string) ([]*domain.PosItemResponse, error) {
+func (u *OrderUsecase) GetPosItemsByOrgID(ctx context.Context, limit int, name, itemType string, id string, search string, categoryFilter string, kind string) ([]*domain.PosItemResponse, error) {
 	orgID, err := shared.RequireOrgID(ctx)
 	if err != nil {
 		return nil, err
@@ -1360,7 +1366,7 @@ func (u *OrderUsecase) GetPosItemsByOrgID(ctx context.Context, limit int, name, 
 		limit = 100
 	}
 
-	items, err := u.repo.GetPosItemsByOrgID(ctx, orgID, limit, name, itemType, id, search, categoryFilter)
+	items, err := u.repo.GetPosItemsByOrgID(ctx, orgID, limit, name, itemType, id, search, categoryFilter, kind)
 	if err != nil {
 		log.Println("Error getting POS items:", err)
 		return nil, apperror.New(500, "Lỗi khi lấy danh sách sản phẩm/dịch vụ", err)

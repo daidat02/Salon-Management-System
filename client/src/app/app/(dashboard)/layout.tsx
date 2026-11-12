@@ -8,6 +8,7 @@ import DashSidebar from '@/components/dashboard/DashSidebar';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { useAppDispatch } from '@/store/hook';
 import { logoutUser } from '@/services/auth';
+import RoleGuard from '@/components/auth/RoleGuard';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const dispatch = useAppDispatch();
@@ -21,7 +22,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <div className="theme-app flex h-screen flex-col overflow-hidden bg-background font-sans text-body">
       {/* Top header cố định — không scroll (preview/admin_preview/index.html:102) */}
-      <DashHeader />
+      <DashHeader onCreateOrder={() => router.push('/app/cashier/pos')} />
 
       {/* Vùng dưới header */}
       <div className="flex min-h-0 flex-1">
@@ -32,7 +33,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* Vùng scroll duy nhất */}
         <main className="custom-scrollbar min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto bg-background">
-          <div className="mx-auto w-full space-y-6 p-6">{children}</div>
+          <div className="mx-auto w-full space-y-6 p-6">
+            <RoleGuard>{children}</RoleGuard>
+          </div>
         </main>
       </div>
     </div>

@@ -5,8 +5,9 @@ import { ArchiveRestore, FileDown, History, SquarePlus } from 'lucide-react';
 import PageHeading from '@/components/dashboard/PageHeading';
 import { INVENTORY_HISTORY_ANCHOR } from './InventoryHistoryTable';
 import { useRouter } from 'next/navigation';
+import useAuth from '@/hooks/use-auth';
 
-function scrollToHistory(e: MouseEvent) {
+function scrollToHistory(e: React.MouseEvent) {
   e.preventDefault();
   document
     .getElementById(INVENTORY_HISTORY_ANCHOR)
@@ -15,6 +16,7 @@ function scrollToHistory(e: MouseEvent) {
 
 export default function InventoryHeading() {
   const router = useRouter();
+  const { can } = useAuth();
   return (
     <PageHeading
       breadcrumbs={[
@@ -36,18 +38,22 @@ export default function InventoryHeading() {
           onClick: (e) => scrollToHistory(e),
         },
         { label: 'Xuất file Excel', icon: FileDown, variant: 'outline' },
-        {
-          label: 'Xuất kho',
-          icon: ArchiveRestore,
-          variant: 'outline',
-          onClick: (e) => router.push('/app/inventory/outbound'),
-        },
-        {
-          label: 'Nhập kho',
-          icon: SquarePlus,
-          variant: 'primary',
-          onClick: (e) => router.push('/app/inventory/inbound'),
-        },
+        ...(can('inventory:write')
+          ? [
+              {
+                label: 'Xuất kho',
+                icon: ArchiveRestore,
+                variant: 'outline' as const,
+                onClick: () => router.push('/app/inventory/outbound'),
+              },
+              {
+                label: 'Nhập kho',
+                icon: SquarePlus,
+                variant: 'primary' as const,
+                onClick: () => router.push('/app/inventory/inbound'),
+              },
+            ]
+          : []),
       ]}
     />
   );

@@ -25,9 +25,6 @@ export default function VoucherDetailItemsCard({ items }: { items: InventoryDocu
       className: 'min-w-[220px]',
       cell: (row) => (
         <div className="flex items-center gap-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-outline bg-surface-container text-sm font-bold text-primary">
-            {(row.product_name || '?').charAt(0).toUpperCase()}
-          </span>
           <div className="min-w-0">
             <div className="truncate font-semibold text-on-surface">{row.product_name}</div>
             <div className="flex items-center gap-2 text-[11px] text-on-surface-variant">

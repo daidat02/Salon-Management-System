@@ -322,6 +322,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Yêu cầu vai trò: owner hoặc manager.",
                 "produces": [
                     "application/json"
                 ],
@@ -353,6 +354,12 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Không có quyền truy cập",
                         "schema": {
                             "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
                         }
@@ -592,6 +599,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Yêu cầu vai trò: owner hoặc manager.",
                 "consumes": [
                     "application/json"
                 ],
@@ -625,6 +633,12 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
                         }
+                    },
+                    "403": {
+                        "description": "Không có quyền truy cập",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
                     }
                 }
             }
@@ -636,6 +650,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Yêu cầu vai trò: owner hoặc manager.",
                 "consumes": [
                     "application/json"
                 ],
@@ -671,6 +686,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
                         }
                     },
+                    "403": {
+                        "description": "Không có quyền truy cập",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
                     "404": {
                         "description": "Not Found",
                         "schema": {
@@ -685,6 +706,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Yêu cầu vai trò: owner hoặc manager.",
                 "produces": [
                     "application/json"
                 ],
@@ -706,6 +728,12 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Không có quyền truy cập",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
                         }
                     },
                     "404": {
@@ -814,6 +842,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Mọi vai trò đã đăng nhập đều có thể tạo phiếu; phiếu mới ở trạng thái chờ duyệt.",
                 "consumes": [
                     "application/json"
                 ],
@@ -947,6 +976,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Yêu cầu vai trò: owner hoặc manager.",
                 "produces": [
                     "application/json"
                 ],
@@ -976,6 +1006,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
                         }
                     },
+                    "403": {
+                        "description": "Không có quyền truy cập",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
                     "404": {
                         "description": "Not Found",
                         "schema": {
@@ -992,6 +1028,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Yêu cầu vai trò: owner hoặc manager.",
                 "produces": [
                     "application/json"
                 ],
@@ -1013,6 +1050,12 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Không có quyền truy cập",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
                         }
                     },
                     "404": {
@@ -1079,6 +1122,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Yêu cầu vai trò: owner hoặc manager.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1119,6 +1163,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
                         }
                     },
+                    "403": {
+                        "description": "Không có quyền truy cập",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
                     "500": {
                         "description": "Lỗi server (vd trùng tên trong org)",
                         "schema": {
@@ -1135,6 +1185,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Yêu cầu vai trò: owner hoặc manager.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1182,6 +1233,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
                         }
                     },
+                    "403": {
+                        "description": "Không có quyền truy cập",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
                     "404": {
                         "description": "Không tìm thấy danh mục",
                         "schema": {
@@ -1196,6 +1253,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Yêu cầu vai trò: owner hoặc manager.",
                 "produces": [
                     "application/json"
                 ],
@@ -1227,6 +1285,12 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Không có quyền truy cập",
                         "schema": {
                             "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
                         }
@@ -1578,6 +1642,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Yêu cầu vai trò: owner hoặc manager.",
                 "produces": [
                     "application/json"
                 ],
@@ -1609,6 +1674,12 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Không có quyền truy cập",
                         "schema": {
                             "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
                         }
@@ -1659,6 +1730,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Yêu cầu vai trò: owner hoặc manager.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1689,6 +1761,12 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Không có quyền truy cập",
                         "schema": {
                             "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
                         }
@@ -1770,6 +1848,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Yêu cầu vai trò: owner hoặc manager.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1805,6 +1884,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
                         }
                     },
+                    "403": {
+                        "description": "Không có quyền truy cập",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
                     "404": {
                         "description": "Not Found",
                         "schema": {
@@ -1819,6 +1904,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Yêu cầu vai trò: owner hoặc manager.",
                 "produces": [
                     "application/json"
                 ],
@@ -1840,6 +1926,12 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Không có quyền truy cập",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
                         }
                     },
                     "404": {
@@ -1949,6 +2041,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Yêu cầu vai trò: owner hoặc manager.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1985,6 +2078,12 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Không có quyền truy cập",
                         "schema": {
                             "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
                         }
@@ -2278,6 +2377,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Yêu cầu vai trò: owner hoặc manager.",
                 "consumes": [
                     "application/json"
                 ],
@@ -2321,6 +2421,12 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Không có quyền truy cập",
                         "schema": {
                             "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
                         }
@@ -2679,6 +2785,12 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
+                        "description": "Lọc loại hàng: product | service",
+                        "name": "kind",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
                         "description": "Con trỏ phân trang: type của dòng cuối trang trước",
                         "name": "type",
                         "in": "query"
@@ -2818,6 +2930,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Yêu cầu vai trò: owner hoặc manager.",
                 "produces": [
                     "application/json"
                 ],
@@ -2849,6 +2962,12 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Không có quyền truy cập",
                         "schema": {
                             "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
                         }
@@ -3293,6 +3412,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Yêu cầu vai trò: owner.",
                 "produces": [
                     "application/json"
                 ],
@@ -3324,6 +3444,12 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Không có quyền truy cập",
                         "schema": {
                             "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
                         }
@@ -3376,6 +3502,75 @@ const docTemplate = `{
                     },
                     "409": {
                         "description": "Slug đã tồn tại",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Lỗi server",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/organizations/demo": {
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Yêu cầu vai trò owner. Xóa toàn bộ dữ liệu nghiệp vụ của tổ chức, giữ cấu hình, reset quỹ và chuyển is_demo=false.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Organizations"
+                ],
+                "summary": "Tắt chế độ dữ liệu mẫu",
+                "parameters": [
+                    {
+                        "description": "Trạng thái dữ liệu mẫu (chỉ hỗ trợ false)",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_internal_domain_organization.UpdateDemoStatusRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Đã xóa dữ liệu mẫu",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Dữ liệu không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Thiếu token / token không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Không có quyền truy cập",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Không tìm thấy tổ chức",
                         "schema": {
                             "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
                         }
@@ -3522,6 +3717,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Yêu cầu vai trò: owner hoặc manager.",
                 "consumes": [
                     "application/json"
                 ],
@@ -3562,8 +3758,57 @@ const docTemplate = `{
                             "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
                         }
                     },
+                    "403": {
+                        "description": "Không có quyền truy cập",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
                     "500": {
                         "description": "Lỗi server (vd trùng SKU)",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/products/materials": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Trả sản phẩm đang hoạt động có product_type material hoặc both, sắp xếp theo tên.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Products"
+                ],
+                "summary": "Lấy toàn bộ sản phẩm vật tư (không phân trang)",
+                "responses": {
+                    "200": {
+                        "description": "Danh sách sản phẩm vật tư",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Thiếu organization",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Thiếu token / token không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Lỗi server",
                         "schema": {
                             "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
                         }
@@ -3670,6 +3915,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Yêu cầu vai trò: owner hoặc manager.",
                 "consumes": [
                     "application/json"
                 ],
@@ -3717,6 +3963,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
                         }
                     },
+                    "403": {
+                        "description": "Không có quyền truy cập",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
                     "404": {
                         "description": "Không tìm thấy sản phẩm",
                         "schema": {
@@ -3731,6 +3983,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Yêu cầu vai trò: owner hoặc manager.",
                 "produces": [
                     "application/json"
                 ],
@@ -3762,6 +4015,12 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Không có quyền truy cập",
                         "schema": {
                             "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
                         }
@@ -3858,6 +4117,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Yêu cầu vai trò: owner hoặc manager.",
                 "produces": [
                     "application/json"
                 ],
@@ -3894,6 +4154,12 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Không có quyền truy cập",
                         "schema": {
                             "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
                         }
@@ -3997,6 +4263,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Yêu cầu vai trò: owner hoặc manager.",
                 "consumes": [
                     "application/json"
                 ],
@@ -4033,6 +4300,12 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Không có quyền truy cập",
                         "schema": {
                             "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
                         }
@@ -4089,6 +4362,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Yêu cầu vai trò: owner hoặc manager.",
                 "consumes": [
                     "application/json"
                 ],
@@ -4136,6 +4410,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
                         }
                     },
+                    "403": {
+                        "description": "Không có quyền truy cập",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
                     "404": {
                         "description": "Không tìm thấy dịch vụ",
                         "schema": {
@@ -4150,6 +4430,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Yêu cầu vai trò: owner hoặc manager.",
                 "produces": [
                     "application/json"
                 ],
@@ -4181,6 +4462,12 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Không có quyền truy cập",
                         "schema": {
                             "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
                         }
@@ -4245,6 +4532,82 @@ const docTemplate = `{
                 }
             }
         },
+        "/services/{id}/materials": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Yêu cầu vai trò: owner hoặc manager. Thay toàn bộ định mức trong 1 transaction; mảng rỗng xóa hết. Chỉ ảnh hưởng đơn tạo sau thời điểm cập nhật.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Services"
+                ],
+                "summary": "Thay định mức nguyên vật liệu của dịch vụ",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID dịch vụ",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Danh sách định mức mới",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_internal_domain_service.ReplaceServiceMaterialsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Cập nhật định mức thành công",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Thiếu id / dữ liệu không hợp lệ / product_id bị trùng",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Thiếu token / token không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Không có quyền truy cập",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Không tìm thấy dịch vụ hoặc sản phẩm",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Lỗi server",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/settings/booking": {
             "get": {
                 "security": [
@@ -4286,6 +4649,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Yêu cầu vai trò: owner hoặc manager.",
                 "consumes": [
                     "application/json"
                 ],
@@ -4322,6 +4686,12 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Không có quyền truy cập",
                         "schema": {
                             "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
                         }
@@ -4382,6 +4752,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Yêu cầu vai trò: owner hoặc manager.",
                 "consumes": [
                     "application/json"
                 ],
@@ -4418,6 +4789,12 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Không có quyền truy cập",
                         "schema": {
                             "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
                         }
@@ -4478,6 +4855,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Yêu cầu vai trò: owner hoặc manager.",
                 "consumes": [
                     "application/json"
                 ],
@@ -4514,6 +4892,12 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Không có quyền truy cập",
                         "schema": {
                             "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
                         }
@@ -4574,6 +4958,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Yêu cầu vai trò: owner hoặc manager.",
                 "consumes": [
                     "application/json"
                 ],
@@ -4610,6 +4995,12 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Không có quyền truy cập",
                         "schema": {
                             "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
                         }
@@ -4713,6 +5104,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Yêu cầu vai trò: owner hoặc manager.",
                 "consumes": [
                     "application/json"
                 ],
@@ -4753,6 +5145,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
                         }
                     },
+                    "403": {
+                        "description": "Không có quyền truy cập",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
                     "500": {
                         "description": "Lỗi server",
                         "schema": {
@@ -4769,6 +5167,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Yêu cầu vai trò: owner.",
                 "consumes": [
                     "application/json"
                 ],
@@ -4809,6 +5208,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
                         }
                     },
+                    "403": {
+                        "description": "Không có quyền truy cập",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
                     "500": {
                         "description": "Lỗi server",
                         "schema": {
@@ -4825,6 +5230,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Yêu cầu vai trò: owner.",
                 "produces": [
                     "application/json"
                 ],
@@ -4856,6 +5262,12 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Không có quyền truy cập",
                         "schema": {
                             "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
                         }
@@ -4931,6 +5343,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Yêu cầu vai trò: owner hoặc manager.",
                 "consumes": [
                     "application/json"
                 ],
@@ -4978,6 +5391,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
                         }
                     },
+                    "403": {
+                        "description": "Không có quyền truy cập",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
                     "404": {
                         "description": "Không tìm thấy nhân viên",
                         "schema": {
@@ -4992,6 +5411,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Yêu cầu vai trò: owner.",
                 "produces": [
                     "application/json"
                 ],
@@ -5023,6 +5443,12 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Không có quyền truy cập",
                         "schema": {
                             "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
                         }
@@ -5098,6 +5524,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Yêu cầu vai trò: owner hoặc manager.",
                 "consumes": [
                     "application/json"
                 ],
@@ -5145,6 +5572,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
                         }
                     },
+                    "403": {
+                        "description": "Không có quyền truy cập",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
                     "404": {
                         "description": "Không tìm thấy nhân viên",
                         "schema": {
@@ -5173,6 +5606,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Yêu cầu vai trò: owner.",
                 "produces": [
                     "application/json"
                 ],
@@ -5226,6 +5660,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
                         }
                     },
+                    "403": {
+                        "description": "Không có quyền truy cập",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
                     "404": {
                         "description": "Không tìm thấy nhân viên",
                         "schema": {
@@ -5246,6 +5686,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Yêu cầu vai trò: owner.",
                 "produces": [
                     "application/json"
                 ],
@@ -5290,6 +5731,12 @@ const docTemplate = `{
                             "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
                         }
                     },
+                    "403": {
+                        "description": "Không có quyền truy cập",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
                     "404": {
                         "description": "Không tìm thấy nhân viên",
                         "schema": {
@@ -5318,6 +5765,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Yêu cầu vai trò: owner.",
                 "produces": [
                     "application/json"
                 ],
@@ -5355,6 +5803,12 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Không có quyền truy cập",
                         "schema": {
                             "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
                         }
@@ -5516,6 +5970,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Yêu cầu vai trò: owner hoặc manager.",
                 "consumes": [
                     "application/json"
                 ],
@@ -5552,6 +6007,12 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Thiếu token / token không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Không có quyền truy cập",
                         "schema": {
                             "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
                         }
@@ -6161,6 +6622,17 @@ const docTemplate = `{
                 }
             }
         },
+        "github_com_daidat02_server_internal_domain_organization.UpdateDemoStatusRequest": {
+            "type": "object",
+            "required": [
+                "is_demo"
+            ],
+            "properties": {
+                "is_demo": {
+                    "type": "boolean"
+                }
+            }
+        },
         "github_com_daidat02_server_internal_domain_product.CreateProductRequest": {
             "type": "object",
             "properties": {
@@ -6278,6 +6750,17 @@ const docTemplate = `{
                 },
                 "price": {
                     "type": "number"
+                }
+            }
+        },
+        "github_com_daidat02_server_internal_domain_service.ReplaceServiceMaterialsRequest": {
+            "type": "object",
+            "properties": {
+                "materials": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_daidat02_server_internal_domain_service.ServiceMaterialInput"
+                    }
                 }
             }
         },
@@ -6431,6 +6914,9 @@ const docTemplate = `{
                 },
                 "id": {
                     "type": "string"
+                },
+                "is_demo": {
+                    "type": "boolean"
                 },
                 "logo_url": {
                     "type": "string"

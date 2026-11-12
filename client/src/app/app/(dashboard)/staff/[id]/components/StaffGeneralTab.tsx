@@ -6,6 +6,7 @@ import { toast } from '@/components/ui/toast';
 import type { Staff, StaffEmploymentType, StaffGender } from '@/types/staff';
 import { getApiErrorMessage } from '@/services/apiClient';
 import useUpdateStaff from '@/hooks/use-update-staff';
+import useAuth from '@/hooks/use-auth';
 import {
   StaffForm,
   emptyStaffFormValues,
@@ -54,6 +55,7 @@ export default function StaffGeneralTab({ staff, onSave }: StaffGeneralTabProps)
   const [draft, setDraft] = React.useState<StaffFormValues>(() => buildInitialValues(staff));
   const [error, setError] = React.useState<string | null>(null);
   const { mutateAsync, isPending } = useUpdateStaff(staff.id);
+  const { can } = useAuth();
 
   const handleSave = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -112,7 +114,7 @@ export default function StaffGeneralTab({ staff, onSave }: StaffGeneralTabProps)
       error={error}
       showBranch
       showStatus
-      footer={
+      footer={can('staff:write') ? (
         <div className="flex flex-wrap items-center justify-between gap-3">
           <span className="text-[11px] text-on-surface-variant">
             Cập nhật lần cuối: {staff.updated_at ? toDateInput(staff.updated_at) : '—'}
@@ -126,7 +128,7 @@ export default function StaffGeneralTab({ staff, onSave }: StaffGeneralTabProps)
             </Button>
           </div>
         </div>
-      }
+      ) : null}
     />
   );
 }

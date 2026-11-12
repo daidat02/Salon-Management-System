@@ -191,6 +191,27 @@ func (u *ProductUsecase) GetProductsByOrgID(ctx context.Context, search string, 
 	return pagination.NewResult(productsResponse, params, total), nil
 }
 
+// GetMaterialProducts trả toàn bộ sản phẩm có thể dùng làm vật tư
+// (product_type material hoặc both), không phân trang.
+func (u *ProductUsecase) GetMaterialProducts(ctx context.Context) ([]*domain.ProductResponse, error) {
+	orgID, err := shared.RequireOrgID(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	products, err := u.repo.GetMaterialProductsByOrgID(ctx, orgID)
+	if err != nil {
+		log.Println("Error getting material products:", err)
+		return nil, apperror.New(500, "Lỗi khi lấy danh sách sản phẩm vật tư", err)
+	}
+
+	result := make([]*domain.ProductResponse, 0, len(products))
+	for _, product := range products {
+		result = append(result, toResponse(product))
+	}
+	return result, nil
+}
+
 func (u *ProductUsecase) UpdateProduct(ctx context.Context, id string, product *domain.Product) (*domain.ProductResponse, error) {
 	if strings.TrimSpace(id) == "" {
 		return nil, apperror.New(400, "Thiếu id sản phẩm", nil)

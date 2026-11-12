@@ -24,6 +24,7 @@ type ServiceRepository interface {
 	GetServiceDetails(ctx context.Context, orgID, serviceID string) (*ServiceResponse, []*ServiceMaterial, error)
 	// GetProductUnits lấy đơn vị lớn + net của sản phẩm (để validate/mặc định unit định mức).
 	GetProductUnits(ctx context.Context, orgID string, productIDs []string) (map[string]ProductUnit, error)
+	ReplaceServiceMaterials(ctx context.Context, orgID, serviceID string, materials []*ServiceMaterialInput) error
 }
 
 // ProductUnit đơn vị của 1 sản phẩm (mirror order.ProductUnit, tránh import chéo domain).

@@ -4,6 +4,10 @@ export const API_BASE =
   'http://localhost:8080/api/v1';
 
 export const API_ENDPOINTS = {
+  ORGANIZATIONS: {
+    DISABLE_DEMO: `${API_BASE}/organizations/demo`,
+  },
+
   AUTH: {
     LOGIN: `${API_BASE}/login`,
     REGISTER: `${API_BASE}/register`,
@@ -23,6 +27,7 @@ export const API_ENDPOINTS = {
     CREATE: `${API_BASE}/products`,
     UPDATE: (id: string) => `${API_BASE}/products/${id}`,
     GET_STATS: `${API_BASE}/products/stats`,
+    GET_MATERIALS: `${API_BASE}/products/materials`,
   },
 
   SERVICES: {
@@ -31,6 +36,7 @@ export const API_ENDPOINTS = {
     GET_DETAIL: (id: string) => `${API_BASE}/services/${id}/details`,
     CREATE: `${API_BASE}/services`,
     UPDATE: (id: string) => `${API_BASE}/services/${id}`,
+    REPLACE_MATERIALS: (id: string) => `${API_BASE}/services/${id}/materials`,
   },
 
   CATEGORIES: {

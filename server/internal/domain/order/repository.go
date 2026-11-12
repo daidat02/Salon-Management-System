@@ -127,7 +127,7 @@ type OrderRepository interface {
 	// + ghi sổ sale + sinh phiếu bán hàng, tất cả 1 tx. appointmentID khác
 	// nil/rỗng thì lịch hẹn của đơn cũng được chuyển completed trong cùng tx.
 	// Trả về mã phiếu vừa sinh.
-	CompleteOrderWithSlip(ctx context.Context, orgID, orderID string, appointmentID *string, lines []SaleSlipLine, fundID string, confirmation *PaymentCompletion) (SaleSlipResult, error)
+	CompleteOrderWithSlip(ctx context.Context, orgID, orderID string, appointmentID *string, lines []SaleSlipLine, description, fundID string, confirmation *PaymentCompletion) (SaleSlipResult, error)
 	// 5. Thanh toán.
 	// InitPayment tạo (hoặc trả lại) payment pending duy nhất của đơn.
 	InitPayment(ctx context.Context, orgID, orderID string, amount float64) (*Payment, error)
@@ -140,7 +140,7 @@ type OrderRepository interface {
 	// UpdateOrderCustomer gán/đổi khách hàng của đơn (customer_id nullable).
 	UpdateOrderCustomer(ctx context.Context, orgID, orderID string, customerID *string) error
 	// 6. Danh mục bán hàng POS.
-	GetPosItemsByOrgID(ctx context.Context, orgID string, limit int, name, itemType string, id string, search string, categoryFilter string) ([]*PosItemResponse, error)
+	GetPosItemsByOrgID(ctx context.Context, orgID string, limit int, name, itemType string, id string, search string, categoryFilter string, kind string) ([]*PosItemResponse, error)
 }
 
 // ProductUnit đơn vị + hệ số quy đổi của 1 sản phẩm (để server tự quy
@@ -158,6 +158,8 @@ type ProductStore interface {
 	GetProductUnits(ctx context.Context, orgID string, productIDs []string) (map[string]ProductUnit, error)
 	// ProductsExistInOrg trả về id KHÔNG thuộc salon (rỗng = tất cả hợp lệ).
 	ProductsExistInOrg(ctx context.Context, orgID string, productIDs []string) ([]string, error)
+	// GetProductNames lấy tên hiện tại của các sản phẩm (kể cả đã xóa mềm).
+	GetProductNames(ctx context.Context, orgID string, productIDs []string) (map[string]string, error)
 }
 
 // ServiceStore giá + định mức dịch vụ tại thời điểm bán.
@@ -168,6 +170,8 @@ type ServiceStore interface {
 	// không có key đó, usecase map sang 404.
 	GetServicePrices(ctx context.Context, orgID string, serviceIDs []string) (map[string]float64, error)
 	GetServiceMaterials(ctx context.Context, orgID string, serviceIDs []string) (map[string][]ServiceMaterialUsage, error)
+	// GetServiceNames lấy tên hiện tại của các dịch vụ (kể cả đã xóa mềm).
+	GetServiceNames(ctx context.Context, orgID string, serviceIDs []string) (map[string]string, error)
 }
 
 // StaffStore các query nhân viên mà order cần.

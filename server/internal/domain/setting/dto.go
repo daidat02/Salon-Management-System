@@ -22,6 +22,7 @@ type OrganizationInfo struct {
 	LogoURL  *string `json:"logo_url"`
 	Timezone string  `json:"timezone"`
 	Status   string  `json:"status"`
+	IsDemo   bool    `json:"is_demo"`
 }
 
 // WorkingHourDay chỉ còn trạng thái mở/đóng của 1 thứ (1=T2 .. 7=CN).

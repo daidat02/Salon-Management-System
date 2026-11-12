@@ -16,6 +16,7 @@ import { useCreateStaffLeave } from '@/hooks/use-create-staff-leave';
 import useStaffLeaves from '@/hooks/use-staff-leaves';
 import { getApiErrorMessage } from '@/services/apiClient';
 import type { StaffLeave, StaffLeaveType } from '@/types/staff';
+import useAuth from '@/hooks/use-auth';
 import { Field } from '../../components/StaffFormParts';
 import { SHIFT_OPTIONS, mockWeek, type WeekShift } from './mock';
 
@@ -190,6 +191,9 @@ export default function StaffScheduleTab({
     },
   ];
 
+  const { can } = useAuth();
+  const canWrite = can('staff:write');
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -197,9 +201,11 @@ export default function StaffScheduleTab({
           <h2 className="text-base font-bold">Lịch phân ca</h2>
           <p className="text-[13px] text-on-surface-variant">Lịch làm việc của nhân viên trong tuần.</p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => setEditingWeek((v) => !v)}>
-          {editingWeek ? 'Lưu lịch' : 'Chỉnh sửa ca'}
-        </Button>
+        {canWrite && (
+          <Button variant="outline" size="sm" onClick={() => setEditingWeek((v) => !v)}>
+            {editingWeek ? 'Lưu lịch' : 'Chỉnh sửa ca'}
+          </Button>
+        )}
       </div>
 
       <div className="flex items-center justify-between">
@@ -262,9 +268,11 @@ export default function StaffScheduleTab({
               <b className="text-primary">{annualUsedDays}</b> / 12 ngày phép năm
             </span>
           </div>
-          <Button size="sm" variant="outline" onClick={() => onLeaveDialogOpenChange(true)}>
-            Thêm ngày nghỉ
-          </Button>
+          {canWrite && (
+            <Button size="sm" variant="outline" onClick={() => onLeaveDialogOpenChange(true)}>
+              Thêm ngày nghỉ
+            </Button>
+          )}
         </div>
 
         {isError && (

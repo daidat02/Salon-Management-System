@@ -7,11 +7,11 @@ type Cursor = { cursorType: string; cursorName: string; cursorId: string };
 export type PosItemsBaseParams = Omit<PosItemsParams, 'cursorType' | 'cursorName' | 'cursorId'>;
 
 export default function usePosItems(params: PosItemsBaseParams = {}) {
-  const { search, category, pageSize } = params;
+  const { search, category, kind, pageSize } = params;
   return useInfiniteQuery<PosItem[], Error>({
-    queryKey: ['pos-items', { search, category, pageSize }],
+    queryKey: ['pos-items', { search, category, kind, pageSize }],
     queryFn: ({ pageParam }) =>
-      getPosItems({ search, category, pageSize, ...((pageParam as Cursor | undefined) ?? {}) }),
+      getPosItems({ search, category, kind, pageSize, ...((pageParam as Cursor | undefined) ?? {}) }),
     initialPageParam: undefined as Cursor | undefined,
     getNextPageParam: (lastPage) => {
       const size = pageSize ?? 20;

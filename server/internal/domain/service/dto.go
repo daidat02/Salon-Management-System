@@ -31,6 +31,12 @@ type UpdateServiceRequest struct {
 	IsActive        *bool   `json:"is_active"`
 }
 
+// ReplaceServiceMaterialsRequest thay toàn bộ định mức vật tư của 1 dịch vụ.
+// Mảng rỗng = xóa hết định mức hiện có.
+type ReplaceServiceMaterialsRequest struct {
+	Materials []ServiceMaterialInput `json:"materials"`
+}
+
 type ServiceResponse struct {
 	ID               string     `json:"id"`
 	OrganizationID   string     `json:"organization_id"`

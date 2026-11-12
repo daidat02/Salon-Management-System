@@ -15,6 +15,8 @@ export interface Order {
   subtotal_amount: number;
   discount_amount: number;
   total_amount: number;
+  /** Tóm tắt dịch vụ/sản phẩm, chốt lúc thanh toán thành công. */
+  description: string;
   status: OrderStatus;
   created_at: string | null;
   updated_at: string | null;

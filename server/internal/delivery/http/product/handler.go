@@ -30,6 +30,7 @@ func boolOrDefault(v *bool, def bool) bool {
 
 // CreateProduct godoc
 // @Summary      Tạo sản phẩm
+// @Description  Yêu cầu vai trò: owner hoặc manager.
 // @Tags         Products
 // @Accept       json
 // @Produce      json
@@ -39,6 +40,7 @@ func boolOrDefault(v *bool, def bool) bool {
 // @Failure      400   {object}  response.ErrorResponse       "Dữ liệu không hợp lệ / thiếu organization"
 // @Failure      401   {object}  response.ErrorResponse       "Thiếu token / token không hợp lệ"
 // @Failure      500   {object}  response.ErrorResponse       "Lỗi server (vd trùng SKU)"
+// @Failure      403  {object}  response.ErrorResponse  "Không có quyền truy cập"
 // @Router       /products [post]
 func (h *ProductHandler) CreateProduct(c *gin.Context) {
 	var req domain.CreateProductRequest
@@ -107,6 +109,27 @@ func (h *ProductHandler) GetProductsByOrgID(c *gin.Context) {
 	response.Success(c, 200, "Danh sách sản phẩm", result)
 }
 
+// GetMaterialProducts godoc
+// @Summary      Lấy toàn bộ sản phẩm vật tư (không phân trang)
+// @Description  Trả sản phẩm đang hoạt động có product_type material hoặc both, sắp xếp theo tên.
+// @Tags         Products
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200  {object}  response.SuccessResponse  "Danh sách sản phẩm vật tư"
+// @Failure      400  {object}  response.ErrorResponse    "Thiếu organization"
+// @Failure      401  {object}  response.ErrorResponse    "Thiếu token / token không hợp lệ"
+// @Failure      500  {object}  response.ErrorResponse    "Lỗi server"
+// @Router       /products/materials [get]
+func (h *ProductHandler) GetMaterialProducts(c *gin.Context) {
+	result, err := h.uc.GetMaterialProducts(c.Request.Context())
+	if err != nil {
+		response.Error(c, err)
+		c.Abort()
+		return
+	}
+	response.Success(c, 200, "Danh sách sản phẩm vật tư", result)
+}
+
 // GetProductByID godoc
 // @Summary      Lấy chi tiết sản phẩm
 // @Description  Trả về thông tin đầy đủ của sản phẩm kèm doanh số tháng hiện tại và doanh thu 6 tháng gần nhất. stock_quantity và min_stock được quy đổi về đơn vị bán (unit).
@@ -153,6 +176,7 @@ func (h *ProductHandler) GetProductStats(c *gin.Context) {
 
 // UpdateProduct godoc
 // @Summary      Cập nhật sản phẩm
+// @Description  Yêu cầu vai trò: owner hoặc manager.
 // @Tags         Products
 // @Accept       json
 // @Produce      json
@@ -163,6 +187,7 @@ func (h *ProductHandler) GetProductStats(c *gin.Context) {
 // @Failure      400   {object}  response.ErrorResponse       "Thiếu id / dữ liệu không hợp lệ"
 // @Failure      401   {object}  response.ErrorResponse       "Thiếu token / token không hợp lệ"
 // @Failure      404   {object}  response.ErrorResponse       "Không tìm thấy sản phẩm"
+// @Failure      403  {object}  response.ErrorResponse  "Không có quyền truy cập"
 // @Router       /products/{id} [put]
 func (h *ProductHandler) UpdateProduct(c *gin.Context) {
 	id := c.Param("id")
@@ -201,6 +226,7 @@ func (h *ProductHandler) UpdateProduct(c *gin.Context) {
 
 // DeleteProduct godoc
 // @Summary      Xóa sản phẩm
+// @Description  Yêu cầu vai trò: owner hoặc manager.
 // @Tags         Products
 // @Produce      json
 // @Security     BearerAuth
@@ -209,6 +235,7 @@ func (h *ProductHandler) UpdateProduct(c *gin.Context) {
 // @Failure      400  {object}  response.ErrorResponse    "Thiếu id"
 // @Failure      401  {object}  response.ErrorResponse    "Thiếu token / token không hợp lệ"
 // @Failure      404  {object}  response.ErrorResponse    "Không tìm thấy sản phẩm"
+// @Failure      403  {object}  response.ErrorResponse  "Không có quyền truy cập"
 // @Router       /products/{id} [delete]
 func (h *ProductHandler) DeleteProduct(c *gin.Context) {
 	id := c.Param("id")

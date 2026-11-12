@@ -18,6 +18,7 @@ func NewAnalyticsHandler(uc *uc.AnalyticsUsecase) *AnalyticsHandler {
 
 // GetRevenueReport godoc
 // @Summary      Báo cáo doanh thu và lợi nhuận theo kỳ
+// @Description  Yêu cầu vai trò: owner hoặc manager.
 // @Tags         Reports
 // @Produce      json
 // @Security     BearerAuth
@@ -26,6 +27,7 @@ func NewAnalyticsHandler(uc *uc.AnalyticsUsecase) *AnalyticsHandler {
 // @Success      200  {object}  response.SuccessResponse
 // @Failure      400  {object}  response.ErrorResponse
 // @Failure      401  {object}  response.ErrorResponse
+// @Failure      403  {object}  response.ErrorResponse  "Không có quyền truy cập"
 // @Router       /reports/revenue [get]
 func (h *AnalyticsHandler) GetRevenueReport(c *gin.Context) {
 	result, err := h.uc.GetRevenueReport(

@@ -40,6 +40,15 @@ const (
 		SET full_name = $3, phone = $4, gender = $5, birth_date = $6, note = $7
 		WHERE id = $1 AND organization_id = $2 AND deleted_at IS NULL
 	`
+	// Cộng dồn thống kê sau khi đơn thanh toán thành công: thêm 1 lần ghé,
+	// cộng tổng chi và điểm tích lũy (tính sẵn ở tầng domain).
+	updateCustomerSpendingQuery = `
+		UPDATE customers
+		SET total_spent = total_spent + $3,
+		    total_visits = total_visits + 1,
+		    reward_points = reward_points + $4
+		WHERE organization_id = $1 AND id = $2 AND deleted_at IS NULL
+	`
 	deleteCustomerQuery = `
 		UPDATE customers
 		SET deleted_at = now()

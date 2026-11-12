@@ -144,8 +144,8 @@ func (m *MockOrderRepository) ApplyCancel(ctx context.Context, orgID, orderID, n
 	return args.Error(0)
 }
 
-func (m *MockOrderRepository) CompleteOrderWithSlip(ctx context.Context, orgID, orderID string, appointmentID *string, lines []domain.SaleSlipLine, fundID string, confirmation *domain.PaymentCompletion) (domain.SaleSlipResult, error) {
-	args := m.Called(ctx, orgID, orderID, appointmentID, lines, fundID, confirmation)
+func (m *MockOrderRepository) CompleteOrderWithSlip(ctx context.Context, orgID, orderID string, appointmentID *string, lines []domain.SaleSlipLine, description, fundID string, confirmation *domain.PaymentCompletion) (domain.SaleSlipResult, error) {
+	args := m.Called(ctx, orgID, orderID, appointmentID, lines, description, fundID, confirmation)
 	if args.Get(0) == nil {
 		return domain.SaleSlipResult{}, args.Error(1)
 	}
@@ -191,8 +191,8 @@ func (m *MockOrderRepository) UpdateOrderCustomer(ctx context.Context, orgID, or
 	return args.Error(0)
 }
 
-func (m *MockOrderRepository) GetPosItemsByOrgID(ctx context.Context, orgID string, limit int, name, itemType string, id string, search string, categoryFilter string) ([]*domain.PosItemResponse, error) {
-	args := m.Called(ctx, orgID, limit, name, itemType, id, search, categoryFilter)
+func (m *MockOrderRepository) GetPosItemsByOrgID(ctx context.Context, orgID string, limit int, name, itemType string, id string, search string, categoryFilter string, kind string) ([]*domain.PosItemResponse, error) {
+	args := m.Called(ctx, orgID, limit, name, itemType, id, search, categoryFilter, kind)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
@@ -228,6 +228,14 @@ func (m *MockProductStore) ProductsExistInOrg(ctx context.Context, orgID string,
 	return args.Get(0).([]string), args.Error(1)
 }
 
+func (m *MockProductStore) GetProductNames(ctx context.Context, orgID string, productIDs []string) (map[string]string, error) {
+	args := m.Called(ctx, orgID, productIDs)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(map[string]string), args.Error(1)
+}
+
 // MockServiceStore giả lập domain.ServiceStore.
 type MockServiceStore struct {
 	mock.Mock
@@ -247,6 +255,14 @@ func (m *MockServiceStore) GetServiceMaterials(ctx context.Context, orgID string
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(map[string][]domain.ServiceMaterialUsage), args.Error(1)
+}
+
+func (m *MockServiceStore) GetServiceNames(ctx context.Context, orgID string, serviceIDs []string) (map[string]string, error) {
+	args := m.Called(ctx, orgID, serviceIDs)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(map[string]string), args.Error(1)
 }
 
 // MockCustomerStore giả lập domain.CustomerStore.

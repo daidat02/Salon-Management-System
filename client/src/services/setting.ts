@@ -67,3 +67,11 @@ export const updateNotificationSettings = async (payload: NotificationSettingsRe
   );
   return res.data.data;
 };
+
+export const disableDemoData = async () => {
+  const res = await apiClient.patch<ApiResponse<{ id: string; is_demo: boolean }>>(
+    API_ENDPOINTS.ORGANIZATIONS.DISABLE_DEMO,
+    { is_demo: false },
+  );
+  return res.data.data;
+};

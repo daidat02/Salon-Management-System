@@ -93,6 +93,11 @@ func (m *MockServiceRepository) ServicesExistInOrg(ctx context.Context, orgID st
 	return args.Get(0).([]string), args.Error(1)
 }
 
+func (m *MockServiceRepository) ReplaceServiceMaterials(ctx context.Context, orgID, serviceID string, materials []*domain.ServiceMaterialInput) error {
+	args := m.Called(ctx, orgID, serviceID, materials)
+	return args.Error(0)
+}
+
 func (m *MockServiceRepository) GetServiceDetails(ctx context.Context, orgID, serviceID string) (*domain.ServiceResponse, []*domain.ServiceMaterial, error) {
 	args := m.Called(ctx, orgID, serviceID)
 	var svc *domain.ServiceResponse

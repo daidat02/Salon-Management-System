@@ -69,3 +69,44 @@ func TestVerifyToken(t *testing.T) {
 		})
 	}
 }
+
+func TestVertifyRole(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	newRouter := func(role string) (*gin.Engine, *int) {
+		calls := 0
+		r := gin.New()
+		r.GET("/protected", func(c *gin.Context) {
+			if role != "" {
+				c.Set("role", role)
+			}
+		}, VertifyRole("owner", "manager"), func(c *gin.Context) {
+			calls++
+			c.Status(http.StatusOK)
+		})
+		return r, &calls
+	}
+
+	tests := []struct {
+		name       string
+		role       string
+		wantStatus int
+		wantCalls  int
+	}{
+		{name: "owner được phép", role: "owner", wantStatus: http.StatusOK, wantCalls: 1},
+		{name: "manager được phép", role: "manager", wantStatus: http.StatusOK, wantCalls: 1},
+		{name: "receptionist bị chặn", role: "receptionist", wantStatus: http.StatusForbidden, wantCalls: 0},
+		{name: "thiếu role", role: "", wantStatus: http.StatusUnauthorized, wantCalls: 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r, calls := newRouter(tt.role)
+			req := httptest.NewRequest(http.MethodGet, "/protected", nil)
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
+
+			assert.Equal(t, tt.wantStatus, w.Code)
+			assert.Equal(t, tt.wantCalls, *calls)
+		})
+	}
+}

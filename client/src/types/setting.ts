@@ -11,6 +11,7 @@ export type OrganizationInfo = {
   logo_url: string | null;
   timezone: string;
   status: string;
+  is_demo: boolean;
 };
 
 export type WorkingHourDay = {

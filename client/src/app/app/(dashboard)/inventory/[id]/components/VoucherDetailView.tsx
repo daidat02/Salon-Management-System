@@ -13,6 +13,7 @@ import VoucherDetailItemsCard from './VoucherDetailItemsCard';
 import VoucherDetailFinanceCard from './VoucherDetailFinanceCard';
 import VoucherDebtCard from './VoucherDebtCard';
 import VoucherPaymentDialog from './VoucherPaymentDialog';
+import useAuth from '@/hooks/use-auth';
 
 function toVoucherType(type: string): VoucherType {
   return type === 'export' || type === 'sale' ? 'outbound' : 'inbound';
@@ -23,6 +24,7 @@ export default function VoucherDetailView() {
   const params = useParams<{ id: string }>();
   const id = params?.id;
   const [paymentOpen, setPaymentOpen] = useState(false);
+  const { can } = useAuth();
   const { data, isLoading, isError, error } = useInventoryDocument(id);
 
   if (isLoading) {
@@ -62,12 +64,12 @@ export default function VoucherDetailView() {
           <VoucherDebtCard
             document={document}
             payments={payments}
-            onPay={() => setPaymentOpen(true)}
+            onPay={can('inventory:write') ? () => setPaymentOpen(true) : undefined}
           />
         </div>
       </div>
 
-      {paymentOpen && (
+      {paymentOpen && can('inventory:write') && (
         <VoucherPaymentDialog
           document={document}
           onOpenChange={setPaymentOpen}

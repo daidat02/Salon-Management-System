@@ -7,6 +7,7 @@ import PageHeading from '@/components/dashboard/PageHeading';
 import { DashboardSkeleton } from '@/components/dashboard/DashboardSkeletons';
 import { getApiErrorMessage } from '@/services/apiClient';
 import useStaffDetail from '@/hooks/use-staff-detail';
+import useAuth from '@/hooks/use-auth';
 import type { Staff } from '@/types/staff';
 import StaffProfileCard, { type StaffContact } from './StaffProfileCard';
 import StaffGeneralTab from './StaffGeneralTab';
@@ -75,6 +76,8 @@ export default function StaffDetailContent() {
   );
   const [rewardPenaltyDialogOpen, setRewardPenaltyDialogOpen] = React.useState(false);
 
+  const { can } = useAuth();
+  const canManagePayroll = can('payroll:manage');
   const { data: staff, isLoading, isError, error } = useStaffDetail(id);
   const current = override ?? staff;
 
@@ -131,9 +134,13 @@ export default function StaffDetailContent() {
             onValueChange={setTab}
             items={[
               { value: 'general', label: 'Thông tin chung', icon: User },
-              { value: 'payroll', label: 'Bảng lương', icon: Wallet },
+              ...(canManagePayroll
+                ? [{ value: 'payroll', label: 'Bảng lương', icon: Wallet }]
+                : []),
               { value: 'history', label: 'Lịch sử dịch vụ', icon: History },
-              { value: 'reward-penalty', label: 'Lịch sử Thưởng/Phạt', icon: Award },
+              ...(canManagePayroll
+                ? [{ value: 'reward-penalty', label: 'Lịch sử Thưởng/Phạt', icon: Award }]
+                : []),
               { value: 'schedule', label: 'Ngày nghỉ & Ca', icon: CalendarDays },
             ]}
           />
@@ -142,11 +149,11 @@ export default function StaffDetailContent() {
             {tab === 'general' && (
               <StaffGeneralTab key={current.id} staff={current} onSave={setOverride} />
             )}
-            {tab === 'payroll' && <StaffPayrollTab staff={current} />}
+            {tab === 'payroll' && canManagePayroll && <StaffPayrollTab staff={current} />}
             {tab === 'history' && (
               <StaffHistoryTab staffId={current.id} staffName={profile.name} />
             )}
-            {tab === 'reward-penalty' && (
+            {tab === 'reward-penalty' && canManagePayroll && (
               <StaffRewardPenaltyTab
                 staffId={current.id}
                 onAddRewardPenalty={() => setRewardPenaltyDialogOpen(true)}
@@ -163,12 +170,14 @@ export default function StaffDetailContent() {
         </div>
       </div>
 
-      <StaffRewardPenaltyCreateDialog
-        open={rewardPenaltyDialogOpen}
-        onOpenChange={setRewardPenaltyDialogOpen}
-        staffId={current.id}
-        onSuccess={() => setTab('reward-penalty')}
-      />
+      {canManagePayroll && (
+        <StaffRewardPenaltyCreateDialog
+          open={rewardPenaltyDialogOpen}
+          onOpenChange={setRewardPenaltyDialogOpen}
+          staffId={current.id}
+          onSuccess={() => setTab('reward-penalty')}
+        />
+      )}
     </div>
   );
 }

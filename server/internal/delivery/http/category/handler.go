@@ -29,6 +29,7 @@ func boolOrDefault(v *bool, def bool) bool {
 
 // CreateCategory godoc
 // @Summary      Tạo danh mục
+// @Description  Yêu cầu vai trò: owner hoặc manager.
 // @Tags         Categories
 // @Accept       json
 // @Produce      json
@@ -38,6 +39,7 @@ func boolOrDefault(v *bool, def bool) bool {
 // @Failure      400   {object}  response.ErrorResponse        "Dữ liệu không hợp lệ / thiếu organization"
 // @Failure      401   {object}  response.ErrorResponse        "Thiếu token / token không hợp lệ"
 // @Failure      500   {object}  response.ErrorResponse        "Lỗi server (vd trùng tên trong org)"
+// @Failure      403  {object}  response.ErrorResponse  "Không có quyền truy cập"
 // @Router       /categories [post]
 func (h *CategoryHandler) CreateCategory(c *gin.Context) {
 	var req domain.CreateCategoryRequest
@@ -90,6 +92,7 @@ func (h *CategoryHandler) GetCategoriesByOrgID(c *gin.Context) {
 
 // UpdateCategory godoc
 // @Summary      Cập nhật danh mục
+// @Description  Yêu cầu vai trò: owner hoặc manager.
 // @Tags         Categories
 // @Accept       json
 // @Produce      json
@@ -100,6 +103,7 @@ func (h *CategoryHandler) GetCategoriesByOrgID(c *gin.Context) {
 // @Failure      400   {object}  response.ErrorResponse        "Thiếu id / dữ liệu không hợp lệ"
 // @Failure      401   {object}  response.ErrorResponse        "Thiếu token / token không hợp lệ"
 // @Failure      404   {object}  response.ErrorResponse        "Không tìm thấy danh mục"
+// @Failure      403  {object}  response.ErrorResponse  "Không có quyền truy cập"
 // @Router       /categories/{id} [put]
 func (h *CategoryHandler) UpdateCategory(c *gin.Context) {
 	id := c.Param("id")
@@ -129,6 +133,7 @@ func (h *CategoryHandler) UpdateCategory(c *gin.Context) {
 
 // DeleteCategory godoc
 // @Summary      Xóa danh mục
+// @Description  Yêu cầu vai trò: owner hoặc manager.
 // @Tags         Categories
 // @Produce      json
 // @Security     BearerAuth
@@ -137,6 +142,7 @@ func (h *CategoryHandler) UpdateCategory(c *gin.Context) {
 // @Failure      400  {object}  response.ErrorResponse    "Thiếu id"
 // @Failure      401  {object}  response.ErrorResponse    "Thiếu token / token không hợp lệ"
 // @Failure      404  {object}  response.ErrorResponse    "Không tìm thấy danh mục"
+// @Failure      403  {object}  response.ErrorResponse  "Không có quyền truy cập"
 // @Router       /categories/{id} [delete]
 func (h *CategoryHandler) DeleteCategory(c *gin.Context) {
 	id := c.Param("id")

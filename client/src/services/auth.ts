@@ -4,7 +4,7 @@ import { createAsyncThunk } from '@reduxjs/toolkit';
 import { API_ENDPOINTS } from '@/constants';
 
 const { AUTH } = API_ENDPOINTS;
-export const logoutUser = createAsyncThunk('auth/logout', async () => {
+export const logoutUser = createAsyncThunk(AUTH.LOGOUT, async () => {
   try {
     await apiClient.post(AUTH.LOGOUT);
   } catch {

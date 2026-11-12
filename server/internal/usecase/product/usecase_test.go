@@ -144,6 +144,69 @@ func TestProductUsecase_CreateProduct(t *testing.T) {
 	}
 }
 
+func TestProductUsecase_GetMaterialProducts(t *testing.T) {
+	products := []*domain.Product{
+		{ID: "prod-1", OrganizationID: "org-123", SKU: "THUOC-DEN", Name: "Thuốc nhuộm đen", ProductType: domain.ProductTypeMaterial, Unit: "tuýp", IsActive: true},
+		{ID: "prod-2", OrganizationID: "org-123", SKU: "DAU-XA", Name: "Dầu xả", ProductType: domain.ProductTypeBoth, Unit: "chai", IsActive: true},
+	}
+
+	tests := []struct {
+		name          string
+		ctx           context.Context
+		mockReturn    []*domain.Product
+		mockErr       error
+		callRepo      bool
+		expectedError bool
+		expectedCode  int
+		expectedLen   int
+	}{
+		{
+			name: "Thành công - Lấy toàn bộ vật tư", ctx: withOrgCtx("org-123"),
+			mockReturn: products, callRepo: true, expectedLen: 2,
+		},
+		{
+			name: "Thành công - Danh sách rỗng", ctx: withOrgCtx("org-123"),
+			mockReturn: []*domain.Product{}, callRepo: true, expectedLen: 0,
+		},
+		{
+			name: "Thất bại - Thiếu organization_id", ctx: context.Background(),
+			expectedError: true, expectedCode: 400,
+		},
+		{
+			name: "Thất bại - Lỗi DB", ctx: withOrgCtx("org-123"),
+			mockErr: errors.New("db error"), callRepo: true,
+			expectedError: true, expectedCode: 500,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockRepo := new(MockProductRepository)
+			if tt.callRepo {
+				mockRepo.On("GetMaterialProductsByOrgID", mock.Anything, "org-123").
+					Return(tt.mockReturn, tt.mockErr)
+			}
+
+			uc := NewProductUsecase(mockRepo)
+			res, err := uc.GetMaterialProducts(tt.ctx)
+
+			if tt.expectedError {
+				assert.Error(t, err)
+				assert.Nil(t, res)
+				assertFlatAppError(t, err, tt.expectedCode)
+			} else {
+				assert.NoError(t, err)
+				assert.Len(t, res, tt.expectedLen)
+				for i, p := range res {
+					assert.Equal(t, tt.mockReturn[i].ID, p.ID)
+					assert.Equal(t, tt.mockReturn[i].ProductType, p.ProductType)
+				}
+			}
+			mockRepo.AssertExpectations(t)
+		})
+	}
+}
+
 func TestProductUsecase_GetProductsByOrgID(t *testing.T) {
 	categoryName := "Chăm sóc tóc"
 	productList := []*domain.Product{

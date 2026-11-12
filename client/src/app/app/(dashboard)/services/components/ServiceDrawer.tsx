@@ -7,7 +7,10 @@ import { DashDrawer } from '@/components/dashboard/DashDrawer';
 import type { Service } from '@/types/service';
 import { formatVND } from '@/lib/format';
 import useServiceDetail from '@/hooks/use-service-detail';
+import useMaterialProducts from '@/hooks/use-material-products';
 import { ServiceFormDialog } from './ServiceFormDialog';
+import { ServiceMaterialsSection } from './ServiceMaterialsSection';
+import useAuth from '@/hooks/use-auth';
 
 function formatDuration(min: number): string {
   if (min >= 60) {
@@ -42,10 +45,19 @@ type Props = {
 export function ServiceDrawer({ open, onOpenChange, service }: Props) {
   const { data, isLoading } = useServiceDetail(service?.id, open);
   const [editOpen, setEditOpen] = React.useState(false);
+  const { can } = useAuth();
+  const canEditMaterials = can('catalog:write');
+  const { data: materialProducts = [], isLoading: materialProductsLoading } = useMaterialProducts(
+    open && canEditMaterials,
+  );
 
   const detail = data?.service;
   const view = detail ?? service;
   const materials = data?.materials ?? [];
+  const materialsRevision = React.useMemo(
+    () => materials.map((m) => `${m.id}:${m.quantity}:${m.unit ?? ''}`).join('|'),
+    [materials],
+  );
   const loading = isLoading && !data;
   const val = (value: number) => (loading ? '—' : String(value));
 
@@ -81,13 +93,15 @@ export function ServiceDrawer({ open, onOpenChange, service }: Props) {
           >
             Đóng
           </Button>
-          <Button
-            className="bg-primary hover:bg-[#436b95] text-on-primary"
-            onClick={() => setEditOpen(true)}
-            disabled={!view}
-          >
-            Chỉnh sửa
-          </Button>
+          {can('catalog:write') && (
+            <Button
+              className="bg-primary hover:bg-[#436b95] text-on-primary"
+              onClick={() => setEditOpen(true)}
+              disabled={!view}
+            >
+              Chỉnh sửa
+            </Button>
+          )}
         </>
       }
       widthClass="!max-w-[640px] !w-[540px]"
@@ -189,44 +203,15 @@ export function ServiceDrawer({ open, onOpenChange, service }: Props) {
         </div>
       </div>
 
-      {/* Materials */}
-      <div className="space-y-3">
-        <h5 className="text-xs font-semibold text-slate-800 uppercase tracking-wider">
-          Định mức vật tư / lần thực hiện
-        </h5>
-        <div className="border border-outline rounded-xl overflow-hidden text-xs">
-          <table className="w-full">
-            <thead className="bg-surface-container-low text-on-surface-variant font-medium">
-              <tr>
-                <th className="py-2 px-3 text-left">Vật tư</th>
-                <th className="py-2 px-3 text-right">Định lượng</th>
-                <th className="py-2 px-3 text-right">Giá vốn</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-outline">
-              {materials.length === 0 ? (
-                <tr>
-                  <td colSpan={3} className="py-4 px-3 text-center text-on-surface-variant">
-                    {loading ? 'Đang tải…' : 'Chưa có định mức vật tư'}
-                  </td>
-                </tr>
-              ) : (
-                materials.map((m) => (
-                  <tr key={m.id}>
-                    <td className="py-2 px-3 font-medium text-slate-700">{m.product_name}</td>
-                    <td className="py-2 px-3 text-right font-mono text-on-surface-variant">
-                      {`${Number(m.quantity).toLocaleString('vi-VN')} ${m.unit || m.product_unit || ''}`.trim()}
-                    </td>
-                    <td className="py-2 px-3 text-right font-bold text-slate-900">
-                      {formatVND(Number(m.quantity) * Number(m.cost_price))}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <ServiceMaterialsSection
+        key={`${view?.id ?? ''}-${materialsRevision}`}
+        serviceId={view?.id ?? ''}
+        materials={materials}
+        products={materialProducts}
+        productsLoading={materialProductsLoading}
+        canEdit={canEditMaterials}
+        loading={loading}
+      />
     </DashDrawer>
     <ServiceFormDialog
       open={editOpen}

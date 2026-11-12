@@ -23,6 +23,7 @@ func NewInventoryHandler(uc *uc.InventoryUsecase) *InventoryHandler {
 
 // CreateDocument godoc
 // @Summary      Tạo phiếu kho (header + chi tiết + ghi sổ tồn)
+// @Description  Yêu cầu vai trò: owner hoặc manager.
 // @Tags         Inventory
 // @Accept       json
 // @Produce      json
@@ -31,6 +32,7 @@ func NewInventoryHandler(uc *uc.InventoryUsecase) *InventoryHandler {
 // @Success      200   {object}  response.SuccessResponse      "Tạo phiếu kho thành công"
 // @Failure      400   {object}  response.ErrorResponse        "Dữ liệu không hợp lệ / tồn không đủ"
 // @Failure      401   {object}  response.ErrorResponse        "Thiếu token / token không hợp lệ"
+// @Failure      403  {object}  response.ErrorResponse  "Không có quyền truy cập"
 // @Router       /inventory/ [post]
 func (h *InventoryHandler) CreateDocument(c *gin.Context) {
 	var req domain.CreateDocumentRequest
@@ -210,6 +212,7 @@ func (h *InventoryHandler) GetTransactionsByProductID(c *gin.Context) {
 
 // AddPayment godoc
 // @Summary      Ghi nhận trả nợ sau cho phiếu nhập
+// @Description  Yêu cầu vai trò: owner hoặc manager.
 // @Tags         Inventory
 // @Accept       json
 // @Produce      json
@@ -220,6 +223,7 @@ func (h *InventoryHandler) GetTransactionsByProductID(c *gin.Context) {
 // @Failure      400          {object}  response.ErrorResponse    "Số tiền/quỹ không hợp lệ hoặc vượt số còn nợ"
 // @Failure      401          {object}  response.ErrorResponse    "Thiếu token / token không hợp lệ"
 // @Failure      404          {object}  response.ErrorResponse    "Phiếu kho không tồn tại"
+// @Failure      403  {object}  response.ErrorResponse  "Không có quyền truy cập"
 // @Router       /inventory/{document_id}/payments [post]
 func (h *InventoryHandler) AddPayment(c *gin.Context) {
 	documentID := c.Param("document_id")

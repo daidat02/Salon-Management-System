@@ -9,6 +9,7 @@ import type { Product } from '@/types/product';
 import type { InventoryTransaction, InventoryTransactionType } from '@/types/inventory';
 import { formatDateTime, formatShortDateTime, formatVND } from '@/lib/format';
 import { ProductFormDialog } from './ProductFormDialog';
+import useAuth from '@/hooks/use-auth';
 
 const formatCompactVND = (value: number) => {
   if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(1).replace('.', ',')}B`;
@@ -56,6 +57,7 @@ type Props = {
 export function ProductDrawer({ open, onOpenChange, product }: Props) {
   const { data: detail, isLoading } = useProductDetail(open ? product?.id ?? null : null);
   const [editOpen, setEditOpen] = React.useState(false);
+  const { can } = useAuth();
   const item = detail ?? product;
 
   // API chi tiết đã quy đổi tồn kho về đơn vị bán (unit); row trong bảng vẫn
@@ -106,13 +108,15 @@ export function ProductDrawer({ open, onOpenChange, product }: Props) {
           >
             Đóng
           </Button>
-          <Button
-            className="bg-primary hover:bg-[#436b95] text-on-primary"
-            onClick={() => setEditOpen(true)}
-            disabled={!editProduct}
-          >
-            Chỉnh sửa
-          </Button>
+          {can('catalog:write') && (
+            <Button
+              className="bg-primary hover:bg-[#436b95] text-on-primary"
+              onClick={() => setEditOpen(true)}
+              disabled={!editProduct}
+            >
+              Chỉnh sửa
+            </Button>
+          )}
         </>
       }
       widthClass="!max-w-[640px] !w-[540px]"

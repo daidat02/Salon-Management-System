@@ -15,6 +15,19 @@ const (
 		       ON c.id = p.category_id AND c.organization_id = p.organization_id
 		WHERE p.organization_id = $1
 	`
+	listMaterialProductsByOrgIDQuery = `
+		SELECT p.id, p.organization_id, p.category_id, c.name AS category_name, p.sku, p.name,
+		       p.unit, p.net_unit, p.net_amount, p.product_type, p.show_on_web,
+		       p.cost_price, p.sell_price, p.stock_quantity, p.min_stock, p.is_active,
+		       p.created_at, p.updated_at
+		FROM products p
+		LEFT JOIN categories c
+		       ON c.id = p.category_id AND c.organization_id = p.organization_id
+		WHERE p.organization_id = $1
+		  AND p.product_type IN ('material', 'both')
+		  AND p.is_active = TRUE
+		ORDER BY p.name ASC
+	`
 	searchProductsFilter = `
 		AND ($2 = '' OR p.name ILIKE $2 OR p.sku ILIKE $2 OR p.product_type ILIKE $2)
 	`
@@ -118,6 +131,12 @@ const (
 	`
 	productUnitsQuery = `
 		SELECT id, unit, net_unit, net_amount
+		FROM products
+		WHERE organization_id = $1 AND id = ANY($2)
+	`
+	// Không lọc deleted_at để vẫn lấy được tên SP đã xóa mềm khi chốt đơn.
+	productNamesQuery = `
+		SELECT id, name
 		FROM products
 		WHERE organization_id = $1 AND id = ANY($2)
 	`

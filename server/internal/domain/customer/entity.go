@@ -9,7 +9,19 @@ const (
 	GenderMale   = "male"
 	GenderFemale = "female"
 	GenderOther  = "other"
+
+	// VNDPerRewardPoint là số tiền chi tiêu để tích 1 điểm thưởng.
+	VNDPerRewardPoint = 10000
 )
+
+// RewardPointsForAmount quy đổi số tiền chi tiêu thành điểm thưởng,
+// làm tròn xuống theo từng mốc VNDPerRewardPoint.
+func RewardPointsForAmount(amount float64) int {
+	if amount <= 0 {
+		return 0
+	}
+	return int(amount / VNDPerRewardPoint)
+}
 
 type Customer struct {
 	ID             string     `json:"id" db:"id"`

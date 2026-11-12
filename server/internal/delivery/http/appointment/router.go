@@ -2,6 +2,7 @@ package appointment
 
 import (
 	"github.com/daidat02/server/internal/delivery/http/middlewares"
+	userDomain "github.com/daidat02/server/internal/domain/user"
 	"github.com/gin-gonic/gin"
 )
 
@@ -17,6 +18,6 @@ func RegisterAppointmentRoutes(r *gin.Engine, h *AppointmentHandler, basePath st
 		group.PUT("/:id/reschedule", h.RescheduleAppointment)
 		group.POST("/:id/cancel", h.CancelAppointment)
 		group.PATCH("/:id/status", h.UpdateAppointmentStatus)
-		group.DELETE("/:id", h.DeleteAppointment)
+		group.DELETE("/:id", middlewares.VertifyRole(userDomain.RoleOwner, userDomain.RoleManager), h.DeleteAppointment)
 	}
 }

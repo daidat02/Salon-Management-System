@@ -248,6 +248,7 @@ func (h *AppointmentHandler) UpdateAppointmentStatus(c *gin.Context) {
 
 // DeleteAppointment godoc
 // @Summary      Xóa cứng lịch hẹn (chỉ pending/cancelled)
+// @Description  Yêu cầu vai trò: owner hoặc manager.
 // @Tags         Appointments
 // @Produce      json
 // @Security     BearerAuth
@@ -256,6 +257,7 @@ func (h *AppointmentHandler) UpdateAppointmentStatus(c *gin.Context) {
 // @Failure      400  {object}  response.ErrorResponse    "Trạng thái không cho xóa (hãy hủy lịch)"
 // @Failure      401  {object}  response.ErrorResponse    "Thiếu token / token không hợp lệ"
 // @Failure      404  {object}  response.ErrorResponse    "Không tìm thấy lịch hẹn"
+// @Failure      403  {object}  response.ErrorResponse  "Không có quyền truy cập"
 // @Router       /appointments/{id} [delete]
 func (h *AppointmentHandler) DeleteAppointment(c *gin.Context) {
 	deletedID, err := h.uc.DeleteAppointment(c.Request.Context(), c.Param("id"))

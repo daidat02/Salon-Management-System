@@ -10,6 +10,7 @@ import useCashFlows from '@/hooks/use-cashflows';
 import useApproveCashFlow from '@/hooks/use-approve-cashflow';
 import { toast } from '@/components/ui/toast';
 import { buildCashflowColumns } from './columns';
+import useAuth from '@/hooks/use-auth';
 import { CashflowApproveDialog } from './CashflowApproveDialog';
 import { mapCashflow } from './cashflowUtils';
 import type { CashflowVoucher } from './types';
@@ -48,6 +49,7 @@ export default function CashflowTable() {
   const [approveTarget, setApproveTarget] = React.useState<CashflowVoucher | null>(null);
   const [approveError, setApproveError] = React.useState<string | null>(null);
   const { mutate: approveCashflow, isPending: isApproving } = useApproveCashFlow();
+  const { can } = useAuth();
 
   const handleApprove = React.useCallback((row: CashflowVoucher) => {
     setApproveError(null);
@@ -55,8 +57,11 @@ export default function CashflowTable() {
   }, []);
 
   const columns = React.useMemo(
-    () => buildCashflowColumns({ onApprove: handleApprove }),
-    [handleApprove],
+    () =>
+      buildCashflowColumns({
+        onApprove: can('cashflow:write') ? handleApprove : undefined,
+      }),
+    [can, handleApprove],
   );
   const rows = React.useMemo(() => (data?.data ?? []).map(mapCashflow), [data]);
   const total = data?.total ?? 0;

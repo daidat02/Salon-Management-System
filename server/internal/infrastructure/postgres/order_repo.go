@@ -680,7 +680,7 @@ func (r *PostgresOrderRepository) ApplyCancel(ctx context.Context, orgID, orderI
 // trong cùng tx. Trả về mã phiếu vừa sinh.
 // Guard: khóa row đơn + chỉ chốt đơn chưa hoàn tất (chống chốt 2 lần);
 // tồn không đủ ở bất kỳ SP nào thì rollback toàn bộ (ErrInsufficientStock).
-func (r *PostgresOrderRepository) CompleteOrderWithSlip(ctx context.Context, orgID, orderID string, appointmentID *string, lines []domain.SaleSlipLine, fundID string, confirmation *domain.PaymentCompletion) (domain.SaleSlipResult, error) {
+func (r *PostgresOrderRepository) CompleteOrderWithSlip(ctx context.Context, orgID, orderID string, appointmentID *string, lines []domain.SaleSlipLine, description, fundID string, confirmation *domain.PaymentCompletion) (domain.SaleSlipResult, error) {
 	var empty domain.SaleSlipResult
 	if confirmation == nil {
 		return empty, fmt.Errorf("thiếu thông tin xác nhận thanh toán")
@@ -809,8 +809,17 @@ func (r *PostgresOrderRepository) CompleteOrderWithSlip(ctx context.Context, org
 	}
 
 	var orderCode string
-	if err := tx.QueryRow(ctx, `SELECT code, total_amount FROM orders WHERE organization_id = $1 AND id = $2`, orgID, orderID).Scan(&orderCode, &orderTotal); err != nil {
+	var customerID *string
+	if err := tx.QueryRow(ctx, `SELECT code, total_amount, customer_id FROM orders WHERE organization_id = $1 AND id = $2`, orgID, orderID).Scan(&orderCode, &orderTotal, &customerID); err != nil {
 		return empty, fmt.Errorf("lỗi khi đọc đơn hàng: %w", err)
+	}
+	if _, err := tx.Exec(ctx, updateOrderDescriptionQuery, orgID, orderID, description); err != nil {
+		return empty, fmt.Errorf("lỗi khi cập nhật mô tả đơn hàng: %w", err)
+	}
+	if customerID != nil {
+		if err := UpdateCustomerSpendingTx(ctx, tx, orgID, *customerID, orderTotal); err != nil {
+			return empty, err
+		}
 	}
 
 	var docID string
@@ -1044,7 +1053,7 @@ func (r *PostgresOrderRepository) UpdateOrderCustomer(ctx context.Context, orgID
 // GetPosItemsByOrgID lấy danh mục bán hàng POS (union sản phẩm retail/both +
 // dịch vụ active), phân trang cursor (type, name, id), tìm theo tên/SKU, lọc danh mục.
 // Limit do usecase clamp 1..100, query ghép từ listItemPos + search + filter + paginate.
-func (r *PostgresOrderRepository) GetPosItemsByOrgID(ctx context.Context, orgID string, limit int, name, itemType string, id string, search string, categoryFilter string) ([]*domain.PosItemResponse, error) {
+func (r *PostgresOrderRepository) GetPosItemsByOrgID(ctx context.Context, orgID string, limit int, name, itemType string, id string, search string, categoryFilter string, kind string) ([]*domain.PosItemResponse, error) {
 	formattedSearch := ""
 	if strings.TrimSpace(search) != "" {
 		formattedSearch = "%" + strings.TrimSpace(search) + "%"
@@ -1057,10 +1066,11 @@ func (r *PostgresOrderRepository) GetPosItemsByOrgID(ctx context.Context, orgID 
 		"both",          // $3
 		formattedSearch, // $4
 		categoryFilter,  // $5
-		itemType,        // $6 (cursor type)
-		name,            // $7 (cursor name)
-		id,              // $8 (cursor id)
-		limit,           // $9
+		kind,            // $6 (filter type: product|service)
+		itemType,        // $7 (cursor type)
+		name,            // $8 (cursor name)
+		id,              // $9 (cursor id)
+		limit,           // $10
 	}
 
 	var items []*domain.PosItemResponse

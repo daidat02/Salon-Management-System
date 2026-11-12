@@ -3,6 +3,8 @@
 import { Filter, ScanBarcode, Search, Store } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { cn } from 'cn';
+import { DashSelect } from '@/components/dashboard/DashSelect';
+import type { CatalogTypeFilter } from './useCatalogData';
 import type { Category } from '@/types/category';
 
 type CatalogToolbarProps = {
@@ -11,6 +13,8 @@ type CatalogToolbarProps = {
   categories: Category[];
   activeCat: string;
   onCategoryChange: (id: string) => void;
+  activeType: CatalogTypeFilter;
+  onTypeChange: (type: CatalogTypeFilter) => void;
 };
 
 export default function CatalogToolbar({
@@ -19,6 +23,8 @@ export default function CatalogToolbar({
   categories,
   activeCat,
   onCategoryChange,
+  activeType,
+  onTypeChange,
 }: CatalogToolbarProps) {
   return (
     <div className="bg-surface flex flex-col gap-3 rounded-md border border-outline p-4 shadow-sm">
@@ -39,9 +45,20 @@ export default function CatalogToolbar({
             className="bg-surface-container-low border-outline h-8 rounded-md border py-2 pr-14 pl-9 text-sm text-on-surface placeholder:text-xs focus-visible:border-primary focus-visible:ring-1 focus-visible:ring-primary"
           />
         </div>
-        <button className="bg-surface-container hover:bg-slate-200 border-outline flex items-center gap-1.5 rounded-md border px-3 py-2 text-xs font-medium text-on-surface transition-colors">
-          <Filter className="h-4 w-4" /> Bộ lọc
-        </button>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <DashSelect
+            value={activeType || 'all'}
+            onValueChange={(value) =>
+              onTypeChange(value === 'all' ? '' : (value as CatalogTypeFilter))
+            }
+            options={[
+              { value: 'all', label: 'Tất cả' },
+              { value: 'service', label: 'Dịch vụ' },
+              { value: 'product', label: 'Sản phẩm' },
+            ]}
+            triggerClassName="h-8! w-[118px] rounded-md text-xs"
+          />
+        </div>
       </div>
 
       <div className="flex items-center gap-2 overflow-x-auto pt-1 pb-0.5 no-scrollbar">

@@ -104,6 +104,14 @@ func (m *MockInventoryProducts) GetProductUnits(ctx context.Context, orgID strin
 	return args.Get(0).(map[string]orderdomain.ProductUnit), args.Error(1)
 }
 
+func (m *MockInventoryProducts) GetProductNames(ctx context.Context, orgID string, productIDs []string) (map[string]string, error) {
+	args := m.Called(ctx, orgID, productIDs)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(map[string]string), args.Error(1)
+}
+
 func (m *MockInventoryRepository) GetDocumentByID(ctx context.Context, orgID string, documentID string) (*domain.DocumentDetailResponse, error) {
 	args := m.Called(ctx, orgID, documentID)
 	if args.Get(0) == nil {

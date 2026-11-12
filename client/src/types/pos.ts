@@ -17,6 +17,7 @@ export interface PosItem {
 export interface PosItemsParams {
   search?: string;
   category?: string;
+  kind?: PosItemType;
   /** Con trỏ phân trang cursor: type/name/id của dòng cuối trang trước */
   cursorType?: string;
   cursorName?: string;

@@ -70,7 +70,7 @@ const insertDefaultBusinessHoursQuery = `
 
 const getGeneralSettingsQuery = `
 	SELECT o.id, o.name, o.slug, o.phone, o.email, o.website, o.address,
-	       o.tax_code, o.slogan, o.logo_url, o.timezone, o.status,
+	       o.tax_code, o.slogan, o.logo_url, o.timezone, o.status, o.is_demo,
 	       COALESCE(bh.open_time_minutes, 510) AS open_time_minutes,
 	       COALESCE(bh.close_time_minutes, 1230) AS close_time_minutes,
 	       bh.break_start_minutes, bh.break_end_minutes, bh.days
@@ -92,6 +92,7 @@ type generalSettingsRow struct {
 	LogoURL           *string `db:"logo_url"`
 	Timezone          string  `db:"timezone"`
 	Status            string  `db:"status"`
+	IsDemo            bool    `db:"is_demo"`
 	OpenTimeMinutes   int     `db:"open_time_minutes"`
 	CloseTimeMinutes  int     `db:"close_time_minutes"`
 	BreakStartMinutes *int    `db:"break_start_minutes"`
@@ -133,6 +134,7 @@ func (r *PostgresSettingRepository) GetGeneralSettings(ctx context.Context, orgI
 			LogoURL:  row.LogoURL,
 			Timezone: row.Timezone,
 			Status:   row.Status,
+			IsDemo:   row.IsDemo,
 		},
 		WorkingHours: workingHours,
 	}, nil

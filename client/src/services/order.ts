@@ -16,6 +16,7 @@ type RawOrder = {
   SubtotalAmount: number;
   DiscountAmount: number;
   TotalAmount: number;
+  Description: string;
   Status: Order['status'];
   CreatedAt: string | null;
   UpdatedAt: string | null;
@@ -31,6 +32,7 @@ function mapOrder(raw: RawOrder): Order {
     subtotal_amount: raw.SubtotalAmount,
     discount_amount: raw.DiscountAmount,
     total_amount: raw.TotalAmount,
+    description: raw.Description,
     status: raw.Status,
     created_at: raw.CreatedAt,
     updated_at: raw.UpdatedAt,
@@ -78,6 +80,7 @@ type RawCreatedOrder = {
   subtotal_amount: number;
   discount_amount: number;
   total_amount: number;
+  description: string;
   status: Order['status'];
   created_at: string | null;
   updated_at: string | null;
@@ -113,6 +116,7 @@ export const createOrder = async (payload: CreateOrderPayload): Promise<CreatedO
     subtotal_amount: o.subtotal_amount,
     discount_amount: o.discount_amount,
     total_amount: o.total_amount,
+    description: o.description,
     status: o.status,
     created_at: o.created_at,
     updated_at: o.updated_at,
@@ -124,6 +128,7 @@ export const createOrder = async (payload: CreateOrderPayload): Promise<CreatedO
 export const getPosItems = async ({
   search,
   category,
+  kind,
   cursorType,
   cursorName,
   cursorId,
@@ -133,6 +138,7 @@ export const getPosItems = async ({
     params: {
       search: search || undefined,
       category: category || undefined,
+      kind: kind || undefined,
       type: cursorType || undefined,
       name: cursorName || undefined,
       id: cursorId || undefined,
@@ -335,6 +341,7 @@ export const addOrderItems = async (
     subtotal_amount: o.subtotal_amount,
     discount_amount: o.discount_amount,
     total_amount: o.total_amount,
+    description: o.description,
     status: o.status,
     created_at: o.created_at,
     updated_at: o.updated_at,
@@ -406,6 +413,7 @@ export const cancelOrder = async (orderId: string): Promise<CreatedOrder> => {
     subtotal_amount: o.subtotal_amount,
     discount_amount: o.discount_amount,
     total_amount: o.total_amount,
+    description: o.description,
     status: o.status,
     created_at: o.created_at,
     updated_at: o.updated_at,
@@ -427,6 +435,7 @@ export const refundOrder = async (orderId: string): Promise<CreatedOrder> => {
     subtotal_amount: o.subtotal_amount,
     discount_amount: o.discount_amount,
     total_amount: o.total_amount,
+    description: o.description,
     status: o.status,
     created_at: o.created_at,
     updated_at: o.updated_at,

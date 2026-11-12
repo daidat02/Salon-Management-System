@@ -3,9 +3,11 @@ import PageHeading from '@/components/dashboard/PageHeading';
 import { FileDown, UserPlus } from 'lucide-react';
 import { useState } from 'react';
 import { StaffCreateDialog } from './StaffCreateDialog';
+import useAuth from '@/hooks/use-auth';
 
 const StaffHeading = () => {
   const [openCreateDialog, setOpenCreateDialog] = useState(false);
+  const { can } = useAuth();
 
   return (
     <>
@@ -24,12 +26,14 @@ const StaffHeading = () => {
             variant: 'outline',
             onClick: () => console.log('Export Excel'),
           },
-          {
-            label: 'Thêm nhân viên',
-            icon: UserPlus,
-            variant: 'primary',
-            onClick: () => setOpenCreateDialog(true),
-          },
+          ...(can('staff:write')
+            ? [{
+                label: 'Thêm nhân viên',
+                icon: UserPlus,
+                variant: 'primary' as const,
+                onClick: () => setOpenCreateDialog(true),
+              }]
+            : []),
         ]}
       />
 

@@ -91,6 +91,37 @@ func (r *PostgresServiceRepository) CreateService(ctx context.Context, service *
 	return nil
 }
 
+// ReplaceServiceMaterials thay toàn bộ định mức vật tư của dịch vụ trong 1 tx.
+// Mảng rỗng xóa hết định mức; khóa dòng dịch vụ trước để trả 404 đúng org.
+func (r *PostgresServiceRepository) ReplaceServiceMaterials(ctx context.Context, orgID, serviceID string, materials []*domain.ServiceMaterialInput) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("lỗi khi bắt đầu transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	var lockedID string
+	if err := tx.QueryRow(ctx, lockServiceQuery, serviceID, orgID).Scan(&lockedID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return fmt.Errorf("thay định mức dịch vụ %s: %w", serviceID, domain.ErrServiceNotFound)
+		}
+		return fmt.Errorf("lỗi khi khóa dịch vụ: %w", err)
+	}
+
+	if _, err := tx.Exec(ctx, deleteServiceMaterialsQuery, serviceID, orgID); err != nil {
+		return fmt.Errorf("lỗi khi xóa định mức cũ: %w", err)
+	}
+
+	if err := r.bulkUpsertServiceMaterials(ctx, tx, orgID, serviceID, materials); err != nil {
+		return fmt.Errorf("lỗi khi thêm định mức mới: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("lỗi khi commit transaction: %w", err)
+	}
+	return nil
+}
+
 func scanServiceRow(scan func(dest ...any) error) (*domain.Service, error) {
 	var s domain.Service
 	var description *string
@@ -418,6 +449,28 @@ func (r *PostgresServiceRepository) GetServicePrices(ctx context.Context, orgID 
 		return nil, fmt.Errorf("lỗi trong quá trình đọc giá dịch vụ: %w", err)
 	}
 	return prices, nil
+}
+
+// GetServiceNames lấy tên hiện tại của các dịch vụ, kể cả đã xóa mềm.
+func (r *PostgresServiceRepository) GetServiceNames(ctx context.Context, orgID string, serviceIDs []string) (map[string]string, error) {
+	rows, err := r.db.Query(ctx, serviceNamesQuery, orgID, serviceIDs)
+	if err != nil {
+		return nil, fmt.Errorf("lỗi khi lấy tên dịch vụ: %w", err)
+	}
+	defer rows.Close()
+
+	names := make(map[string]string, len(serviceIDs))
+	for rows.Next() {
+		var id, name string
+		if err := rows.Scan(&id, &name); err != nil {
+			return nil, fmt.Errorf("lỗi khi đọc tên dịch vụ: %w", err)
+		}
+		names[id] = name
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("lỗi trong quá trình đọc tên dịch vụ: %w", err)
+	}
+	return names, nil
 }
 
 // GetServiceMaterials lấy định mức vật tư + giá vốn hiện tại theo từng dịch vụ,

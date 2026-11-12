@@ -45,17 +45,17 @@ func (h *CustomerHandler) CreateCustomer(c *gin.Context) {
 	}
 	var birthDateParsed *time.Time
 	if req.BirthDate != nil && *req.BirthDate != "" {
-    // 1. Phải hứng cả 2 giá trị trả về: parsedTime và err
-    parsedTime, err := time.Parse("2006-01-02", *req.BirthDate)
-    if err != nil {
-		response.Error(c, apperror.New(400, "Dữ liệu không hợp lệ", err))
-		c.Abort()
-		return
-    }
-    
-    // 3. Gán địa chỉ nếu parse thành công
-    birthDateParsed = &parsedTime
-}
+		// 1. Phải hứng cả 2 giá trị trả về: parsedTime và err
+		parsedTime, err := time.Parse("2006-01-02", *req.BirthDate)
+		if err != nil {
+			response.Error(c, apperror.New(400, "Dữ liệu không hợp lệ", err))
+			c.Abort()
+			return
+		}
+
+		// 3. Gán địa chỉ nếu parse thành công
+		birthDateParsed = &parsedTime
+	}
 	customer := &domain.Customer{
 		FullName:  req.FullName,
 		Phone:     req.Phone,
@@ -228,6 +228,7 @@ func (h *CustomerHandler) UpdateCustomer(c *gin.Context) {
 
 // DeleteCustomer godoc
 // @Summary      Xóa mềm khách hàng
+// @Description  Yêu cầu vai trò: owner hoặc manager.
 // @Tags         Customers
 // @Produce      json
 // @Security     BearerAuth
@@ -236,6 +237,7 @@ func (h *CustomerHandler) UpdateCustomer(c *gin.Context) {
 // @Failure      400  {object}  response.ErrorResponse    "Thiếu id"
 // @Failure      401  {object}  response.ErrorResponse    "Thiếu token / token không hợp lệ"
 // @Failure      404  {object}  response.ErrorResponse    "Không tìm thấy khách hàng"
+// @Failure      403  {object}  response.ErrorResponse  "Không có quyền truy cập"
 // @Router       /customers/{id} [delete]
 func (h *CustomerHandler) DeleteCustomer(c *gin.Context) {
 	id := c.Param("id")

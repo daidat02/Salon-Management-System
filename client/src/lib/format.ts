@@ -43,3 +43,15 @@ export const parseLocalDate = (dateStr: string | null): Date | undefined => {
   const date = new Date(`${dateStr}T00:00:00`);
   return isNaN(date.getTime()) ? undefined : date;
 };
+
+export const formatStockQuantity = (
+  quantity: number,
+  netAmount?: number,
+  unit?: string,
+): string => {
+  if (quantity === 0) return 'Hết hàng';
+  if (netAmount && netAmount > 0) {
+    return `${quantity / netAmount} ${unit ?? ''}`;
+  }
+  return `${quantity} ${unit ?? ''}`;
+};

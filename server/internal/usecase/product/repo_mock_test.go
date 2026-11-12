@@ -41,6 +41,14 @@ func (m *MockProductRepository) GetProductsByOrgID(ctx context.Context, orgID st
 	return args.Get(0).([]*domain.Product), args.Error(1)
 }
 
+func (m *MockProductRepository) GetMaterialProductsByOrgID(ctx context.Context, orgID string) ([]*domain.Product, error) {
+	args := m.Called(ctx, orgID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*domain.Product), args.Error(1)
+}
+
 func (m *MockProductRepository) CountProductsByOrgID(ctx context.Context, orgID string, search string, status string, categoryID string) (int64, error) {
 	args := m.Called(ctx, orgID, search, status, categoryID)
 	return args.Get(0).(int64), args.Error(1)

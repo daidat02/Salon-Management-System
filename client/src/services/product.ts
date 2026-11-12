@@ -36,6 +36,12 @@ export const getProductsByOrgID = async ({
   return res.data.data;
 };
 
+/** Toàn bộ sản phẩm vật tư (material/both), không phân trang. */
+export const getMaterialProducts = async () => {
+  const res = await apiClient.get<ApiResponse<Product[]>>(PRODUCTS_ENDPOINT.GET_MATERIALS);
+  return res.data.data;
+};
+
 export const getProductById = async (id: string) => {
   const res = await apiClient.get<ApiResponse<ProductDetail>>(
     PRODUCTS_ENDPOINT.GET_BY_ID(id),

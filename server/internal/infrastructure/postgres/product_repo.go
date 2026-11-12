@@ -188,6 +188,29 @@ func (r *PostgresProductRepository) GetProductsByOrgID(
 	return products, nil
 }
 
+// GetMaterialProductsByOrgID trả toàn bộ sản phẩm dùng làm vật tư (material/both)
+// đang hoạt động, không phân trang, sắp xếp theo tên.
+func (r *PostgresProductRepository) GetMaterialProductsByOrgID(ctx context.Context, orgID string) ([]*domain.Product, error) {
+	rows, err := r.db.Query(ctx, listMaterialProductsByOrgIDQuery, orgID)
+	if err != nil {
+		return nil, fmt.Errorf("lỗi khi truy vấn sản phẩm vật tư: %w", err)
+	}
+	defer rows.Close()
+
+	products := make([]*domain.Product, 0)
+	for rows.Next() {
+		p, err := scanProductRow(rows.Scan)
+		if err != nil {
+			return nil, fmt.Errorf("lỗi khi đọc dữ liệu sản phẩm vật tư: %w", err)
+		}
+		products = append(products, p)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("lỗi trong quá trình duyệt sản phẩm vật tư: %w", err)
+	}
+	return products, nil
+}
+
 // attachRevenueThisMonth gắn doanh thu tháng hiện tại cho các sản phẩm trong page.
 func (r *PostgresProductRepository) attachRevenueThisMonth(ctx context.Context, orgID string, products []*domain.Product) error {
 	if len(products) == 0 {
@@ -355,6 +378,28 @@ func (r *PostgresProductRepository) GetProductPricing(ctx context.Context, orgID
 		return nil, fmt.Errorf("lỗi trong quá trình đọc giá: %w", err)
 	}
 	return pricing, nil
+}
+
+// GetProductNames lấy tên hiện tại của các sản phẩm, kể cả đã xóa mềm.
+func (r *PostgresProductRepository) GetProductNames(ctx context.Context, orgID string, productIDs []string) (map[string]string, error) {
+	rows, err := r.db.Query(ctx, productNamesQuery, orgID, productIDs)
+	if err != nil {
+		return nil, fmt.Errorf("lỗi khi lấy tên sản phẩm: %w", err)
+	}
+	defer rows.Close()
+
+	names := make(map[string]string, len(productIDs))
+	for rows.Next() {
+		var id, name string
+		if err := rows.Scan(&id, &name); err != nil {
+			return nil, fmt.Errorf("lỗi khi đọc tên sản phẩm: %w", err)
+		}
+		names[id] = name
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("lỗi trong quá trình đọc tên sản phẩm: %w", err)
+	}
+	return names, nil
 }
 
 // GetProductUnits lấy đơn vị + hệ số quy đổi của các sản phẩm

@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  disableDemoData,
   getBookingSettings,
   getGeneralSettings,
   getNotificationSettings,
@@ -78,6 +79,16 @@ export function useUpdatePaymentSettings() {
     mutationFn: updatePaymentSettings,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['settings', 'payment'] });
+    },
+  });
+}
+
+export function useDisableDemoData() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: disableDemoData,
+    onSuccess: () => {
+      queryClient.clear();
     },
   });
 }

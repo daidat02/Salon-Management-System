@@ -39,6 +39,8 @@ func productsWithPricing() *MockProductStore {
 		Return(map[string]domain.ProductPricing{"prod-1": {SellPrice: 150000, CostPrice: 90000}}, nil)
 	p.On("GetProductUnits", mock.Anything, "org-123", mock.Anything).
 		Return(map[string]domain.ProductUnit{"prod-1": {Unit: "chai"}}, nil)
+	p.On("GetProductNames", mock.Anything, "org-123", mock.Anything).
+		Return(map[string]string{"prod-1": "Dầu gội"}, nil)
 	return p
 }
 
@@ -583,6 +585,7 @@ func TestOrderUsecase_ConfirmPayment(t *testing.T) {
 		completedOrder.Status = domain.StatusCompleted
 		completedOrder.DiscountAmount = 50000
 		completedOrder.TotalAmount = 250000
+		completedOrder.Description = "Sản phẩm: Dầu gội"
 		succeededPayment := *pendingPayment
 		succeededPayment.Amount = 250000
 		succeededPayment.Status = domain.PaymentStatusSucceeded
@@ -591,7 +594,11 @@ func TestOrderUsecase_ConfirmPayment(t *testing.T) {
 		repo.On("GetOrderByID", mock.Anything, "org-123", "ord-1").Return(pendingOrder, nil).Once()
 		repo.On("GetPaymentByID", mock.Anything, "org-123", "ord-1", "pay-1").Return(pendingPayment, nil).Once()
 		itemMocks(repo)
-		repo.On("CompleteOrderWithSlip", mock.Anything, "org-123", "ord-1", mock.Anything, mock.Anything, "fund-1", mock.Anything).
+		var gotDescription string
+		repo.On("CompleteOrderWithSlip", mock.Anything, "org-123", "ord-1", mock.Anything, mock.Anything, mock.Anything, "fund-1", mock.Anything).
+			Run(func(args mock.Arguments) {
+				gotDescription = args.Get(5).(string)
+			}).
 			Return(domain.SaleSlipResult{DocumentID: "doc-1", DocumentCode: "XK-ORD-1"}, nil).Once()
 		repo.On("GetOrderByID", mock.Anything, "org-123", "ord-1").Return(&completedOrder, nil).Once()
 		repo.On("GetPaymentByID", mock.Anything, "org-123", "ord-1", "pay-1").Return(&succeededPayment, nil).Once()
@@ -605,6 +612,8 @@ func TestOrderUsecase_ConfirmPayment(t *testing.T) {
 		assert.Equal(t, "doc-1", res.DocumentID)
 		assert.Equal(t, domain.StatusCompleted, res.Order.Status)
 		assert.Equal(t, float64(250000), res.Order.TotalAmount)
+		assert.Equal(t, "Sản phẩm: Dầu gội", gotDescription)
+		assert.Equal(t, "Sản phẩm: Dầu gội", res.Order.Description)
 		assert.Equal(t, domain.PaymentStatusSucceeded, res.Payment.Status)
 		repo.AssertExpectations(t)
 	})
@@ -626,7 +635,7 @@ func TestOrderUsecase_ConfirmPayment(t *testing.T) {
 
 		assert.NoError(t, err)
 		assert.Equal(t, "XK-ORD-1", res.DocumentCode)
-		repo.AssertNotCalled(t, "CompleteOrderWithSlip", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+		repo.AssertNotCalled(t, "CompleteOrderWithSlip", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	})
 
 	t.Run("Thất bại - Giảm giá vượt số còn thiếu", func(t *testing.T) {
@@ -634,7 +643,7 @@ func TestOrderUsecase_ConfirmPayment(t *testing.T) {
 		repo.On("GetOrderByID", mock.Anything, "org-123", "ord-1").Return(pendingOrder, nil)
 		repo.On("GetPaymentByID", mock.Anything, "org-123", "ord-1", "pay-1").Return(pendingPayment, nil)
 		itemMocks(repo)
-		repo.On("CompleteOrderWithSlip", mock.Anything, "org-123", "ord-1", mock.Anything, mock.Anything, "fund-1", mock.Anything).
+		repo.On("CompleteOrderWithSlip", mock.Anything, "org-123", "ord-1", mock.Anything, mock.Anything, mock.Anything, "fund-1", mock.Anything).
 			Return(domain.SaleSlipResult{}, domain.ErrDiscountExceedsRemaining)
 
 		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), settingOK())
@@ -671,6 +680,35 @@ func TestOrderUsecase_ConfirmPayment(t *testing.T) {
 		assert.Nil(t, res)
 		assertFlatAppError(t, err, 400)
 	})
+}
+
+func TestOrderUsecase_LoadOrderDescription(t *testing.T) {
+	items := []*domain.OrderItem{
+		{ItemType: domain.ItemTypeService, ServiceID: strP("svc-1")},
+		{ItemType: domain.ItemTypeProduct, ProductID: strP("prod-1")},
+		{ItemType: domain.ItemTypeService, ServiceID: strP("svc-2")},
+		{ItemType: domain.ItemTypeProduct, ProductID: strP("prod-missing")},
+		{ItemType: domain.ItemTypeService, ServiceID: strP("svc-3")},
+		{ItemType: domain.ItemTypeProduct, ProductID: strP("prod-1")},
+		{ItemType: domain.ItemTypeService},
+	}
+
+	services := new(MockServiceStore)
+	services.On("GetServiceNames", mock.Anything, "org-123", mock.Anything).
+		Return(map[string]string{
+			"svc-1": " Gội đầu ",
+			"svc-2": "Cắt tóc",
+			"svc-3": "Gội đầu",
+		}, nil)
+	products := new(MockProductStore)
+	products.On("GetProductNames", mock.Anything, "org-123", mock.Anything).
+		Return(map[string]string{"prod-1": "Dầu gội"}, nil)
+
+	uc := NewOrderUsecase(new(MockOrderRepository), catalogOK(), products, services, new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
+	got, err := uc.loadOrderDescription(withOrgCtx("org-123"), "org-123", items)
+
+	assert.NoError(t, err)
+	assert.Equal(t, "Dịch vụ: Gội đầu, Cắt tóc; Sản phẩm: Dầu gội", got)
 }
 
 func TestOrderUsecase_GetOrders(t *testing.T) {
@@ -719,11 +757,11 @@ func TestOrderUsecase_GetPosItemsByOrgID(t *testing.T) {
 
 	t.Run("Thành công - Trả danh sách gồm product và service", func(t *testing.T) {
 		repo := new(MockOrderRepository)
-		repo.On("GetPosItemsByOrgID", mock.Anything, "org-123", 20, "", "", "", "", "").
+		repo.On("GetPosItemsByOrgID", mock.Anything, "org-123", 20, "", "", "", "", "", "").
 			Return(items, nil)
 
 		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
-		res, err := uc.GetPosItemsByOrgID(withOrgCtx("org-123"), 20, "", "", "", "", "")
+		res, err := uc.GetPosItemsByOrgID(withOrgCtx("org-123"), 20, "", "", "", "", "", "")
 
 		assert.NoError(t, err)
 		assert.Len(t, res, 2)
@@ -735,11 +773,11 @@ func TestOrderUsecase_GetPosItemsByOrgID(t *testing.T) {
 
 	t.Run("Thành công - limit ngoài khoảng được clamp", func(t *testing.T) {
 		repo := new(MockOrderRepository)
-		repo.On("GetPosItemsByOrgID", mock.Anything, "org-123", 20, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		repo.On("GetPosItemsByOrgID", mock.Anything, "org-123", 20, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(items, nil)
 
 		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
-		res, err := uc.GetPosItemsByOrgID(withOrgCtx("org-123"), 0, "", "", "", "", "")
+		res, err := uc.GetPosItemsByOrgID(withOrgCtx("org-123"), 0, "", "", "", "", "", "")
 
 		assert.NoError(t, err)
 		assert.Len(t, res, 2)
@@ -748,11 +786,11 @@ func TestOrderUsecase_GetPosItemsByOrgID(t *testing.T) {
 
 	t.Run("Thành công - limit vượt trần được clamp", func(t *testing.T) {
 		repo := new(MockOrderRepository)
-		repo.On("GetPosItemsByOrgID", mock.Anything, "org-123", 100, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		repo.On("GetPosItemsByOrgID", mock.Anything, "org-123", 100, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(items, nil)
 
 		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
-		res, err := uc.GetPosItemsByOrgID(withOrgCtx("org-123"), 999, "", "", "", "", "")
+		res, err := uc.GetPosItemsByOrgID(withOrgCtx("org-123"), 999, "", "", "", "", "", "")
 
 		assert.NoError(t, err)
 		assert.Len(t, res, 2)
@@ -761,7 +799,7 @@ func TestOrderUsecase_GetPosItemsByOrgID(t *testing.T) {
 
 	t.Run("Thất bại - Thiếu organization_id", func(t *testing.T) {
 		uc := NewOrderUsecase(new(MockOrderRepository), catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
-		res, err := uc.GetPosItemsByOrgID(context.Background(), 20, "", "", "", "", "")
+		res, err := uc.GetPosItemsByOrgID(context.Background(), 20, "", "", "", "", "", "")
 
 		assert.Error(t, err)
 		assert.Nil(t, res)
@@ -770,11 +808,11 @@ func TestOrderUsecase_GetPosItemsByOrgID(t *testing.T) {
 
 	t.Run("Thất bại - Lỗi DB", func(t *testing.T) {
 		repo := new(MockOrderRepository)
-		repo.On("GetPosItemsByOrgID", mock.Anything, "org-123", 20, "", "", "", "", "").
+		repo.On("GetPosItemsByOrgID", mock.Anything, "org-123", 20, "", "", "", "", "", "").
 			Return(nil, errors.New("db query failed"))
 
 		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
-		res, err := uc.GetPosItemsByOrgID(withOrgCtx("org-123"), 20, "", "", "", "", "")
+		res, err := uc.GetPosItemsByOrgID(withOrgCtx("org-123"), 20, "", "", "", "", "", "")
 
 		assert.Error(t, err)
 		assert.Nil(t, res)

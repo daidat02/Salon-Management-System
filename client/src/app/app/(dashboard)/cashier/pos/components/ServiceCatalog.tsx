@@ -16,6 +16,8 @@ export default function ServiceCatalog({ onAdd }: Props) {
     categories,
     activeCat,
     setActiveCat,
+    activeType,
+    setActiveType,
     items,
     isPosLoading,
     isPosError,
@@ -33,6 +35,8 @@ export default function ServiceCatalog({ onAdd }: Props) {
         categories={categories}
         activeCat={activeCat}
         onCategoryChange={setActiveCat}
+        activeType={activeType}
+        onTypeChange={setActiveType}
       />
       <CatalogGrid
         items={items}

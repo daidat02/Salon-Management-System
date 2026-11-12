@@ -499,6 +499,163 @@ func TestServiceUsecase_DeleteService(t *testing.T) {
 	}
 }
 
+func TestServiceUsecase_ReplaceServiceMaterials(t *testing.T) {
+	mockMaterials := []*domain.ServiceMaterial{
+		{ID: "sm-1", OrganizationID: "org-123", ServiceID: "svc-1", ProductID: "prod-1", Quantity: 2, Unit: "chai", ProductName: "Dầu gội", ProductUnit: "chai", CostPrice: 90000},
+		{ID: "sm-2", OrganizationID: "org-123", ServiceID: "svc-1", ProductID: "prod-2", Quantity: 30, Unit: "ml", ProductName: "Thuốc nhuộm", ProductUnit: "tuýp", CostPrice: 5000},
+	}
+
+	validMaterials := []*domain.ServiceMaterialInput{
+		{ProductID: "prod-1", Quantity: 2},
+		{ProductID: "prod-2", Quantity: 30},
+	}
+	units := map[string]domain.ProductUnit{
+		"prod-1": {Unit: "chai"},
+		"prod-2": {Unit: "tuýp", NetUnit: strPtr("ml"), NetAmount: f64Ptr(60)},
+	}
+
+	tests := []struct {
+		name            string
+		ctx             context.Context
+		serviceID       string
+		materials       []*domain.ServiceMaterialInput
+		callProducts    bool
+		missingProducts []string
+		productsErr     error
+		callUnits       bool
+		unitsErr        error
+		callReplace     bool
+		replaceErr      error
+		callDetails     bool
+		detailErr       error
+		expectedError   bool
+		expectedCode    int
+		expectedMatLen  int
+	}{
+		{
+			name: "Thành công - Thay 2 định mức", ctx: withOrgCtx("org-123"),
+			serviceID: "svc-1", materials: validMaterials,
+			callProducts: true, callUnits: true, callReplace: true, callDetails: true,
+			expectedMatLen: 2,
+		},
+		{
+			name: "Thành công - Mảng rỗng xóa hết định mức", ctx: withOrgCtx("org-123"),
+			serviceID: "svc-1", materials: []*domain.ServiceMaterialInput{},
+			callReplace: true, callDetails: true, expectedMatLen: 0,
+		},
+		{
+			name: "Thất bại - Thiếu organization_id", ctx: context.Background(),
+			serviceID: "svc-1", materials: validMaterials,
+			expectedError: true, expectedCode: 400,
+		},
+		{
+			name: "Thất bại - Thiếu id dịch vụ", ctx: withOrgCtx("org-123"),
+			serviceID: "  ", materials: validMaterials,
+			expectedError: true, expectedCode: 400,
+		},
+		{
+			name: "Thất bại - Trùng product_id", ctx: withOrgCtx("org-123"),
+			serviceID: "svc-1",
+			materials: []*domain.ServiceMaterialInput{
+				{ProductID: "prod-1", Quantity: 1},
+				{ProductID: "prod-1", Quantity: 2},
+			},
+			expectedError: true, expectedCode: 400,
+		},
+		{
+			name: "Thất bại - Sản phẩm không thuộc tổ chức", ctx: withOrgCtx("org-123"),
+			serviceID: "svc-1", materials: validMaterials,
+			callProducts: true, missingProducts: []string{"prod-2"},
+			expectedError: true, expectedCode: 404,
+		},
+		{
+			name: "Thất bại - Đơn vị không hợp lệ", ctx: withOrgCtx("org-123"),
+			serviceID: "svc-1",
+			materials: []*domain.ServiceMaterialInput{
+				{ProductID: "prod-1", Quantity: 1, Unit: strPtr("kg")},
+			},
+			callProducts: true, callUnits: true,
+			expectedError: true, expectedCode: 400,
+		},
+		{
+			name: "Thất bại - Lỗi DB khi kiểm tra sản phẩm", ctx: withOrgCtx("org-123"),
+			serviceID: "svc-1", materials: validMaterials,
+			callProducts: true, productsErr: errors.New("db error"),
+			expectedError: true, expectedCode: 500,
+		},
+		{
+			name: "Thất bại - Lỗi DB khi lấy đơn vị", ctx: withOrgCtx("org-123"),
+			serviceID: "svc-1", materials: validMaterials,
+			callProducts: true, callUnits: true, unitsErr: errors.New("db error"),
+			expectedError: true, expectedCode: 500,
+		},
+		{
+			name: "Thất bại - Không tìm thấy dịch vụ", ctx: withOrgCtx("org-123"),
+			serviceID: "svc-missing", materials: []*domain.ServiceMaterialInput{},
+			callReplace: true, replaceErr: domain.ErrServiceNotFound,
+			expectedError: true, expectedCode: 404,
+		},
+		{
+			name: "Thất bại - Lỗi DB khi replace", ctx: withOrgCtx("org-123"),
+			serviceID: "svc-1", materials: []*domain.ServiceMaterialInput{},
+			callReplace: true, replaceErr: errors.New("db error"),
+			expectedError: true, expectedCode: 500,
+		},
+		{
+			name: "Thất bại - Lỗi DB khi lấy lại định mức", ctx: withOrgCtx("org-123"),
+			serviceID: "svc-1", materials: []*domain.ServiceMaterialInput{},
+			callReplace: true, callDetails: true, detailErr: errors.New("db error"),
+			expectedError: true, expectedCode: 500,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockRepo := new(MockServiceRepository)
+			if tt.callProducts {
+				mockRepo.On("ProductsExistInOrg", mock.Anything, "org-123", mock.Anything).
+					Return(tt.missingProducts, tt.productsErr)
+			}
+			if tt.callUnits {
+				mockRepo.On("GetProductUnits", mock.Anything, "org-123", mock.Anything).
+					Return(units, tt.unitsErr)
+			}
+			if tt.callReplace {
+				mockRepo.On("ReplaceServiceMaterials", mock.Anything, "org-123", tt.serviceID, tt.materials).
+					Return(tt.replaceErr)
+			}
+			if tt.callDetails {
+				details := mockMaterials
+				if tt.expectedMatLen == 0 {
+					details = []*domain.ServiceMaterial{}
+				}
+				mockRepo.On("GetServiceDetails", mock.Anything, "org-123", tt.serviceID).
+					Return(&domain.ServiceResponse{ID: tt.serviceID}, details, tt.detailErr)
+			}
+
+			uc := NewServiceUsecase(mockRepo)
+			result, err := uc.ReplaceServiceMaterials(tt.ctx, tt.serviceID, tt.materials)
+
+			if tt.expectedError {
+				assert.Error(t, err)
+				assert.Nil(t, result)
+				assertFlatAppError(t, err, tt.expectedCode)
+				if !tt.callReplace {
+					mockRepo.AssertNotCalled(t, "ReplaceServiceMaterials", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+				}
+			} else {
+				assert.NoError(t, err)
+				assert.Len(t, result, tt.expectedMatLen)
+				for _, m := range result {
+					assert.Equal(t, "org-123", m.OrganizationID)
+					assert.Equal(t, tt.serviceID, m.ServiceID)
+				}
+			}
+			mockRepo.AssertExpectations(t)
+		})
+	}
+}
+
 func TestServiceUsecase_GetServiceDetails(t *testing.T) {
 	now := time.Now()
 	catID := "cat-1"

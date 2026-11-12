@@ -58,7 +58,7 @@ export default function CatalogGrid({
       )}
       {!isLoading && !isError && items.length === 0 && (
         <div className="py-10 text-center text-sm text-on-surface-variant">
-          Không tìm thấy sản phẩm nào
+          Không tìm thấy mục nào
         </div>
       )}
       {/* Sentinel cuộn vô hạn + trạng thái */}

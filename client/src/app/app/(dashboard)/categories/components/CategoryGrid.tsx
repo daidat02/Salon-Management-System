@@ -11,6 +11,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import useCategory from '@/hooks/use-category';
 import useService from '@/hooks/use-service';
 import { useDeleteCategory } from '@/hooks/use-delete-category';
+import useAuth from '@/hooks/use-auth';
 import type { Category } from '@/types/category';
 import { cn } from 'cn';
 import CategoryDetail from './CategoryDetail';
@@ -32,6 +33,8 @@ export default function CategoryGrid() {
   const [editOpen, setEditOpen] = React.useState(false);
   const [deleting, setDeleting] = React.useState<Category | null>(null);
   const { mutate: deleteMutate, isPending: isDeleting } = useDeleteCategory();
+  const { can } = useAuth();
+  const canWrite = can('catalog:write');
 
   const categories = data?.data ?? [];
   const serviceCountByCategory = React.useMemo(() => {
@@ -182,6 +185,7 @@ export default function CategoryGrid() {
                         </Tag>
                       </div>
                       <div className="flex items-center gap-1">
+                        {canWrite && (
                         <button
                           className="p-1.5 text-on-surface-variant hover:text-primary hover:bg-surface-container rounded-lg transition-colors"
                           title="Chỉnh sửa"
@@ -192,6 +196,8 @@ export default function CategoryGrid() {
                         >
                           <Pencil className="h-4 w-4" />
                         </button>
+                        )}
+                        {canWrite && (
                         <button
                           className="p-1.5 text-on-surface-variant hover:text-error hover:bg-surface-container rounded-lg transition-colors"
                           title="Xóa"
@@ -202,6 +208,7 @@ export default function CategoryGrid() {
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
+                        )}
                       </div>
                     </div>
                   </div>

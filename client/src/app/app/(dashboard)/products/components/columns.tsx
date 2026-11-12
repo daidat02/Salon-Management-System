@@ -1,6 +1,7 @@
 import { Tag } from '@/components/ui/tag';
 import type { DashColumn } from '@/components/dashboard/DashTable';
 import { Product } from '@/types/product';
+import { formatStockQuantity } from '@/lib/format';
 
 export const productColumns: DashColumn<Product>[] = [
   {
@@ -63,9 +64,7 @@ export const productColumns: DashColumn<Product>[] = [
     header: 'Doanh thu tháng',
     className: 'text-center font-medium',
     cell: (row) =>
-      row.revenue_this_month
-        ? row.revenue_this_month.toLocaleString('vi-VN') + ' đ'
-        : '0 đ',
+      row.revenue_this_month ? row.revenue_this_month.toLocaleString('vi-VN') + ' đ' : '0 đ',
   },
   {
     id: 'stock_quantity',
@@ -83,11 +82,7 @@ export const productColumns: DashColumn<Product>[] = [
         size="sm"
         shape="rounded"
       >
-        {row.stock_quantity
-          ? row.net_amount && row.net_amount > 0
-            ? `${row.stock_quantity / row.net_amount} ${row.unit ?? ''}`
-            : `${row.stock_quantity} ${row.unit ?? ''}`
-          : 'Hết hàng'}
+        {formatStockQuantity(row.stock_quantity, row.net_amount || 0, row.unit)}
       </Tag>
     ),
   },

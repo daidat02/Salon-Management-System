@@ -54,18 +54,20 @@ func VerifyToken() gin.HandlerFunc {
 	}
 }
 
-func VertifyRole(requiredRole []string) gin.HandlerFunc {
+func VertifyRole(requiredRoles ...string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		userRole, exists := c.Get("role")
-		if !exists {
+		value, exists := c.Get("role")
+		userRole, ok := value.(string)
+		if !exists || !ok || userRole == "" {
 			response.Error(c, apperror.New(401, "Không tìm thấy vai trò người dùng", nil))
 			c.Abort()
 			return
 		}
 
-		for _, role := range requiredRole {
+		for _, role := range requiredRoles {
 			if userRole == role {
 				c.Next()
+				return
 			}
 		}
 

@@ -10,6 +10,7 @@ import { DashDateRangePicker } from '@/components/dashboard/DashDateRangePicker'
 import useCashFlowCategories from '@/hooks/use-cashflow-categories';
 import useFunds from '@/hooks/use-funds';
 import { CashflowCreateDialog } from './CashflowCreateDialog';
+import useAuth from '@/hooks/use-auth';
 
 function getCurrentMonthRange(): DateRange {
   const now = new Date();
@@ -29,6 +30,7 @@ export default function CashflowHeading() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [createOpen, setCreateOpen] = React.useState(false);
+  const { can } = useAuth();
   const { data: categories } = useCashFlowCategories();
   const { data: funds } = useFunds(true);
 
@@ -85,12 +87,14 @@ export default function CashflowHeading() {
         }
         actions={[
           { label: 'Xuất file CSV', icon: Download, variant: 'outline' },
-          {
-            label: 'Thêm phiếu',
-            icon: Plus,
-            variant: 'primary',
-            onClick: () => setCreateOpen(true),
-          },
+          ...(can('cashflow:create')
+            ? [{
+                label: 'Thêm phiếu',
+                icon: Plus,
+                variant: 'primary' as const,
+                onClick: () => setCreateOpen(true),
+              }]
+            : []),
         ]}
       />
 

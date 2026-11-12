@@ -21,6 +21,11 @@ type CreateOrganizationRequest struct {
 	OwnerFullName string `json:"owner_full_name"`
 }
 
+// UpdateDemoStatusRequest là body của API cập nhật trạng thái dữ liệu mẫu.
+type UpdateDemoStatusRequest struct {
+	IsDemo *bool `json:"is_demo" binding:"required"`
+}
+
 // OrganizationResponse trả về thông tin tổ chức vừa tạo.
 type OrganizationResponse struct {
 	ID        string     `json:"id"`
@@ -35,6 +40,7 @@ type OrganizationResponse struct {
 	TaxCode   *string    `json:"tax_code,omitempty"`
 	Slogan    *string    `json:"slogan,omitempty"`
 	LogoURL   *string    `json:"logo_url,omitempty"`
+	IsDemo    bool       `json:"is_demo"`
 	CreatedAt *time.Time `json:"created_at,omitempty"`
 	UpdatedAt *time.Time `json:"updated_at,omitempty"`
 }

@@ -2,6 +2,7 @@ package customer
 
 import (
 	"github.com/daidat02/server/internal/delivery/http/middlewares"
+	userDomain "github.com/daidat02/server/internal/domain/user"
 	"github.com/gin-gonic/gin"
 )
 
@@ -15,6 +16,6 @@ func RegisterCustomerRoutes(r *gin.Engine, h *CustomerHandler, basePath string) 
 		group.GET("/:id", h.GetCustomerDetail)
 		group.POST("", h.CreateCustomer)
 		group.PUT("/:id", h.UpdateCustomer)
-		group.DELETE("/:id", h.DeleteCustomer)
+		group.DELETE("/:id", middlewares.VertifyRole(userDomain.RoleOwner, userDomain.RoleManager), h.DeleteCustomer)
 	}
 }

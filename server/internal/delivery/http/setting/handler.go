@@ -57,6 +57,7 @@ func (h *SettingHandler) GetBookingSettings(c *gin.Context) {
 
 // UpdateBookingSettings godoc
 // @Summary      Cập nhật cài đặt lịch hẹn
+// @Description  Yêu cầu vai trò: owner hoặc manager.
 // @Tags         Settings
 // @Accept       json
 // @Produce      json
@@ -66,6 +67,7 @@ func (h *SettingHandler) GetBookingSettings(c *gin.Context) {
 // @Failure      400   {object}  response.ErrorResponse    "Dữ liệu không hợp lệ"
 // @Failure      401   {object}  response.ErrorResponse    "Thiếu token / token không hợp lệ"
 // @Failure      500   {object}  response.ErrorResponse    "Lỗi server"
+// @Failure      403  {object}  response.ErrorResponse  "Không có quyền truy cập"
 // @Router       /settings/booking [put]
 func (h *SettingHandler) UpdateBookingSettings(c *gin.Context) {
 	var req domain.BookingSettings
@@ -125,6 +127,7 @@ func (h *SettingHandler) GetNotificationSettings(c *gin.Context) {
 
 // UpdateNotificationSettings godoc
 // @Summary      Cập nhật cài đặt thông báo
+// @Description  Yêu cầu vai trò: owner hoặc manager.
 // @Tags         Settings
 // @Accept       json
 // @Produce      json
@@ -134,6 +137,7 @@ func (h *SettingHandler) GetNotificationSettings(c *gin.Context) {
 // @Failure      400   {object}  response.ErrorResponse    "Dữ liệu không hợp lệ"
 // @Failure      401   {object}  response.ErrorResponse    "Thiếu token / token không hợp lệ"
 // @Failure      500   {object}  response.ErrorResponse    "Lỗi server"
+// @Failure      403  {object}  response.ErrorResponse  "Không có quyền truy cập"
 // @Router       /settings/notifications [put]
 func (h *SettingHandler) UpdateNotificationSettings(c *gin.Context) {
 	var req domain.NotificationSettings
@@ -154,6 +158,7 @@ func (h *SettingHandler) UpdateNotificationSettings(c *gin.Context) {
 
 // UpdateGeneralSettings godoc
 // @Summary      Cập nhật cài đặt chung (thông tin salon + giờ làm việc)
+// @Description  Yêu cầu vai trò: owner hoặc manager.
 // @Tags         Settings
 // @Accept       json
 // @Produce      json
@@ -164,6 +169,7 @@ func (h *SettingHandler) UpdateNotificationSettings(c *gin.Context) {
 // @Failure      401   {object}  response.ErrorResponse    "Thiếu token / token không hợp lệ"
 // @Failure      404   {object}  response.ErrorResponse    "Không tìm thấy tổ chức"
 // @Failure      500   {object}  response.ErrorResponse    "Lỗi server"
+// @Failure      403  {object}  response.ErrorResponse  "Không có quyền truy cập"
 // @Router       /settings/general [put]
 func (h *SettingHandler) UpdateGeneralSettings(c *gin.Context) {
 	var req domain.GeneralSettingsResponse
@@ -184,6 +190,7 @@ func (h *SettingHandler) UpdateGeneralSettings(c *gin.Context) {
 
 // UpdatePaymentSettings godoc
 // @Summary      Cập nhật cài đặt thanh toán (hóa đơn + phương thức thanh toán)
+// @Description  Yêu cầu vai trò: owner hoặc manager.
 // @Tags         Settings
 // @Accept       json
 // @Produce      json
@@ -193,6 +200,7 @@ func (h *SettingHandler) UpdateGeneralSettings(c *gin.Context) {
 // @Failure      400   {object}  response.ErrorResponse    "Dữ liệu không hợp lệ"
 // @Failure      401   {object}  response.ErrorResponse    "Thiếu token / token không hợp lệ"
 // @Failure      500   {object}  response.ErrorResponse    "Lỗi server"
+// @Failure      403  {object}  response.ErrorResponse  "Không có quyền truy cập"
 // @Router       /settings/payment [put]
 func (h *SettingHandler) UpdatePaymentSettings(c *gin.Context) {
 	var req domain.PaymentSettingsResponse
