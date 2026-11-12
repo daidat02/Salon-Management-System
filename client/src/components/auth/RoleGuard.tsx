@@ -3,9 +3,10 @@
 import { usePathname } from 'next/navigation';
 import AccessDenied from './AccessDenied';
 import useAuth from '@/hooks/use-auth';
+import { normalizeAppPathname } from '@/lib/pathname';
 
 export default function RoleGuard({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
+  const pathname = normalizeAppPathname(usePathname());
   const { user, canAccessRoute } = useAuth();
 
   if (!user) return null;

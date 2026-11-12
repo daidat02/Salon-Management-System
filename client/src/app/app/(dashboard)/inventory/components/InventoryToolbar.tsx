@@ -88,7 +88,7 @@ export default function InventoryToolbar() {
         },
       ]}
       onRefresh={() => router.refresh()}
-      onReset={() => router.push('/app/inventory', { scroll: false })}
+      onReset={() => router.push('/inventory', { scroll: false })}
     />
   );
 }

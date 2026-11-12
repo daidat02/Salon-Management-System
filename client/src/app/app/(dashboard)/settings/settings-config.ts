@@ -29,7 +29,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   {
     key: 'general',
     label: 'Cửa hàng',
-    path: '/app/settings/general',
+    path: '/settings/general',
     icon: Store,
     description:
       'Thông tin nhận diện salon, giờ mở cửa và các quy tắc hiển thị, hóa đơn chung.',
@@ -38,7 +38,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   {
     key: 'booking',
     label: 'Lịch hẹn',
-    path: '/app/settings/booking',
+    path: '/settings/booking',
     icon: CalendarDays,
     description:
       'Quy tắc đặt lịch, khung giờ, giới hạn đặt trước, hủy/đổi và tự động xác nhận.',
@@ -47,7 +47,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   {
     key: 'payment',
     label: 'Thu ngân & Thanh toán',
-    path: '/app/settings/payment',
+    path: '/settings/payment',
     icon: CreditCard,
     description:
       'Phương thức thanh toán, tài khoản nhận tiền, thiết bị quầy và quy tắc chốt đơn.',
@@ -56,7 +56,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   {
     key: 'finance',
     label: 'Tài chính & Quỹ',
-    path: '/app/settings/finance',
+    path: '/settings/finance',
     icon: Wallet,
     description:
       'Quản lý quỹ tiền mặt / ngân hàng, danh mục thu chi mặc định và quy tắc chốt ca.',
@@ -65,7 +65,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   {
     key: 'crm',
     label: 'Khách hàng & Loyalty',
-    path: '/app/settings/crm',
+    path: '/settings/crm',
     icon: Users,
     description:
       'Hạng thành viên, quy tắc tích điểm/đổi điểm và phân loại khách hàng.',
@@ -80,7 +80,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
   {
     key: 'notifications',
     label: 'Thông báo',
-    path: '/app/settings/notifications',
+    path: '/settings/notifications',
     icon: BellRing,
     description:
       'Bật/tắt nhắc lịch, chăm sóc khách hàng và các cảnh báo vận hành nội bộ.',

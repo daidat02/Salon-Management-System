@@ -164,7 +164,7 @@ export default function PosContent() {
           });
           setCart([]);
           setSubmitError(null);
-          router.push(`/app/orders/${orderId}`);
+          router.push(`/orders/${orderId}`);
         },
         onError: (err) => {
           const msg = getApiErrorMessage(err);
@@ -208,7 +208,7 @@ export default function PosContent() {
           setCustomer(null);
           setNewCustomer(null);
           setSubmitError(null);
-          router.push('/app/cashier');
+          router.push('/cashier');
         },
         onError: (err) => {
           const msg = getApiErrorMessage(err);

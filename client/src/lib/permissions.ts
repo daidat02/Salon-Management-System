@@ -65,11 +65,11 @@ const ROLE_PERMISSIONS: Record<AuthRole, Permission[]> = {
 };
 
 const ROUTE_ACCESS: { prefix: string; roles: AuthRole[] }[] = [
-  { prefix: '/app/settings', roles: ['owner', 'manager'] },
-  { prefix: '/app/reports', roles: ['owner', 'manager'] },
-  { prefix: '/app/inventory/inbound', roles: ['owner', 'manager'] },
-  { prefix: '/app/inventory/outbound', roles: ['owner', 'manager'] },
-  { prefix: '/app/staff', roles: ['owner', 'manager'] },
+  { prefix: '/settings', roles: ['owner', 'manager'] },
+  { prefix: '/reports', roles: ['owner', 'manager'] },
+  { prefix: '/inventory/inbound', roles: ['owner', 'manager'] },
+  { prefix: '/inventory/outbound', roles: ['owner', 'manager'] },
+  { prefix: '/staff', roles: ['owner', 'manager'] },
 ];
 
 export function hasPermission(role: string | null | undefined, permission: Permission): boolean {

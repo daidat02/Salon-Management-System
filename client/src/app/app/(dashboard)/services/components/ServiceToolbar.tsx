@@ -84,7 +84,7 @@ const ServiceToolbar = () => {
         },
       ]}
       onRefresh={() => router.refresh()}
-      onReset={() => router.push('/app/services', { scroll: false })}
+      onReset={() => router.push('/services', { scroll: false })}
     />
   );
 };

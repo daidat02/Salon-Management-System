@@ -61,7 +61,7 @@ const CategoryToolbar = () => {
   };
 
   const handleReset = () => {
-    router.push('/app/categories?tab=service', { scroll: false });
+    router.push('/categories?tab=service', { scroll: false });
   };
 
   return (

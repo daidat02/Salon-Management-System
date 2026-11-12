@@ -44,7 +44,7 @@ function LoginForm() {
       // Mirror token vào sessionStorage khi "ghi nhớ" (tab-scoped).
       // Token chính nằm trong Redux memory (không persist — chống XSS).
       if (remember) sessionStorage.setItem('access_token', result.payload.accessToken);
-      router.push(searchParams.get('next') ?? '/app/overview');
+      router.push(searchParams.get('next') ?? '/overview');
     }
   }
 
@@ -115,7 +115,7 @@ function LoginForm() {
               Ghi nhớ đăng nhập
             </label>
             <Link
-              href="/app/forgot-password"
+              href="/forgot-password"
               className="font-semibold text-brand hover:text-brand-hover"
             >
               Quên mật khẩu?

@@ -27,7 +27,7 @@ export function buildOrderColumns(lookup: CustomerLookup): DashColumn<Order>[] {
       header: 'Mã đơn',
       className: 'font-mono font-medium text-primary min-w-[110px]',
       cell: (row) => (
-        <Link href={`/app/orders/${row.id}`} className="hover:underline">
+        <Link href={`/orders/${row.id}`} className="hover:underline">
           {row.code}
         </Link>
       ),

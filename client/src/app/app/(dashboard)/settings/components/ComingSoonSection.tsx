@@ -39,7 +39,7 @@ export default function ComingSoonSection({ section }: { section: SettingsSectio
 
       <div className="border-outline bg-surface text-on-surface-variant rounded-xl border border-dashed p-5 text-xs leading-relaxed">
         Phần này sẽ được triển khai ở giai đoạn sau. Hiện tại bạn có thể xem mẫu UI hoàn chỉnh tại{' '}
-        <Link href="/app/settings/finance" className="text-primary font-semibold hover:underline">
+        <Link href="/settings/finance" className="text-primary font-semibold hover:underline">
           Tài chính &amp; Quỹ
         </Link>
         .

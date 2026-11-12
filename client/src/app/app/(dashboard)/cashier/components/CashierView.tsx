@@ -158,7 +158,7 @@ export default function CashierView() {
               ? 'Thử đổi bộ lọc hoặc từ khóa tìm kiếm.'
               : 'Tất cả đơn đã hoàn tất — tạo đơn mới cho khách tại quầy.'}
           </p>
-          <Button size="sm" onClick={() => router.push('/app/cashier/pos')} className="mt-1">
+          <Button size="sm" onClick={() => router.push('/cashier/pos')} className="mt-1">
             <Plus className="h-3.5 w-3.5" />
             Tạo đơn mới
           </Button>
@@ -181,7 +181,7 @@ export default function CashierView() {
       {!isLoading && !isError && filtered.length > 0 && (
         <div className="flex flex-col items-center justify-center pt-2">
           <button
-            onClick={() => router.push('/app/orders')}
+            onClick={() => router.push('/orders')}
             className="inline-flex items-center gap-2 rounded-xl border border-outline bg-surface px-5 py-2.5 text-xs font-semibold tracking-wide text-on-surface shadow-sm transition-colors hover:bg-surface-container"
           >
             <span>Xem tất cả {active.length} đơn hôm nay</span>
@@ -209,13 +209,13 @@ export default function CashierView() {
           </div>
           <div className="flex w-full items-center justify-end gap-2 md:w-auto">
             <button
-              onClick={() => router.push(`/app/orders/${latestCompleted.id}`)}
+              onClick={() => router.push(`/orders/${latestCompleted.id}`)}
               className="rounded-lg border border-outline px-3 py-1.5 text-xs font-semibold text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
             >
               In lại phiếu
             </button>
             <button
-              onClick={() => router.push('/app/orders')}
+              onClick={() => router.push('/orders')}
               className="rounded-lg bg-surface-container px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary-container"
             >
               Xem lịch sử giao dịch

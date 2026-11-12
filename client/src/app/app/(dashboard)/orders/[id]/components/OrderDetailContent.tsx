@@ -581,7 +581,7 @@ export default function OrderDetailContent() {
         backButton={{ label: 'Quay lại danh sách đơn' }}
         breadcrumbs={[
           { label: 'Trang chủ', href: '#' },
-          { label: 'Đơn hàng', href: '/app/orders' },
+          { label: 'Đơn hàng', href: '/orders' },
           { label: order.code },
         ]}
         title={`Chi tiết đơn hàng ${order.code}`}
@@ -623,7 +623,7 @@ export default function OrderDetailContent() {
                   label: 'Chỉnh sửa',
                   icon: Pencil,
                   variant: 'primary' as const,
-                  onClick: () => router.push(`/app/cashier/pos?orderId=${order.id}`),
+                  onClick: () => router.push(`/cashier/pos?orderId=${order.id}`),
                 },
               ]
             : []),

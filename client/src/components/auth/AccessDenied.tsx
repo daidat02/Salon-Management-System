@@ -14,7 +14,7 @@ export default function AccessDenied() {
           Vai trò hiện tại không được phép mở trang này.
         </p>
       </div>
-      <Button render={<Link href="/app/overview" />} variant="outline" size="sm">
+      <Button render={<Link href="/overview" />} variant="outline" size="sm">
         Về trang tổng quan
       </Button>
     </div>

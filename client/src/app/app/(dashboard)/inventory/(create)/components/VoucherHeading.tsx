@@ -18,11 +18,11 @@ export default function VoucherHeading({ type, onSaveDraft, onComplete }: Vouche
   return (
     <div className="space-y-3">
       <PageHeading
-        backButton={{ label: 'Quay lại kho hàng', href: '/app/inventory' }}
+        backButton={{ label: 'Quay lại kho hàng', href: '/inventory' }}
         breadcrumbs={[
           { label: 'Trang chủ', href: '#' },
           { label: 'Quản lý kho', href: '#' },
-          { label: 'Nhập xuất kho', href: '/app/inventory' },
+          { label: 'Nhập xuất kho', href: '/inventory' },
           { label: meta.breadcrumb },
         ]}
         title={meta.title}

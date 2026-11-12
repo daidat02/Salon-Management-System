@@ -16,13 +16,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   async function handleLogout() {
     await dispatch(logoutUser());
-    router.replace('/app/login');
+    router.replace('/login');
   }
 
   return (
     <div className="theme-app flex h-screen flex-col overflow-hidden bg-background font-sans text-body">
       {/* Top header cố định — không scroll (preview/admin_preview/index.html:102) */}
-      <DashHeader onCreateOrder={() => router.push('/app/cashier/pos')} />
+      <DashHeader onCreateOrder={() => router.push('/cashier/pos')} />
 
       {/* Vùng dưới header */}
       <div className="flex min-h-0 flex-1">

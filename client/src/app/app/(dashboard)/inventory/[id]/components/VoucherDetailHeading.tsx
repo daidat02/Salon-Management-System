@@ -21,7 +21,7 @@ export default function VoucherDetailHeading({ document }: VoucherDetailHeadingP
   return (
     <div className="space-y-3">
       <Link
-        href="/app/inventory"
+        href="/inventory"
         className="inline-flex items-center gap-1.5 rounded-md p-1.5 text-xs font-medium text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
       >
         <ArrowLeft className="h-4 w-4" />
@@ -31,7 +31,7 @@ export default function VoucherDetailHeading({ document }: VoucherDetailHeadingP
         breadcrumbs={[
           { label: 'Trang chủ', href: '#' },
           { label: 'Quản lý kho', href: '#' },
-          { label: 'Nhập xuất kho', href: '/app/inventory' },
+          { label: 'Nhập xuất kho', href: '/inventory' },
           { label: document.document_code },
         ]}
         title={`Chi tiết ${TYPE_LABEL[document.type] ?? 'phiếu kho'} ${document.document_code}`}

@@ -191,7 +191,7 @@ export function AppointmentDetailDrawer({ open, onOpenChange, appointment }: Pro
   const startPayment = () => {
     if (!current || !canStartPayment) return;
     onOpenChange(false);
-    router.push(`/app/cashier/pos?appointmentId=${current.id}`);
+    router.push(`/cashier/pos?appointmentId=${current.id}`);
   };
 
   const mockAction = (title: string) => {

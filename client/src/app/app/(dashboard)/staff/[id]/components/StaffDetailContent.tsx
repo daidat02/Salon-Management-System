@@ -106,10 +106,10 @@ export default function StaffDetailContent() {
   return (
     <div className="space-y-4">
       <PageHeading
-        backButton={{ label: 'Quay lại danh sách nhân viên', href: '/app/staff' }}
+        backButton={{ label: 'Quay lại danh sách nhân viên', href: '/staff' }}
         breadcrumbs={[
-          { label: 'Nhân viên', href: '/app/staff' },
-          { label: 'Chi tiết nhân viên', href: `/app/staff` },
+          { label: 'Nhân viên', href: '/staff' },
+          { label: 'Chi tiết nhân viên', href: `/staff` },
           { label: profile.name, active: true },
         ]}
         title={profile.name}

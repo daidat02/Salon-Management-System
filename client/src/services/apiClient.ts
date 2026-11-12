@@ -93,10 +93,10 @@ function clearAuthAndRedirect() {
       localStorage.removeItem('access_token');
     } catch {}
     const next = window.location.pathname + window.location.search;
-    if (!window.location.pathname.startsWith('/app/login')) {
+    if (!window.location.pathname.startsWith('/login')) {
       // Cố ý reload cả trang (không dùng router): interceptor đứng ngoài React tree
       // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-      window.location.href = `/app/login?next=${encodeURIComponent(next)}`;
+      window.location.href = `/login?next=${encodeURIComponent(next)}`;
     }
   }
 }

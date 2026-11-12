@@ -86,7 +86,7 @@ const ProductToolbar = () => {
         },
       ]}
       onRefresh={() => router.refresh()}
-      onReset={() => router.push('/app/products', { scroll: false })}
+      onReset={() => router.push('/products', { scroll: false })}
     />
   );
 };

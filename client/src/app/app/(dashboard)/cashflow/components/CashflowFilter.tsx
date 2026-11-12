@@ -140,7 +140,7 @@ export default function CashflowFilter() {
         },
       ]}
       onRefresh={() => router.refresh()}
-      onReset={() => router.push('/app/cashflow', { scroll: false })}
+      onReset={() => router.push('/cashflow', { scroll: false })}
     />
   );
 }

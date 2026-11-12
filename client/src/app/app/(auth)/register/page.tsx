@@ -14,8 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080/api/v1";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "/api/v1";
 
 const ROLES = [
   { value: "manager", label: "Quản lý salon" },
@@ -87,7 +86,7 @@ export default function RegisterPage() {
           được tạo. Hãy đăng nhập để bắt đầu.
         </p>
         <Button
-          onClick={() => router.push("/app/login")}
+          onClick={() => router.push("/login")}
           className="mt-6 h-10 w-full text-sm"
         >
           Đăng nhập ngay
@@ -229,7 +228,7 @@ export default function RegisterPage() {
         <p className="mt-5 text-center text-xs text-on-surface-variant">
           Đã có tài khoản?{" "}
           <Link
-            href="/app/login"
+            href="/login"
             className="font-semibold text-brand hover:text-brand-hover"
           >
             Đăng nhập

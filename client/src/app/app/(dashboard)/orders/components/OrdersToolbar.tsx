@@ -75,7 +75,7 @@ export default function OrdersToolbar({ historyOnly = false }: OrdersToolbarProp
         },
       ]}
       onRefresh={() => router.refresh()}
-      onReset={() => router.push('/app/orders', { scroll: false })}
+      onReset={() => router.push('/orders', { scroll: false })}
     />
   );
 }

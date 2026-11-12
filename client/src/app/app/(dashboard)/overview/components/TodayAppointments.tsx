@@ -103,7 +103,7 @@ export default function TodayAppointments({ appointments, total }: TodayAppointm
           </p>
         </div>
         <Link
-          href="/app/appointments"
+          href="/appointments"
           className="inline-flex shrink-0 items-center gap-0.5 text-xs font-semibold text-primary hover:underline"
         >
           Xem tất cả ({total})

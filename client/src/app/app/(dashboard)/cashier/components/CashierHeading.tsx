@@ -20,7 +20,7 @@ export default function CashierHeading() {
           label: 'Tạo đơn mới',
           icon: Plus,
           variant: 'primary',
-          onClick: () => router.push('/app/cashier/pos'),
+          onClick: () => router.push('/cashier/pos'),
         },
       ]}
     />

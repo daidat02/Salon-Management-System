@@ -11,10 +11,10 @@ export default function LandingPage() {
         Đây là trang chủ của website landing tại <code>/landing</code>.
       </p>
       <Link
-        href="/app"
+        href={process.env.NEXT_PUBLIC_APP_URL ?? 'http://app.localhost:3000'}
         className="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700"
       >
-        Vào /app (Dashboard)
+        Vào Dashboard
       </Link>
     </main>
   );

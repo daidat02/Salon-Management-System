@@ -76,7 +76,7 @@ export default function LowStockAlerts({ items }: LowStockAlertsProps) {
 
       <div className="mt-2 border-t border-outline pt-4">
         <Link
-          href="/app/inventory/inbound"
+          href="/inventory/inbound"
           className="group inline-flex items-center gap-1.5 text-xs font-semibold text-primary transition-colors hover:text-brand-hover"
         >
           <span>+ Nhập kho ngay</span>

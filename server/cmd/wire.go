@@ -30,7 +30,7 @@ func NewRouter(cfg *config.Config, dbPool *pgxpool.Pool) *gin.Engine {
 	r := gin.Default()
 	r.SetTrustedProxies([]string{"192.168.1.131"})
 	// Định nghĩa các nguồn được phép truy cập (CORS)
-	allowedOrigins := []string{"http://localhost:58864", "http://localhost:3000", "http://localhost:3002"}
+	allowedOrigins := []string{"http://localhost:58864", "http://localhost:3000", "http://app.localhost:3000"}
 	// Cấu hình CORS để cho phép các yêu cầu từ các nguồn được chỉ định
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     allowedOrigins,

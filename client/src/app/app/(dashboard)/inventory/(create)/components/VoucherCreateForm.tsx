@@ -228,7 +228,7 @@ export default function VoucherCreateForm({ initialType }: { initialType: Vouche
             description: `Đã lưu ${doc.document_code} với ${lines.length} dòng hàng`,
             type: 'success',
           });
-          router.push('/app/inventory');
+          router.push('/inventory');
         },
         onError: (err) => {
           const msg = getApiErrorMessage(err);

@@ -120,7 +120,7 @@ export default function CategoryGrid() {
               Không tìm thấy danh mục nào. Thử đổi từ khóa hoặc{' '}
               <button
                 className="font-semibold text-primary hover:underline"
-                onClick={() => router.push('/app/categories?tab=service', { scroll: false })}
+                onClick={() => router.push('/categories?tab=service', { scroll: false })}
               >
                 đặt lại bộ lọc
               </button>

@@ -52,7 +52,7 @@ export default function StaffTable({
   };
 
   const handleClickRow = (id: string) => {
-    router.push(`/app/staff/${id}`);
+    router.push(`/staff/${id}`);
   };
   if (isError) {
     return (

@@ -14,7 +14,10 @@ export default function LandingLayout({
             <a href="/landing" className="hover:text-primary">
               Trang chủ
             </a>
-            <a href="/app" className="hover:text-primary">
+            <a
+              href={process.env.NEXT_PUBLIC_APP_URL ?? 'http://app.localhost:3000'}
+              className="hover:text-primary"
+            >
               Dashboard
             </a>
           </nav>

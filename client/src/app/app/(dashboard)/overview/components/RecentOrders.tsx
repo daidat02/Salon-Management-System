@@ -84,7 +84,7 @@ export default function RecentOrders({ orders, total }: RecentOrdersProps) {
           </p>
         </div>
         <Link
-          href="/app/orders"
+          href="/orders"
           className="inline-flex shrink-0 items-center gap-0.5 text-xs font-semibold text-primary hover:underline"
         >
           Xem tất cả ({total})

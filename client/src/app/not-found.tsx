@@ -38,7 +38,7 @@ export default function NotFound() {
         </Button>
         <Button
           variant="outline"
-          render={<Link href="/app/overview" />}
+          render={<Link href="/overview" />}
           className="h-10 bg-surface px-6 text-sm font-medium border-outline hover:bg-surface-container"
         >
           <ArrowLeft className="h-4 w-4" />

@@ -41,7 +41,7 @@ export const historyColumns: DashColumn<InventoryDocument>[] = [
     header: 'Mã phiếu',
     className: 'font-mono text-primary font-semibold text-[11px] min-w-[130px]',
     cell: (row) => (
-      <Link href={`/app/inventory/${row.id}`} className="hover:underline">
+      <Link href={`/inventory/${row.id}`} className="hover:underline">
         {row.document_code}
       </Link>
     ),

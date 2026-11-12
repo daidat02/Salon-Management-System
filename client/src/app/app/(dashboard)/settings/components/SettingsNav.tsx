@@ -3,10 +3,11 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from 'cn';
+import { normalizeAppPathname } from '@/lib/pathname';
 import { SETTINGS_SECTIONS } from '../settings-config';
 
 export default function SettingsNav() {
-  const pathname = usePathname();
+  const pathname = normalizeAppPathname(usePathname());
 
   return (
     <nav className="bg-surface border-outline rounded-xl border p-2 shadow-sm">

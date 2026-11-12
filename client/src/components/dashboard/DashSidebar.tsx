@@ -32,6 +32,7 @@ import {
 } from '@/components/ui/sidebar';
 import { cn } from 'cn';
 import useAuth from '@/hooks/use-auth';
+import { normalizeAppPathname } from '@/lib/pathname';
 import type { Permission } from '@/lib/permissions';
 
 type NavItem = {
@@ -48,27 +49,27 @@ type NavItem = {
 
 // Nav chính — bám preview/admin_preview/index.html (dòng 164–223)
 const MAIN_NAV: NavItem[] = [
-  { key: 'overview', label: 'Tổng quan', href: '/app/overview', icon: LayoutDashboard },
-  { key: 'cashier', label: 'Thu ngân', href: '/app/cashier', icon: ShoppingCart },
+  { key: 'overview', label: 'Tổng quan', href: '/overview', icon: LayoutDashboard },
+  { key: 'cashier', label: 'Thu ngân', href: '/cashier', icon: ShoppingCart },
   {
     key: 'appointments',
     label: 'Lịch hẹn',
-    href: '/app/appointments',
+    href: '/appointments',
     icon: Calendar,
     badge: '12',
   },
-  { key: 'orders', label: 'Đơn hàng', href: '/app/orders', icon: Receipt },
-  { key: 'customers', label: 'Khách hàng', href: '/app/customers', icon: Users, meta: '1.2k' },
-  { key: 'categories', label: 'Danh mục', href: '/app/categories', icon: Tags },
-  { key: 'products', label: 'Sản phẩm', href: '/app/products', icon: Package },
-  { key: 'services', label: 'Dịch vụ', href: '/app/services', icon: Sparkles },
-  { key: 'inventory', label: 'Kho hàng', href: '/app/inventory', icon: Archive },
-  { key: 'staff', label: 'Nhân viên', href: '/app/staff', icon: UserCheck },
-  { key: 'cashflow', label: 'Thu & Chi', href: '/app/cashflow', icon: Wallet },
+  { key: 'orders', label: 'Đơn hàng', href: '/orders', icon: Receipt },
+  { key: 'customers', label: 'Khách hàng', href: '/customers', icon: Users, meta: '1.2k' },
+  { key: 'categories', label: 'Danh mục', href: '/categories', icon: Tags },
+  { key: 'products', label: 'Sản phẩm', href: '/products', icon: Package },
+  { key: 'services', label: 'Dịch vụ', href: '/services', icon: Sparkles },
+  { key: 'inventory', label: 'Kho hàng', href: '/inventory', icon: Archive },
+  { key: 'staff', label: 'Nhân viên', href: '/staff', icon: UserCheck },
+  { key: 'cashflow', label: 'Thu & Chi', href: '/cashflow', icon: Wallet },
   {
     key: 'reports',
     label: 'Báo cáo',
-    href: '/app/reports',
+    href: '/reports',
     icon: ChartColumn,
     permission: 'reports:view',
   },
@@ -91,13 +92,13 @@ export default function DashSidebar({
   onCreateOrder,
   onLogout,
 }: DashSidebarProps) {
-  const pathname = usePathname();
+  const pathname = normalizeAppPathname(usePathname());
   const { can } = useAuth();
   const visibleNav = MAIN_NAV.filter((item) => !item.permission || can(item.permission));
 
   // Sửa lại logic nhận diện active theo prefix (startsWith) để support các trang con (create, [id],...)
   const activeKey =
-    [...visibleNav, { key: 'settings', href: '/app/settings' }]
+    [...visibleNav, { key: 'settings', href: '/settings' }]
       .sort((a, b) => b.href.length - a.href.length) // Ưu tiên match đường dẫn dài hơn trước
       .find((item) => pathname === item.href || pathname.startsWith(item.href + '/'))?.key ??
     defaultActiveKey;
@@ -158,7 +159,7 @@ export default function DashSidebar({
             <SidebarMenuItem>
               <SidebarMenuButton
                 isActive={activeKey === 'settings'}
-                render={<Link href="/app/settings" />}
+                render={<Link href="/settings" />}
                 className="h-auto rounded-xl px-3.5 py-2 text-xs font-medium text-slate-600 hover:text-slate-900 [&_svg]:size-4 [&_svg]:text-slate-400"
               >
                 <Settings />

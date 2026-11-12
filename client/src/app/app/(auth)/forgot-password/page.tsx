@@ -48,7 +48,7 @@ export default function ForgotPasswordPage() {
             Gửi lại mã
           </Button>
           <Button
-            onClick={() => router.push("/app/login")}
+            onClick={() => router.push("/login")}
             className="h-10 w-full text-sm"
           >
             Quay lại đăng nhập
@@ -100,7 +100,7 @@ export default function ForgotPasswordPage() {
         </form>
 
         <Link
-          href="/app/login"
+          href="/login"
           className="mt-5 inline-flex items-center gap-1.5 text-xs font-semibold text-brand hover:text-brand-hover"
         >
           <ArrowLeft className="h-3.5 w-3.5" />

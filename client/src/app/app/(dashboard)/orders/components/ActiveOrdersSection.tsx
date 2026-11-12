@@ -85,7 +85,7 @@ export default function ActiveOrdersSection() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => router.push('/app/cashier/pos')}
+            onClick={() => router.push('/cashier/pos')}
             className="h-7 px-2.5 text-xs"
           >
             <Plus className="h-3.5 w-3.5" />
@@ -120,7 +120,7 @@ export default function ActiveOrdersSection() {
           <p className="text-xs text-on-surface-variant">
             Tất cả đơn đã hoàn tất — tạo đơn mới cho khách tại quầy.
           </p>
-          <Button size="sm" onClick={() => router.push('/app/cashier/pos')} className="mt-1">
+          <Button size="sm" onClick={() => router.push('/cashier/pos')} className="mt-1">
             <Plus className="h-3.5 w-3.5" />
             Tạo đơn mới
           </Button>
@@ -139,7 +139,7 @@ export default function ActiveOrdersSection() {
               return (
                 <Link
                   key={order.id}
-                  href={`/app/orders/${order.id}`}
+                  href={`/orders/${order.id}`}
                   className="group rounded-md border border-outline bg-surface p-4 shadow-sm transition-colors hover:border-primary/40 hover:shadow"
                 >
                   <div className="flex items-start justify-between gap-2">

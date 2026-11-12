@@ -67,7 +67,7 @@ export default function CashierOrderCard({
   const phone = customer?.phone ?? '';
   const isCompleted = order.status === 'completed';
 
-  const goDetail = () => router.push(`/app/orders/${order.id}`);
+  const goDetail = () => router.push(`/orders/${order.id}`);
 
   return (
     <div

@@ -44,13 +44,13 @@ export default function InventoryHeading() {
                 label: 'Xuất kho',
                 icon: ArchiveRestore,
                 variant: 'outline' as const,
-                onClick: () => router.push('/app/inventory/outbound'),
+                onClick: () => router.push('/inventory/outbound'),
               },
               {
                 label: 'Nhập kho',
                 icon: SquarePlus,
                 variant: 'primary' as const,
-                onClick: () => router.push('/app/inventory/inbound'),
+                onClick: () => router.push('/inventory/inbound'),
               },
             ]
           : []),
