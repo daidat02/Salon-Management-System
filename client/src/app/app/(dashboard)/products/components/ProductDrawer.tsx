@@ -4,7 +4,7 @@ import * as React from 'react';
 import { AlertTriangle, Banknote, Boxes, Package, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DashDrawer } from '@/components/dashboard/DashDrawer';
-import useProductDetail from '@/hooks/use-product-detail';
+import { useProductDetail } from '@/hooks/product';
 import type { Product } from '@/types/product';
 import type { InventoryTransaction, InventoryTransactionType } from '@/types/inventory';
 import { formatDateTime, formatShortDateTime, formatVND } from '@/lib/format';

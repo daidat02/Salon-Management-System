@@ -54,6 +54,10 @@ func (r *GeneralSettingsResponse) Validate() error {
 			return errors.New("Giờ nghỉ phải nằm trong giờ mở cửa và bắt đầu trước khi kết thúc")
 		}
 	}
+
+	if err := r.Payroll.Validate(); err != nil {
+		return err
+	}
 	return nil
 }
 

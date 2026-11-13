@@ -4,7 +4,7 @@ import { RefreshCw } from 'lucide-react';
 import { StatsSkeleton } from '@/components/dashboard/DashboardSkeletons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getApiErrorMessage } from '@/services/apiClient';
-import useOverview from '@/hooks/use-overview';
+import { useOverview } from '@/hooks/report';
 import OverviewHeading from './OverviewHeading';
 import OverviewKpiCards from './OverviewKpiCards';
 import RevenueChart from './RevenueChart';

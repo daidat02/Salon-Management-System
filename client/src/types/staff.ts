@@ -1,8 +1,12 @@
 export type StaffGender = 'male' | 'female' | 'other';
 export type StaffEmploymentType = 'fulltime' | 'parttime';
 
+export type StaffPayrollStatus = 'draft' | 'approved' | 'paid' | 'cancelled';
+
 export interface StaffPayroll {
   staff_id: string;
+  source: 'payroll' | 'live';
+  payroll_status: StaffPayrollStatus | null;
   date_from: string;
   date_to: string;
   base_salary: number;

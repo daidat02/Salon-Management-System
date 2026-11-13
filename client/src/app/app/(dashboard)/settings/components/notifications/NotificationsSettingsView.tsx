@@ -19,7 +19,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Tag } from '@/components/ui/tag';
 import { toast } from '@/components/ui/toast';
-import { useNotificationSettings, useUpdateNotificationSettings } from '@/hooks/use-settings';
+import { useNotificationSettings, useUpdateNotificationSettings } from '@/hooks/settings';
 import type { NotificationSettingsResponse } from '@/types/setting';
 import {
   createDefaultNotificationSettings,

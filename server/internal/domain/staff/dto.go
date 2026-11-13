@@ -60,6 +60,8 @@ type StaffPayrollResponse struct {
 	TotalCommission     float64   `json:"total_commission" db:"total_commission"`
 	TotalAmountValue    float64   `json:"total_amount_value" db:"total_amount_value"`
 	NetPay              float64   `json:"net_pay" db:"net_pay"`
+	Source              string    `json:"source" db:"-"`
+	PayrollStatus       *string   `json:"payroll_status" db:"-"`
 }
 
 // StaffServiceHistorySummary tổng hợp dịch vụ đã thực hiện trong khoảng ngày.
@@ -125,6 +127,22 @@ type StaffBasicInfo struct {
 	Code     string `db:"code" json:"code"`
 	FullName string `db:"full_name" json:"full_name"`
 	Position string `db:"position" json:"position"`
+}
+
+type BulkPayrollDraftItem struct {
+	StaffID   string `json:"staff_id"`
+	StaffCode string `json:"staff_code"`
+	StaffName string `json:"staff_name"`
+	Result    string `json:"result"`
+	Reason    string `json:"reason"`
+}
+
+type BulkPayrollDraftResponse struct {
+	TargetMonth string                 `json:"target_month"`
+	Created     int                    `json:"created"`
+	Skipped     int                    `json:"skipped"`
+	Failed      int                    `json:"failed"`
+	Items       []BulkPayrollDraftItem `json:"items"`
 }
 
 const (

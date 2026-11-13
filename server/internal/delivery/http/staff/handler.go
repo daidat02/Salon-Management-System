@@ -232,8 +232,11 @@ func (h *StaffHandler) UpdateStaff(c *gin.Context) {
 
 type CreatePayrollRequest struct {
 	TargetMonth string `json:"target_month" binding:"required"`
-	// Sẵn sàng mở rộng sau này:
-	// Note string `json:"note"`
+	Status      string `json:"status" binding:"omitempty,oneof=draft approved"`
+}
+
+type CreatePayrollDraftsRequest struct {
+	TargetMonth string `json:"target_month" binding:"required"`
 }
 
 // CreatePayroll godoc
@@ -243,7 +246,7 @@ type CreatePayrollRequest struct {
 // @Produce      json
 // @Security     BearerAuth
 // @Param        id            path      string                  true  "ID nhân viên"
-// @Param        body          body      CreatePayrollRequest    true  "Kỳ bảng lương (yyyy-MM)"
+// @Param        body          body      CreatePayrollRequest    true  "Kỳ bảng lương (yyyy-MM) và trạng thái (draft | approved)"
 // @Success      200           {object}  response.SuccessResponse  "Tạo bảng lương thành công"
 // @Failure      400           {object}  response.ErrorResponse    "Thiếu id / thiếu target_month / tham số không hợp lệ"
 // @Failure      401           {object}  response.ErrorResponse    "Thiếu token / token không hợp lệ"
@@ -265,6 +268,7 @@ func (h *StaffHandler) CreatePayroll(c *gin.Context) {
 		c.Request.Context(),
 		c.Param("id"),
 		req.TargetMonth,
+		req.Status,
 	)
 
 	if err != nil {
@@ -273,7 +277,38 @@ func (h *StaffHandler) CreatePayroll(c *gin.Context) {
 		c.Abort()
 		return
 	}
-	response.Success(c, 200, "Duyệt Bảng lương nhân viên thành công", nil)
+	response.Success(c, 200, "Lưu bảng lương nhân viên thành công", nil)
+}
+
+// CreatePayrollDrafts godoc
+// @Summary      Tạo bảng lương nháp hàng loạt
+// @Description  Yêu cầu vai trò: owner. Bỏ qua nhân viên đã có bảng lương trong kỳ.
+// @Tags         Staff
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        body  body      CreatePayrollDraftsRequest  true  "Kỳ lương (yyyy-MM)"
+// @Success      200   {object}  response.SuccessResponse    "Tạo bảng lương nháp thành công"
+// @Failure      400   {object}  response.ErrorResponse      "Kỳ lương không hợp lệ hoặc ở tương lai"
+// @Failure      401   {object}  response.ErrorResponse      "Thiếu token / token không hợp lệ"
+// @Failure      403   {object}  response.ErrorResponse      "Không có quyền truy cập"
+// @Failure      500   {object}  response.ErrorResponse      "Lỗi server"
+// @Router       /staff/payrolls-draft [post]
+func (h *StaffHandler) CreatePayrollDrafts(c *gin.Context) {
+	var req CreatePayrollDraftsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, apperror.New(400, "Thiếu target_month hoặc dữ liệu không hợp lệ", err))
+		c.Abort()
+		return
+	}
+
+	result, err := h.uc.CreatePayrollDrafts(c.Request.Context(), req.TargetMonth)
+	if err != nil {
+		response.Error(c, err)
+		c.Abort()
+		return
+	}
+	response.Success(c, 200, "Tạo bảng lương nháp thành công", result)
 }
 
 // GetStaffPayroll godoc
@@ -282,10 +317,8 @@ func (h *StaffHandler) CreatePayroll(c *gin.Context) {
 // @Tags         Staff
 // @Produce      json
 // @Security     BearerAuth
-// @Param        id                    path   string  true   "ID nhân viên"
-// @Param        date_from             query  string  false  "Từ ngày (yyyy-MM-dd hoặc RFC3339), mặc định đầu tháng"
-// @Param        date_to               query  string  false  "Đến ngày (yyyy-MM-dd hoặc RFC3339), mặc định cuối tháng"
-// @Param        standard_working_days query  int     false  "Số ngày công chuẩn (mặc định 26)"
+// @Param        id            path   string  true   "ID nhân viên"
+// @Param        period_month  query  string  true   "Kỳ lương (yyyy-MM)"
 // @Success      200  {object}  response.SuccessResponse  "Bảng lương nhân viên"
 // @Failure      400  {object}  response.ErrorResponse    "Thiếu id / tham số không hợp lệ"
 // @Failure      401  {object}  response.ErrorResponse    "Thiếu token / token không hợp lệ"
@@ -294,23 +327,10 @@ func (h *StaffHandler) CreatePayroll(c *gin.Context) {
 // @Failure      403  {object}  response.ErrorResponse  "Không có quyền truy cập"
 // @Router       /staff/{id}/payroll [get]
 func (h *StaffHandler) GetStaffPayroll(c *gin.Context) {
-	standardWorkingDays := 0
-	if raw := strings.TrimSpace(c.Query("standard_working_days")); raw != "" {
-		parsed, err := strconv.Atoi(raw)
-		if err != nil {
-			response.Error(c, apperror.New(400, "standard_working_days không hợp lệ", err))
-			c.Abort()
-			return
-		}
-		standardWorkingDays = parsed
-	}
-
 	result, err := h.uc.GetStaffPayroll(
 		c.Request.Context(),
 		c.Param("id"),
-		c.Query("date_from"),
-		c.Query("date_to"),
-		standardWorkingDays,
+		c.Query("period_month"),
 	)
 	if err != nil {
 		response.Error(c, err)

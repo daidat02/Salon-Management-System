@@ -47,6 +47,7 @@ type WorkingHours struct {
 type GeneralSettingsResponse struct {
 	Organization OrganizationInfo `json:"organization"`
 	WorkingHours WorkingHours     `json:"working_hours"`
+	Payroll      PayrollSettings  `json:"payroll"`
 }
 
 type SettingRepository interface {

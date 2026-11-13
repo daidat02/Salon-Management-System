@@ -562,6 +562,8 @@ definitions:
     properties:
       organization:
         $ref: '#/definitions/github_com_daidat02_server_internal_domain_setting.OrganizationInfo'
+      payroll:
+        $ref: '#/definitions/github_com_daidat02_server_internal_domain_setting.PayrollSettings'
       working_hours:
         $ref: '#/definitions/github_com_daidat02_server_internal_domain_setting.WorkingHours'
     type: object
@@ -642,6 +644,15 @@ definitions:
         type: array
       receipt:
         $ref: '#/definitions/github_com_daidat02_server_internal_domain_setting.ReceiptSettings'
+    type: object
+  github_com_daidat02_server_internal_domain_setting.PayrollSettings:
+    properties:
+      auto_draft_cutoff_day:
+        type: integer
+      standard_working_days:
+        type: integer
+      start_day:
+        type: integer
     type: object
   github_com_daidat02_server_internal_domain_setting.ReceiptSettings:
     properties:
@@ -862,8 +873,20 @@ definitions:
       message:
         type: string
     type: object
+  internal_delivery_http_staff.CreatePayrollDraftsRequest:
+    properties:
+      target_month:
+        type: string
+    required:
+    - target_month
+    type: object
   internal_delivery_http_staff.CreatePayrollRequest:
     properties:
+      status:
+        enum:
+        - draft
+        - approved
+        type: string
       target_month:
         type: string
     required:
@@ -4378,18 +4401,11 @@ paths:
         name: id
         required: true
         type: string
-      - description: Từ ngày (yyyy-MM-dd hoặc RFC3339), mặc định đầu tháng
+      - description: Kỳ lương (yyyy-MM)
         in: query
-        name: date_from
+        name: period_month
+        required: true
         type: string
-      - description: Đến ngày (yyyy-MM-dd hoặc RFC3339), mặc định cuối tháng
-        in: query
-        name: date_to
-        type: string
-      - description: Số ngày công chuẩn (mặc định 26)
-        in: query
-        name: standard_working_days
-        type: integer
       produces:
       - application/json
       responses:
@@ -4430,7 +4446,7 @@ paths:
         name: id
         required: true
         type: string
-      - description: Kỳ bảng lương (yyyy-MM)
+      - description: Kỳ bảng lương (yyyy-MM) và trạng thái (draft | approved)
         in: body
         name: body
         required: true
@@ -4567,6 +4583,47 @@ paths:
       security:
       - BearerAuth: []
       summary: Lấy lịch sử dịch vụ nhân viên đã thực hiện
+      tags:
+      - Staff
+  /staff/payrolls-draft:
+    post:
+      consumes:
+      - application/json
+      description: 'Yêu cầu vai trò: owner. Bỏ qua nhân viên đã có bảng lương trong
+        kỳ.'
+      parameters:
+      - description: Kỳ lương (yyyy-MM)
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/internal_delivery_http_staff.CreatePayrollDraftsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Tạo bảng lương nháp thành công
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse'
+        "400":
+          description: Kỳ lương không hợp lệ hoặc ở tương lai
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "401":
+          description: Thiếu token / token không hợp lệ
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "403":
+          description: Không có quyền truy cập
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+        "500":
+          description: Lỗi server
+          schema:
+            $ref: '#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Tạo bảng lương nháp hàng loạt
       tags:
       - Staff
   /staff/salary-adjustment:

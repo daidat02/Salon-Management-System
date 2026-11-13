@@ -13,6 +13,7 @@ import {
   Save,
   Store,
   Upload,
+  Wallet,
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from 'cn';
@@ -22,14 +23,14 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Tag } from '@/components/ui/tag';
 import { toast } from '@/components/ui/toast';
-import useGeneralSettings from '@/hooks/use-general-settings';
-import { useUpdateGeneralSettings } from '@/hooks/use-settings';
+import { useGeneralSettings, useUpdateGeneralSettings } from '@/hooks/settings';
 import type { GeneralSettingsResponse, WorkingHours as ApiWorkingHours } from '@/types/setting';
 import {
   createDefaultSettings,
   WEEKDAY_LABELS,
   WEEKDAYS,
   type GeneralSettings,
+  type PayrollSettings,
   type SalonInfo,
   type Weekday,
   type WorkingHours,
@@ -43,6 +44,7 @@ type FormErrors = {
   salon: SalonErrors;
   workingHours?: string;
   days?: string;
+  payroll?: string;
 };
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -95,6 +97,15 @@ function validate(settings: GeneralSettings): FormErrors {
     errors.days = 'Vui lòng chọn ít nhất một ngày áp dụng.';
   }
 
+  const payroll = settings.payroll;
+  if (payroll.startDay < 1 || payroll.startDay > 28) {
+    errors.payroll = 'Ngày bắt đầu kỳ lương phải nằm trong khoảng 1 đến 28.';
+  } else if (payroll.standardWorkingDays < 1 || payroll.standardWorkingDays > 31) {
+    errors.payroll = 'Số ngày công chuẩn phải nằm trong khoảng 1 đến 31.';
+  } else if (payroll.autoDraftCutoffDay < 1 || payroll.autoDraftCutoffDay > 28) {
+    errors.payroll = 'Ngày tới hạn tạo bảng lương nháp phải nằm trong khoảng 1 đến 28.';
+  }
+
   return errors;
 }
 
@@ -102,7 +113,8 @@ function hasAnyError(errors: FormErrors): boolean {
   return Boolean(
     Object.keys(errors.salon).length > 0 ||
       errors.workingHours ||
-      errors.days,
+      errors.days ||
+      errors.payroll,
   );
 }
 
@@ -494,6 +506,82 @@ function BusinessHoursCard({
   );
 }
 
+function PayrollSettingsCard({
+  value,
+  error,
+  onChange,
+}: {
+  value: PayrollSettings;
+  error?: string;
+  onChange: (patch: Partial<PayrollSettings>) => void;
+}) {
+  const handleNumberChange = (key: keyof PayrollSettings, raw: string) => {
+    const parsed = Number(raw);
+    onChange({ [key]: raw === '' || !Number.isFinite(parsed) ? 0 : parsed });
+  };
+
+  return (
+    <SettingsCard
+      icon={Wallet}
+      title="Kỳ lương & chốt lương"
+      description="Chu kỳ tính lương và số ngày công chuẩn dùng cho bảng lương của nhân viên."
+    >
+      <div className="grid gap-4 sm:grid-cols-3">
+        <div>
+          <Label htmlFor="payroll-start-day" className={labelClass}>
+            Ngày bắt đầu kỳ lương <span className="text-error">*</span>
+          </Label>
+          <DashInput
+            id="payroll-start-day"
+            type="number"
+            min={1}
+            max={28}
+            value={value.startDay}
+            onChange={(event) => handleNumberChange('startDay', event.target.value)}
+            aria-invalid={Boolean(error) || undefined}
+          />
+        </div>
+        <div>
+          <Label htmlFor="payroll-standard-days" className={labelClass}>
+            Số ngày công chuẩn <span className="text-error">*</span>
+          </Label>
+          <DashInput
+            id="payroll-standard-days"
+            type="number"
+            min={1}
+            max={31}
+            value={value.standardWorkingDays}
+            onChange={(event) => handleNumberChange('standardWorkingDays', event.target.value)}
+            aria-invalid={Boolean(error) || undefined}
+          />
+        </div>
+        <div>
+          <Label htmlFor="payroll-cutoff-day" className={labelClass}>
+            Ngày tới hạn tạo nháp <span className="text-error">*</span>
+          </Label>
+          <DashInput
+            id="payroll-cutoff-day"
+            type="number"
+            min={1}
+            max={28}
+            value={value.autoDraftCutoffDay}
+            onChange={(event) => handleNumberChange('autoDraftCutoffDay', event.target.value)}
+            aria-invalid={Boolean(error) || undefined}
+          />
+        </div>
+      </div>
+
+      {error && <p className="text-error mt-2 text-[11px]">{error}</p>}
+
+      <p className="text-on-surface-variant mt-3 flex items-start gap-1.5 text-[11px] leading-relaxed">
+        <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+        Ví dụ ngày bắt đầu là 26: kỳ lương 11/2026 tính từ 26/10 đến 26/11. Ngày tới hạn dùng để
+        hệ thống tự tạo bảng lương nháp khi chưa chốt.
+      </p>
+    </SettingsCard>
+  );
+}
+
 function timeToMinutes(value?: string | null): number {
   if (!value) return 0;
   const [hours, minutes] = value.split(':').map(Number);
@@ -542,6 +630,13 @@ function mapGeneralSettings(data: GeneralSettingsResponse): GeneralSettings {
       breakEnd: minutesToTime(workingHours?.break_end_minutes),
       days: days.length > 0 ? days : defaults.workingHours.days,
     },
+    payroll: {
+      startDay: data.payroll?.start_day ?? defaults.payroll.startDay,
+      standardWorkingDays:
+        data.payroll?.standard_working_days ?? defaults.payroll.standardWorkingDays,
+      autoDraftCutoffDay:
+        data.payroll?.auto_draft_cutoff_day ?? defaults.payroll.autoDraftCutoffDay,
+    },
   };
 }
 
@@ -577,6 +672,11 @@ function toGeneralPayload(
       logo_url: settings.salon.logoUrl,
     },
     working_hours: buildWorkingHours(settings),
+    payroll: {
+      start_day: settings.payroll.startDay,
+      standard_working_days: settings.payroll.standardWorkingDays,
+      auto_draft_cutoff_day: settings.payroll.autoDraftCutoffDay,
+    },
   };
 }
 
@@ -610,6 +710,13 @@ export default function GeneralSettingsView() {
     setDraft((current) => ({
       ...current,
       workingHours: { ...current.workingHours, ...patch },
+    }));
+  }, []);
+
+  const updatePayroll = React.useCallback((patch: Partial<PayrollSettings>) => {
+    setDraft((current) => ({
+      ...current,
+      payroll: { ...current.payroll, ...patch },
     }));
   }, []);
 
@@ -676,6 +783,12 @@ export default function GeneralSettingsView() {
         value={draft.workingHours}
         errors={{ workingHours: errors.workingHours, days: errors.days }}
         onChange={updateWorkingHours}
+      />
+
+      <PayrollSettingsCard
+        value={draft.payroll}
+        error={errors.payroll}
+        onChange={updatePayroll}
       />
 
       {dirty && (

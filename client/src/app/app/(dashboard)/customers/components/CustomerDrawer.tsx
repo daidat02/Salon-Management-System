@@ -4,7 +4,7 @@ import * as React from 'react';
 import { AlarmClock, Cake, Phone, Star, TriangleAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DashDrawer } from '@/components/dashboard/DashDrawer';
-import useCustomerDetail from '@/hooks/use-customer-detail';
+import { useCustomerDetail } from '@/hooks/customer';
 import { getApiErrorMessage } from '@/services/apiClient';
 import type { SpendByMonth } from '@/types/customer';
 import { CustomerForm } from './CustomerForm';

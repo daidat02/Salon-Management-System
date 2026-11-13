@@ -228,6 +228,48 @@ const (
 		AND s.deleted_at IS NULL
 	`
 
+	getPayrollByPeriodQuery = `
+		SELECT id, organization_id, staff_id, period_month, base_salary,
+		       commission_amount, bonus_amount, advance_amount, deduction_amount,
+		       net_pay, status, cash_flow_id, paid_at, created_by, approved_by,
+		       created_at, updated_at, standard_working_days, total_leave_days,
+		       actual_working_days, penalty_amount, adjustment_deduction,
+		       total_orders, total_items, total_amount_value
+		FROM payrolls
+		WHERE organization_id = $1
+			AND staff_id = $2
+			AND period_month = date_trunc('month', $3::date)
+		ORDER BY (status <> 'cancelled') DESC, updated_at DESC
+		LIMIT 1
+	`
+
+	getPayrollForUpdateQuery = `
+		SELECT id, status, net_pay
+		FROM payrolls
+		WHERE organization_id = $1
+			AND staff_id = $2
+			AND period_month = date_trunc('month', $3::date)
+		ORDER BY (status <> 'cancelled') DESC, updated_at DESC
+		LIMIT 1
+		FOR UPDATE
+	`
+
+	listStaffForPayrollDraftQuery = `
+		SELECT ` + staffSelectColumns + `
+		FROM staff
+		WHERE organization_id = $1
+			AND deleted_at IS NULL
+			AND status IN ('active', 'on_leave')
+			AND COALESCE(hire_date, created_at::date) <= $2::date
+		ORDER BY code
+	`
+
+	getPayrollSettingsQuery = `
+		SELECT start_day, standard_working_days, auto_draft_cutoff_day
+		FROM payroll_settings
+		WHERE organization_id = $1
+	`
+
 	existPayrollOfStaffAndPeriodQuery = `
 		SELECT 1
 		FROM payrolls
@@ -239,10 +281,20 @@ const (
     INSERT INTO payrolls (
         id, organization_id, staff_id, period_month, base_salary,
         commission_amount, bonus_amount, advance_amount, deduction_amount,
-        net_pay, status, cash_flow_id, created_by, approved_by
+        net_pay, status, cash_flow_id, created_by, approved_by,
+        standard_working_days, total_leave_days, actual_working_days,
+        penalty_amount, adjustment_deduction, total_orders, total_items,
+        total_amount_value
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14);
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
+            $15, $16, $17, $18, $19, $20, $21, $22);
 `
+
+	promotePayrollDraftQuery = `
+		UPDATE payrolls
+		SET status = 'approved', cash_flow_id = $3, approved_by = $4
+		WHERE id = $1 AND organization_id = $2 AND status = 'draft';
+	`
 
 	createSalaryAdjustmentQuery = `
 		INSERT INTO staff_salary_adjustments (

@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import usePosItems from '@/hooks/use-pos-items';
-import useCategory from '@/hooks/use-category';
+import { usePosItems } from '@/hooks/order';
+import { useCategory } from '@/hooks/category';
 import type { CatalogItem } from './catalogTypes';
 
 export type CatalogTypeFilter = '' | 'service' | 'product';

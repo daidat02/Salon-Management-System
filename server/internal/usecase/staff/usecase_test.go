@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/daidat02/server/internal/delivery/http/middlewares"
+	settingDomain "github.com/daidat02/server/internal/domain/setting"
 	domain "github.com/daidat02/server/internal/domain/staff"
 	"github.com/daidat02/server/pkg/apperror"
 
@@ -649,168 +650,251 @@ func TestStaffUsecase_UpdateStaff(f *testing.T) {
 	}
 }
 
-func TestStaffUsecase_GetStaffPayroll(f *testing.T) {
-	payroll := &domain.StaffPayrollResponse{
-		StaffID:             "staff-1",
-		BaseSalary:          8000000,
-		StandardWorkingDays: 26,
-		ActualWorkingDays:   24,
-		ProratedBaseSalary:  7384615.38,
-		TotalCommission:     1039500,
-		NetPay:              8300000,
+func TestStaffUsecase_GetStaffPayroll(t *testing.T) {
+	defaultSettings := func() *settingDomain.PayrollSettings {
+		s := settingDomain.DefaultPayrollSettings()
+		return &s
 	}
 
-	tests := []struct {
-		name                string
-		ctx                 context.Context
-		id                  string
-		dateFrom            string
-		dateTo              string
-		standardWorkingDays int
-		mockReturn          *domain.StaffPayrollResponse
-		mockErr             error
-		callRepo            bool
-		expectedDays        int
-		expectedError       bool
-		expectedCode        int
-	}{
-		{
-			name:          "Thành công - Mặc định tháng hiện tại và 26 ngày công",
-			ctx:           withOrgCtx("org-123"),
-			id:            "staff-1",
-			mockReturn:    payroll,
-			callRepo:      true,
-			expectedDays:  26,
-			expectedError: false,
-		},
-		{
-			name:                "Thành công - Khoảng ngày và ngày công tùy chọn",
-			ctx:                 withOrgCtx("org-123"),
-			id:                  "staff-1",
-			dateFrom:            "2026-09-01",
-			dateTo:              "2026-09-30",
-			standardWorkingDays: 30,
-			mockReturn:          payroll,
-			callRepo:            true,
-			expectedDays:        30,
-			expectedError:       false,
-		},
-		{
-			name:          "Thất bại - Thiếu id nhân viên",
-			ctx:           withOrgCtx("org-123"),
-			id:            " ",
-			callRepo:      false,
-			expectedError: true,
-			expectedCode:  400,
-		},
-		{
-			name:          "Thất bại - Thiếu organization_id trong context",
-			ctx:           context.Background(),
-			id:            "staff-1",
-			callRepo:      false,
-			expectedError: true,
-			expectedCode:  400,
-		},
-		{
-			name:          "Thất bại - date_from không hợp lệ",
-			ctx:           withOrgCtx("org-123"),
-			id:            "staff-1",
-			dateFrom:      "01-09-2026",
-			callRepo:      false,
-			expectedError: true,
-			expectedCode:  400,
-		},
-		{
-			name:          "Thất bại - date_to không hợp lệ",
-			ctx:           withOrgCtx("org-123"),
-			id:            "staff-1",
-			dateTo:        "not-a-date",
-			callRepo:      false,
-			expectedError: true,
-			expectedCode:  400,
-		},
-		{
-			name:          "Thất bại - date_from sau date_to",
-			ctx:           withOrgCtx("org-123"),
-			id:            "staff-1",
-			dateFrom:      "2026-09-30",
-			dateTo:        "2026-09-01",
-			callRepo:      false,
-			expectedError: true,
-			expectedCode:  400,
-		},
-		{
-			name:                "Thất bại - Số ngày công chuẩn không hợp lệ",
-			ctx:                 withOrgCtx("org-123"),
-			id:                  "staff-1",
-			standardWorkingDays: 32,
-			callRepo:            false,
-			expectedError:       true,
-			expectedCode:        400,
-		},
-		{
-			name:          "Thất bại - Không tìm thấy nhân viên",
-			ctx:           withOrgCtx("org-123"),
-			id:            "staff-missing",
-			mockErr:       domain.ErrStaffNotFound,
-			callRepo:      true,
-			expectedDays:  26,
-			expectedError: true,
-			expectedCode:  404,
-		},
-		{
-			name:          "Thất bại - Lỗi database",
-			ctx:           withOrgCtx("org-123"),
-			id:            "staff-1",
-			mockErr:       errors.New("db connection refused"),
-			callRepo:      true,
-			expectedDays:  26,
-			expectedError: true,
-			expectedCode:  500,
-		},
-	}
+	t.Run("Thành công - kỳ chưa có bảng lương thì tính live", func(t *testing.T) {
+		mockRepo := new(MockStaffRepository)
+		staff := validStaff()
+		live := &domain.StaffPayrollResponse{
+			StaffID:             "staff-1",
+			BaseSalary:          8000000,
+			StandardWorkingDays: 26,
+			ActualWorkingDays:   24,
+			ProratedBaseSalary:  7384615.38,
+			TotalCommission:     1039500,
+			NetPay:              8300000,
+		}
+		mockRepo.On("GetPayrollSettings", mock.Anything, "org-123").Return(defaultSettings(), nil).Once()
+		mockRepo.On("GetStaffByID", mock.Anything, "org-123", "staff-1").Return(staff, nil).Once()
+		mockRepo.On("GetPayrollByPeriod", mock.Anything, "org-123", "staff-1", "2026-11-01").
+			Return(nil, domain.ErrPayrollNotFound).Once()
+		mockRepo.On("GetStaffPayroll", mock.Anything, "org-123", "staff-1", "2026-10-26", "2026-11-26", 26).
+			Return(live, nil).Once()
 
-	for _, tt := range tests {
-		f.Run(tt.name, func(t *testing.T) {
-			mockRepo := new(MockStaffRepository)
-			if tt.callRepo {
-				mockRepo.On(
-					"GetStaffPayroll",
-					mock.Anything,
-					"org-123",
-					tt.id,
-					tt.dateFrom,
-					tt.dateTo,
-					tt.expectedDays,
-				).Return(tt.mockReturn, tt.mockErr)
-			}
+		uc := NewStaffUsecase(mockRepo)
+		res, err := uc.GetStaffPayroll(withOrgCtx("org-123"), "staff-1", "2026-11")
 
-			uc := NewStaffUsecase(mockRepo)
-			res, err := uc.GetStaffPayroll(
-				tt.ctx,
-				tt.id,
-				tt.dateFrom,
-				tt.dateTo,
-				tt.standardWorkingDays,
-			)
+		assert.NoError(t, err)
+		assert.Equal(t, "live", res.Source)
+		assert.Nil(t, res.PayrollStatus)
+		mockRepo.AssertExpectations(t)
+	})
 
-			if tt.expectedError {
-				assert.Error(t, err)
-				assert.Nil(t, res)
-				assertFlatAppError(t, err, tt.expectedCode)
-				if tt.callRepo {
-					mockRepo.AssertExpectations(t)
-				} else {
-					mockRepo.AssertNotCalled(t, "GetStaffPayroll", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
-				}
-				return
-			}
+	t.Run("Thành công - kỳ đã có bảng lương thì đọc snapshot", func(t *testing.T) {
+		mockRepo := new(MockStaffRepository)
+		staff := validStaff()
+		payroll := &domain.Payroll{
+			ID:                  "payroll-1",
+			StaffID:             "staff-1",
+			Status:              domain.PayrollStatusApproved,
+			BaseSalary:          7000000,
+			CommissionAmount:    1000000,
+			BonusAmount:         500000,
+			AdvanceAmount:       200000,
+			DeductionAmount:     100000,
+			NetPay:              8200000,
+			StandardWorkingDays: 26,
+			TotalLeaveDays:      2,
+			ActualWorkingDays:   24,
+			PenaltyAmount:       40000,
+			AdjustmentDeduction: 60000,
+			TotalOrders:         10,
+			TotalItems:          15,
+			TotalAmountValue:    5000000,
+		}
+		mockRepo.On("GetPayrollSettings", mock.Anything, "org-123").Return(defaultSettings(), nil).Once()
+		mockRepo.On("GetStaffByID", mock.Anything, "org-123", "staff-1").Return(staff, nil).Once()
+		mockRepo.On("GetPayrollByPeriod", mock.Anything, "org-123", "staff-1", "2026-11-01").
+			Return(payroll, nil).Once()
 
-			assert.NoError(t, err)
-			assert.Equal(t, tt.mockReturn, res)
-			mockRepo.AssertExpectations(t)
-		})
-	}
+		uc := NewStaffUsecase(mockRepo)
+		res, err := uc.GetStaffPayroll(withOrgCtx("org-123"), "staff-1", "2026-11")
+
+		assert.NoError(t, err)
+		assert.Equal(t, "payroll", res.Source)
+		assert.NotNil(t, res.PayrollStatus)
+		assert.Equal(t, domain.PayrollStatusApproved, *res.PayrollStatus)
+		assert.Equal(t, payroll.BaseSalary, res.ProratedBaseSalary)
+		assert.Equal(t, payroll.StandardWorkingDays, res.StandardWorkingDays)
+		assert.Equal(t, payroll.TotalLeaveDays, res.TotalLeaveDays)
+		assert.Equal(t, payroll.ActualWorkingDays, res.ActualWorkingDays)
+		assert.Equal(t, payroll.CommissionAmount, res.TotalCommission)
+		assert.Equal(t, payroll.DeductionAmount, res.TotalDeduction)
+		assert.Equal(t, payroll.NetPay, res.NetPay)
+		mockRepo.AssertNotCalled(t, "GetStaffPayroll", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	})
+
+	t.Run("Thành công - bảng lương cancelled thì tính live", func(t *testing.T) {
+		mockRepo := new(MockStaffRepository)
+		staff := validStaff()
+		payroll := &domain.Payroll{StaffID: "staff-1", Status: domain.PayrollStatusCancelled}
+		live := &domain.StaffPayrollResponse{StaffID: "staff-1"}
+		mockRepo.On("GetPayrollSettings", mock.Anything, "org-123").Return(defaultSettings(), nil).Once()
+		mockRepo.On("GetStaffByID", mock.Anything, "org-123", "staff-1").Return(staff, nil).Once()
+		mockRepo.On("GetPayrollByPeriod", mock.Anything, "org-123", "staff-1", "2026-11-01").
+			Return(payroll, nil).Once()
+		mockRepo.On("GetStaffPayroll", mock.Anything, "org-123", "staff-1", "2026-10-26", "2026-11-26", 26).
+			Return(live, nil).Once()
+
+		uc := NewStaffUsecase(mockRepo)
+		res, err := uc.GetStaffPayroll(withOrgCtx("org-123"), "staff-1", "2026-11")
+
+		assert.NoError(t, err)
+		assert.Equal(t, "live", res.Source)
+	})
+
+	t.Run("Thành công - dùng start_day và ngày công từ cấu hình", func(t *testing.T) {
+		mockRepo := new(MockStaffRepository)
+		staff := validStaff()
+		settings := &settingDomain.PayrollSettings{
+			StartDay:            25,
+			StandardWorkingDays: 22,
+			AutoDraftCutoffDay:  7,
+		}
+		live := &domain.StaffPayrollResponse{StaffID: "staff-1"}
+		mockRepo.On("GetPayrollSettings", mock.Anything, "org-123").Return(settings, nil).Once()
+		mockRepo.On("GetStaffByID", mock.Anything, "org-123", "staff-1").Return(staff, nil).Once()
+		mockRepo.On("GetPayrollByPeriod", mock.Anything, "org-123", "staff-1", "2026-11-01").
+			Return(nil, domain.ErrPayrollNotFound).Once()
+		mockRepo.On("GetStaffPayroll", mock.Anything, "org-123", "staff-1", "2026-10-25", "2026-11-25", 22).
+			Return(live, nil).Once()
+
+		uc := NewStaffUsecase(mockRepo)
+		_, err := uc.GetStaffPayroll(withOrgCtx("org-123"), "staff-1", "2026-11")
+
+		assert.NoError(t, err)
+		mockRepo.AssertExpectations(t)
+	})
+
+	t.Run("Thành công - lỗi đọc cấu hình thì dùng mặc định", func(t *testing.T) {
+		mockRepo := new(MockStaffRepository)
+		staff := validStaff()
+		live := &domain.StaffPayrollResponse{StaffID: "staff-1"}
+		mockRepo.On("GetPayrollSettings", mock.Anything, "org-123").Return(nil, errors.New("db down")).Once()
+		mockRepo.On("GetStaffByID", mock.Anything, "org-123", "staff-1").Return(staff, nil).Once()
+		mockRepo.On("GetPayrollByPeriod", mock.Anything, "org-123", "staff-1", "2026-11-01").
+			Return(nil, domain.ErrPayrollNotFound).Once()
+		mockRepo.On("GetStaffPayroll", mock.Anything, "org-123", "staff-1", "2026-10-26", "2026-11-26", 26).
+			Return(live, nil).Once()
+
+		uc := NewStaffUsecase(mockRepo)
+		_, err := uc.GetStaffPayroll(withOrgCtx("org-123"), "staff-1", "2026-11")
+
+		assert.NoError(t, err)
+		mockRepo.AssertExpectations(t)
+	})
+
+	t.Run("Thành công - nhân viên vào làm sau kỳ thì trả rỗng", func(t *testing.T) {
+		mockRepo := new(MockStaffRepository)
+		staff := validStaff()
+		staff.HireDate = time.Date(2026, 12, 1, 0, 0, 0, 0, time.UTC)
+		mockRepo.On("GetPayrollSettings", mock.Anything, "org-123").Return(defaultSettings(), nil).Once()
+		mockRepo.On("GetStaffByID", mock.Anything, "org-123", "staff-1").Return(staff, nil).Once()
+
+		uc := NewStaffUsecase(mockRepo)
+		res, err := uc.GetStaffPayroll(withOrgCtx("org-123"), "staff-1", "2026-11")
+
+		assert.NoError(t, err)
+		assert.Nil(t, res)
+		mockRepo.AssertNotCalled(t, "GetPayrollByPeriod", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	})
+
+	t.Run("Thành công - fallback created_at khi thiếu hire_date", func(t *testing.T) {
+		mockRepo := new(MockStaffRepository)
+		staff := validStaff()
+		staff.HireDate = time.Time{}
+		created := time.Date(2026, 12, 1, 0, 0, 0, 0, time.UTC)
+		staff.CreatedAt = &created
+		mockRepo.On("GetPayrollSettings", mock.Anything, "org-123").Return(defaultSettings(), nil).Once()
+		mockRepo.On("GetStaffByID", mock.Anything, "org-123", "staff-1").Return(staff, nil).Once()
+
+		uc := NewStaffUsecase(mockRepo)
+		res, err := uc.GetStaffPayroll(withOrgCtx("org-123"), "staff-1", "2026-11")
+
+		assert.NoError(t, err)
+		assert.Nil(t, res)
+	})
+
+	t.Run("Thất bại - thiếu id nhân viên", func(t *testing.T) {
+		uc := NewStaffUsecase(new(MockStaffRepository))
+		res, err := uc.GetStaffPayroll(withOrgCtx("org-123"), " ", "2026-11")
+
+		assert.Nil(t, res)
+		assertFlatAppError(t, err, 400)
+	})
+
+	t.Run("Thất bại - thiếu kỳ lương", func(t *testing.T) {
+		uc := NewStaffUsecase(new(MockStaffRepository))
+		res, err := uc.GetStaffPayroll(withOrgCtx("org-123"), "staff-1", " ")
+
+		assert.Nil(t, res)
+		assertFlatAppError(t, err, 400)
+	})
+
+	t.Run("Thất bại - kỳ lương sai định dạng", func(t *testing.T) {
+		uc := NewStaffUsecase(new(MockStaffRepository))
+		res, err := uc.GetStaffPayroll(withOrgCtx("org-123"), "staff-1", "11-2026")
+
+		assert.Nil(t, res)
+		assertFlatAppError(t, err, 400)
+	})
+
+	t.Run("Thất bại - thiếu organization_id trong context", func(t *testing.T) {
+		uc := NewStaffUsecase(new(MockStaffRepository))
+		res, err := uc.GetStaffPayroll(context.Background(), "staff-1", "2026-11")
+
+		assert.Nil(t, res)
+		assertFlatAppError(t, err, 400)
+	})
+
+	t.Run("Thất bại - không tìm thấy nhân viên", func(t *testing.T) {
+		mockRepo := new(MockStaffRepository)
+		mockRepo.On("GetPayrollSettings", mock.Anything, "org-123").Return(defaultSettings(), nil).Once()
+		mockRepo.On("GetStaffByID", mock.Anything, "org-123", "staff-missing").
+			Return(nil, domain.ErrStaffNotFound).Once()
+
+		uc := NewStaffUsecase(mockRepo)
+		res, err := uc.GetStaffPayroll(withOrgCtx("org-123"), "staff-missing", "2026-11")
+
+		assert.Nil(t, res)
+		assertFlatAppError(t, err, 404)
+	})
+
+	t.Run("Thất bại - lỗi đọc bảng lương theo kỳ", func(t *testing.T) {
+		mockRepo := new(MockStaffRepository)
+		staff := validStaff()
+		mockRepo.On("GetPayrollSettings", mock.Anything, "org-123").Return(defaultSettings(), nil).Once()
+		mockRepo.On("GetStaffByID", mock.Anything, "org-123", "staff-1").Return(staff, nil).Once()
+		mockRepo.On("GetPayrollByPeriod", mock.Anything, "org-123", "staff-1", "2026-11-01").
+			Return(nil, errors.New("db down")).Once()
+
+		uc := NewStaffUsecase(mockRepo)
+		res, err := uc.GetStaffPayroll(withOrgCtx("org-123"), "staff-1", "2026-11")
+
+		assert.Nil(t, res)
+		assertFlatAppError(t, err, 500)
+	})
+
+	t.Run("Thất bại - lỗi tính lương live", func(t *testing.T) {
+		mockRepo := new(MockStaffRepository)
+		staff := validStaff()
+		mockRepo.On("GetPayrollSettings", mock.Anything, "org-123").Return(defaultSettings(), nil).Once()
+		mockRepo.On("GetStaffByID", mock.Anything, "org-123", "staff-1").Return(staff, nil).Once()
+		mockRepo.On("GetPayrollByPeriod", mock.Anything, "org-123", "staff-1", "2026-11-01").
+			Return(nil, domain.ErrPayrollNotFound).Once()
+		mockRepo.On("GetStaffPayroll", mock.Anything, "org-123", "staff-1", "2026-10-26", "2026-11-26", 26).
+			Return(nil, errors.New("db down")).Once()
+
+		uc := NewStaffUsecase(mockRepo)
+		res, err := uc.GetStaffPayroll(withOrgCtx("org-123"), "staff-1", "2026-11")
+
+		assert.Nil(t, res)
+		assertFlatAppError(t, err, 500)
+	})
 }
 
 func TestStaffUsecase_GetStaffServiceHistory(t *testing.T) {
@@ -1097,4 +1181,243 @@ func TestStaffUsecase_DeleteStaff(f *testing.T) {
 			}
 		})
 	}
+}
+
+func payrollFixture() *domain.StaffPayrollResponse {
+	return &domain.StaffPayrollResponse{
+		StaffID:             "staff-1",
+		DateFrom:            time.Date(2026, 10, 26, 0, 0, 0, 0, time.UTC),
+		DateTo:              time.Date(2026, 11, 26, 0, 0, 0, 0, time.UTC),
+		BaseSalary:          8000000,
+		StandardWorkingDays: 26,
+		TotalLeaveDays:      2,
+		ActualWorkingDays:   24,
+		ProratedBaseSalary:  7384615.38,
+		BonusAmount:         500000,
+		AdjustmentDeduction: 60000,
+		PenaltyAmount:       40000,
+		AdvanceAmount:       200000,
+		TotalDeduction:      100000,
+		TotalOrders:         10,
+		TotalItems:          15,
+		TotalCommission:     1039500,
+		TotalAmountValue:    5000000,
+		NetPay:              8694115.38,
+	}
+}
+
+func payrollSettingsFixture() *settingDomain.PayrollSettings {
+	s := settingDomain.DefaultPayrollSettings()
+	return &s
+}
+
+func TestStaffUsecase_CreatePayroll(t *testing.T) {
+	const (
+		orgID       = "org-123"
+		staffID     = "staff-1"
+		targetMonth = "2026-11"
+	)
+
+	staffInfo := &domain.StaffBasicInfo{
+		ID:       staffID,
+		Code:     "NV001",
+		FullName: "Nguyễn Văn A",
+		Position: "Thợ cắt tóc",
+	}
+
+	t.Run("draft - chưa có bảng lương thì lưu nháp đủ snapshot", func(t *testing.T) {
+		mockRepo := new(MockStaffRepository)
+		mockRepo.On("GetStaffBasicByID", mock.Anything, orgID, staffID).Return(staffInfo, nil).Once()
+		mockRepo.On("GetPayrollSettings", mock.Anything, orgID).Return(payrollSettingsFixture(), nil).Once()
+		mockRepo.On("GetPayrollByPeriod", mock.Anything, orgID, staffID, "2026-11-01").
+			Return(nil, domain.ErrPayrollNotFound).Once()
+		mockRepo.On("GetStaffPayroll", mock.Anything, orgID, staffID, "2026-10-26", "2026-11-26", 26).
+			Return(payrollFixture(), nil).Once()
+		mockRepo.On("CreatePayroll", mock.Anything, mock.MatchedBy(func(p *domain.Payroll) bool {
+			return p.Status == domain.PayrollStatusDraft &&
+				p.BaseSalary == 7384615.38 &&
+				p.CommissionAmount == 1039500 &&
+				p.BonusAmount == 500000 &&
+				p.AdvanceAmount == 200000 &&
+				p.DeductionAmount == 100000 &&
+				p.NetPay == 8694115.38 &&
+				p.StandardWorkingDays == 26 &&
+				p.TotalLeaveDays == 2 &&
+				p.ActualWorkingDays == 24 &&
+				p.PenaltyAmount == 40000 &&
+				p.AdjustmentDeduction == 60000 &&
+				p.TotalOrders == 10 &&
+				p.TotalItems == 15 &&
+				p.TotalAmountValue == 5000000
+		}), staffInfo).Return(nil).Once()
+
+		uc := NewStaffUsecase(mockRepo)
+		err := uc.CreatePayroll(withOrgCtx(orgID), staffID, targetMonth, "draft")
+
+		assert.NoError(t, err)
+		mockRepo.AssertExpectations(t)
+	})
+
+	t.Run("approved - chưa có bảng lương thì tính live rồi chốt", func(t *testing.T) {
+		mockRepo := new(MockStaffRepository)
+		mockRepo.On("GetStaffBasicByID", mock.Anything, orgID, staffID).Return(staffInfo, nil).Once()
+		mockRepo.On("GetPayrollSettings", mock.Anything, orgID).Return(payrollSettingsFixture(), nil).Once()
+		mockRepo.On("GetPayrollByPeriod", mock.Anything, orgID, staffID, "2026-11-01").
+			Return(nil, domain.ErrPayrollNotFound).Once()
+		mockRepo.On("GetStaffPayroll", mock.Anything, orgID, staffID, "2026-10-26", "2026-11-26", 26).
+			Return(payrollFixture(), nil).Once()
+		mockRepo.On("CreatePayroll", mock.Anything, mock.MatchedBy(func(p *domain.Payroll) bool {
+			return p.Status == domain.PayrollStatusApproved && p.BaseSalary == 7384615.38
+		}), staffInfo).Return(nil).Once()
+
+		uc := NewStaffUsecase(mockRepo)
+		err := uc.CreatePayroll(withOrgCtx(orgID), staffID, targetMonth, "approved")
+
+		assert.NoError(t, err)
+		mockRepo.AssertExpectations(t)
+	})
+
+	t.Run("approved - đã có draft thì chỉ chuyển trạng thái, không tính lại", func(t *testing.T) {
+		mockRepo := new(MockStaffRepository)
+		mockRepo.On("GetStaffBasicByID", mock.Anything, orgID, staffID).Return(staffInfo, nil).Once()
+		mockRepo.On("GetPayrollSettings", mock.Anything, orgID).Return(payrollSettingsFixture(), nil).Once()
+		mockRepo.On("GetPayrollByPeriod", mock.Anything, orgID, staffID, "2026-11-01").
+			Return(&domain.Payroll{ID: "payroll-draft", StaffID: staffID, Status: domain.PayrollStatusDraft, NetPay: 8694115.38}, nil).Once()
+		mockRepo.On("CreatePayroll", mock.Anything, mock.MatchedBy(func(p *domain.Payroll) bool {
+			return p.ID == "payroll-draft" && p.Status == domain.PayrollStatusApproved
+		}), staffInfo).Return(nil).Once()
+
+		uc := NewStaffUsecase(mockRepo)
+		err := uc.CreatePayroll(withOrgCtx(orgID), staffID, targetMonth, "approved")
+
+		assert.NoError(t, err)
+		mockRepo.AssertNotCalled(t, "GetStaffPayroll", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+		mockRepo.AssertExpectations(t)
+	})
+
+	t.Run("approved - đã có approved thì trả 409", func(t *testing.T) {
+		mockRepo := new(MockStaffRepository)
+		mockRepo.On("GetStaffBasicByID", mock.Anything, orgID, staffID).Return(staffInfo, nil).Once()
+		mockRepo.On("GetPayrollSettings", mock.Anything, orgID).Return(payrollSettingsFixture(), nil).Once()
+		mockRepo.On("GetPayrollByPeriod", mock.Anything, orgID, staffID, "2026-11-01").
+			Return(&domain.Payroll{ID: "payroll-1", StaffID: staffID, Status: domain.PayrollStatusApproved}, nil).Once()
+
+		uc := NewStaffUsecase(mockRepo)
+		err := uc.CreatePayroll(withOrgCtx(orgID), staffID, targetMonth, "approved")
+
+		assertFlatAppError(t, err, 409)
+		mockRepo.AssertNotCalled(t, "CreatePayroll", mock.Anything, mock.Anything, mock.Anything)
+	})
+
+	t.Run("approved - bảng lương cũ cancelled thì được tạo mới", func(t *testing.T) {
+		mockRepo := new(MockStaffRepository)
+		mockRepo.On("GetStaffBasicByID", mock.Anything, orgID, staffID).Return(staffInfo, nil).Once()
+		mockRepo.On("GetPayrollSettings", mock.Anything, orgID).Return(payrollSettingsFixture(), nil).Once()
+		mockRepo.On("GetPayrollByPeriod", mock.Anything, orgID, staffID, "2026-11-01").
+			Return(&domain.Payroll{ID: "payroll-old", StaffID: staffID, Status: domain.PayrollStatusCancelled}, nil).Once()
+		mockRepo.On("GetStaffPayroll", mock.Anything, orgID, staffID, "2026-10-26", "2026-11-26", 26).
+			Return(payrollFixture(), nil).Once()
+		mockRepo.On("CreatePayroll", mock.Anything, mock.MatchedBy(func(p *domain.Payroll) bool {
+			return p.Status == domain.PayrollStatusApproved && p.ID != "payroll-old"
+		}), staffInfo).Return(nil).Once()
+
+		uc := NewStaffUsecase(mockRepo)
+		err := uc.CreatePayroll(withOrgCtx(orgID), staffID, targetMonth, "approved")
+
+		assert.NoError(t, err)
+		mockRepo.AssertExpectations(t)
+	})
+
+	t.Run("draft - đã có bảng lương thì trả 409", func(t *testing.T) {
+		mockRepo := new(MockStaffRepository)
+		mockRepo.On("GetStaffBasicByID", mock.Anything, orgID, staffID).Return(staffInfo, nil).Once()
+		mockRepo.On("GetPayrollSettings", mock.Anything, orgID).Return(payrollSettingsFixture(), nil).Once()
+		mockRepo.On("GetPayrollByPeriod", mock.Anything, orgID, staffID, "2026-11-01").
+			Return(&domain.Payroll{ID: "payroll-1", StaffID: staffID, Status: domain.PayrollStatusDraft}, nil).Once()
+
+		uc := NewStaffUsecase(mockRepo)
+		err := uc.CreatePayroll(withOrgCtx(orgID), staffID, targetMonth, "draft")
+
+		assertFlatAppError(t, err, 409)
+		mockRepo.AssertNotCalled(t, "GetStaffPayroll", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	})
+
+	t.Run("trạng thái không hợp lệ trả 400", func(t *testing.T) {
+		uc := NewStaffUsecase(new(MockStaffRepository))
+		err := uc.CreatePayroll(withOrgCtx(orgID), staffID, targetMonth, "paid")
+
+		assertFlatAppError(t, err, 400)
+	})
+}
+
+func TestStaffUsecase_CreatePayrollDrafts(t *testing.T) {
+	const orgID = "org-123"
+
+	t.Run("chặn kỳ tương lai theo UTC+7", func(t *testing.T) {
+		mockRepo := new(MockStaffRepository)
+		uc := NewStaffUsecase(mockRepo)
+
+		_, err := uc.CreatePayrollDrafts(withOrgCtx(orgID), "2999-01")
+
+		assertFlatAppError(t, err, 400)
+		mockRepo.AssertNotCalled(t, "ListStaffForPayrollDraft", mock.Anything, mock.Anything, mock.Anything)
+	})
+
+	t.Run("chặn kỳ sai định dạng", func(t *testing.T) {
+		uc := NewStaffUsecase(new(MockStaffRepository))
+
+		_, err := uc.CreatePayrollDrafts(withOrgCtx(orgID), "01-2026")
+
+		assertFlatAppError(t, err, 400)
+	})
+
+	t.Run("tổng hợp created, skipped, failed theo từng nhân viên", func(t *testing.T) {
+		mockRepo := new(MockStaffRepository)
+		staffs := []*domain.Staff{
+			{ID: "staff-a", Code: "NV001", FullName: "Nhân viên A", Position: "Thợ", Status: "active"},
+			{ID: "staff-b", Code: "NV002", FullName: "Nhân viên B", Position: "Thợ", Status: "active"},
+			{ID: "staff-c", Code: "NV003", FullName: "Nhân viên C", Position: "Thợ", Status: "on_leave"},
+			{ID: "staff-d", Code: "NV004", FullName: "Nhân viên D", Position: "Thợ", Status: "active"},
+		}
+		mockRepo.On("GetPayrollSettings", mock.Anything, orgID).Return(payrollSettingsFixture(), nil).Once()
+		mockRepo.On("ListStaffForPayrollDraft", mock.Anything, orgID, "2026-11-26").Return(staffs, nil).Once()
+
+		mockRepo.On("GetPayrollByPeriod", mock.Anything, orgID, "staff-a", "2026-11-01").
+			Return(nil, domain.ErrPayrollNotFound).Once()
+		mockRepo.On("GetPayrollByPeriod", mock.Anything, orgID, "staff-b", "2026-11-01").
+			Return(&domain.Payroll{ID: "payroll-b", StaffID: "staff-b", Status: domain.PayrollStatusApproved}, nil).Once()
+		mockRepo.On("GetPayrollByPeriod", mock.Anything, orgID, "staff-c", "2026-11-01").
+			Return(&domain.Payroll{ID: "payroll-c", StaffID: "staff-c", Status: domain.PayrollStatusCancelled}, nil).Once()
+		mockRepo.On("GetPayrollByPeriod", mock.Anything, orgID, "staff-d", "2026-11-01").
+			Return(nil, domain.ErrPayrollNotFound).Once()
+
+		mockRepo.On("GetStaffPayroll", mock.Anything, orgID, "staff-a", "2026-10-26", "2026-11-26", 26).
+			Return(payrollFixture(), nil).Once()
+		mockRepo.On("GetStaffPayroll", mock.Anything, orgID, "staff-c", "2026-10-26", "2026-11-26", 26).
+			Return(payrollFixture(), nil).Once()
+		mockRepo.On("GetStaffPayroll", mock.Anything, orgID, "staff-d", "2026-10-26", "2026-11-26", 26).
+			Return(nil, errors.New("db down")).Once()
+
+		mockRepo.On("CreatePayroll", mock.Anything, mock.MatchedBy(func(p *domain.Payroll) bool {
+			return p.StaffID == "staff-a" && p.Status == domain.PayrollStatusDraft
+		}), mock.Anything).Return(nil).Once()
+		mockRepo.On("CreatePayroll", mock.Anything, mock.MatchedBy(func(p *domain.Payroll) bool {
+			return p.StaffID == "staff-c" && p.Status == domain.PayrollStatusDraft
+		}), mock.Anything).Return(nil).Once()
+
+		uc := NewStaffUsecase(mockRepo)
+		res, err := uc.CreatePayrollDrafts(withOrgCtx(orgID), "2026-11")
+
+		assert.NoError(t, err)
+		assert.Equal(t, "2026-11", res.TargetMonth)
+		assert.Equal(t, 2, res.Created)
+		assert.Equal(t, 1, res.Skipped)
+		assert.Equal(t, 1, res.Failed)
+		assert.Len(t, res.Items, 4)
+		assert.Equal(t, "created", res.Items[0].Result)
+		assert.Equal(t, "skipped", res.Items[1].Result)
+		assert.Equal(t, "created", res.Items[2].Result)
+		assert.Equal(t, "failed", res.Items[3].Result)
+		mockRepo.AssertExpectations(t)
+	})
 }

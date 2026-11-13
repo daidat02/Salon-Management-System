@@ -3,7 +3,7 @@
 import { BadgeCheck } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { Progress, ProgressIndicator, ProgressTrack } from '@/components/ui/progress';
-import useCategoryExpenseStats from '@/hooks/use-category-expense-stats';
+import { useCategoryExpenseStats } from '@/hooks/cashflow';
 import { formatVND } from '@/lib/format';
 import { cn } from 'cn';
 

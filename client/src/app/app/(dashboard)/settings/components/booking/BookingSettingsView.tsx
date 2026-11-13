@@ -18,7 +18,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Tag } from '@/components/ui/tag';
 import { toast } from '@/components/ui/toast';
-import { useBookingSettings, useUpdateBookingSettings } from '@/hooks/use-settings';
+import { useBookingSettings, useUpdateBookingSettings } from '@/hooks/settings';
 import type { BookingSettingsResponse } from '@/types/setting';
 import {
   createDefaultBookingSettings,

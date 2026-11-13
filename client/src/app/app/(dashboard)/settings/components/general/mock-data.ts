@@ -19,9 +19,16 @@ export type SalonInfo = {
   logoUrl: string;
 };
 
+export type PayrollSettings = {
+  startDay: number;
+  standardWorkingDays: number;
+  autoDraftCutoffDay: number;
+};
+
 export type GeneralSettings = {
   salon: SalonInfo;
   workingHours: WorkingHours;
+  payroll: PayrollSettings;
 };
 
 export const WEEKDAY_LABELS: Record<Weekday, string> = {
@@ -54,6 +61,11 @@ export function createDefaultSettings(): GeneralSettings {
       breakStart: '12:30',
       breakEnd: '13:30',
       days: [...WEEKDAYS],
+    },
+    payroll: {
+      startDay: 26,
+      standardWorkingDays: 26,
+      autoDraftCutoffDay: 7,
     },
   };
 }

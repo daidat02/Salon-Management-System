@@ -5,7 +5,7 @@ import DashTable from '@/components/dashboard/DashTable';
 import { customerColumns } from './columns';
 import type { Customer } from '@/types/customer';
 import { useRouter, useSearchParams } from 'next/navigation';
-import useCustomer from '@/hooks/use-customer';
+import { useCustomer } from '@/hooks/customer';
 import { getApiErrorMessage } from '@/services/apiClient';
 import { CustomerDrawer } from './CustomerDrawer';
 import { TableSkeleton } from '@/components/dashboard/DashboardSkeletons';

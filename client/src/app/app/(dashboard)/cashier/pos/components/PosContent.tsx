@@ -11,10 +11,8 @@ import InvoicePanel, {
 } from './InvoicePanel';
 import type { AppointmentItem, AppointmentStatus } from '@/types/appointment';
 import { normalizePhone } from '@/services/customer';
-import { useCreateOrder } from '@/hooks/use-create-order';
-import { useAddOrderItems } from '@/hooks/use-add-order-items';
-import useOrderDetail from '@/hooks/use-order-detail';
-import useAppointmentDetail from '@/hooks/use-appointment-detail';
+import { useCreateOrder, useAddOrderItems, useOrderDetail } from '@/hooks/order';
+import { useAppointmentDetail } from '@/hooks/appointment';
 import { getApiErrorMessage } from '@/services/apiClient';
 import { toast } from '@/components/ui/toast';
 

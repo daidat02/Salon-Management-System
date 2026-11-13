@@ -10,8 +10,8 @@ func RegisterInventoryRoutes(r *gin.Engine, h *InventoryHandler, basePath string
 	group := r.Group(basePath + "/inventory")
 	group.Use(middlewares.VerifyToken())
 	{
-		group.POST("/", middlewares.VertifyRole(userDomain.RoleOwner, userDomain.RoleManager), h.CreateDocument)
-		group.GET("/", h.GetDocumentsByOrgID)
+		group.POST("", middlewares.VertifyRole(userDomain.RoleOwner, userDomain.RoleManager), h.CreateDocument)
+		group.GET("", h.GetDocumentsByOrgID)
 		group.GET("/transactions", h.GetTransactionsByOrgID)
 		group.GET("/low-stock", h.GetLowStockProducts)
 		group.GET("/stats", h.GetInventoryStats)

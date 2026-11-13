@@ -1,10 +1,9 @@
 // Same-origin mặc định: mọi request đi qua /api/v1 của chính domain đang mở.
 // Dev: next.config rewrite /api -> backend Go. Prod: reverse proxy /api -> Go.
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080/api';
-const API_VERSION = process.env.NEXT_PUBLIC_API_VERSION || 'v1';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+const API_VERSION = process.env.NEXT_PUBLIC_API_VERSION;
 
 export const API_BASE = `${API_BASE_URL}/${API_VERSION}`;
-
 export const API_ENDPOINTS = {
   ORGANIZATIONS: {
     DISABLE_DEMO: `/organizations/demo`,
@@ -54,8 +53,8 @@ export const API_ENDPOINTS = {
   },
 
   INVENTORY: {
-    GET_DOCUMENTS: `/inventory/`,
-    CREATE_DOCUMENT: `/inventory/`,
+    GET_DOCUMENTS: `/inventory`,
+    CREATE_DOCUMENT: `/inventory`,
     GET_DOCUMENT_DETAIL: (documentId: string) => `/inventory/${documentId}`,
     ADD_PAYMENT: (documentId: string) => `/inventory/${documentId}/payments`,
     GET_STATS: `/inventory/stats`,

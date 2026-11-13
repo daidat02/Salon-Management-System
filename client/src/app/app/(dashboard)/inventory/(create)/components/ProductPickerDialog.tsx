@@ -6,7 +6,7 @@ import { cn } from 'cn';
 import { DashDialog, DashDialogFooter } from '@/components/dashboard/DashDialog';
 import { DashSelect } from '@/components/dashboard/DashSelect';
 import DashTable, { type DashColumn } from '@/components/dashboard/DashTable';
-import useProduct from '@/hooks/use-product';
+import { useProduct } from '@/hooks/product';
 import type { Category } from '@/types/category';
 import type { Product } from '@/types/product';
 import { formatPlain as formatVND } from '@/lib/format';

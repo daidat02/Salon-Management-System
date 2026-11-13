@@ -1,41 +1,26 @@
 'use client';
 
 import * as React from 'react';
-import type { DateRange } from 'react-day-picker';
 import { format } from 'date-fns';
 import { isAxiosError } from 'axios';
 import { Banknote } from 'lucide-react';
 import { Tag } from '@/components/ui/tag';
 import { Button } from '@/components/ui/button';
 import { DashDialog, DashDialogFooter } from '@/components/dashboard/DashDialog';
-import { DashDateRangePicker } from '@/components/dashboard/DashDateRangePicker';
 import { DashSelect } from '@/components/dashboard/DashSelect';
-import DashTabs from '@/components/dashboard/DashTabs';
 import { toast } from '@/components/ui/toast';
-import useStaffPayroll from '@/hooks/use-staff-payroll';
-import { useCreateStaffPayroll } from '@/hooks/use-create-staff-payroll';
+import { useStaffPayroll, useCreateStaffPayroll } from '@/hooks/staff';
 import { formatVND } from '@/lib/format';
 import { getApiErrorMessage } from '@/services/apiClient';
-import type { Staff, StaffPayroll } from '@/types/staff';
+import type { Staff, StaffPayroll, StaffPayrollStatus } from '@/types/staff';
 import { StaffAdvanceDialog } from './StaffAdvanceDialog';
 
-const STANDARD_WORKING_DAYS = 26;
-
-function getMonthRange(value: string): DateRange {
-  const [year, month] = value.split('-').map(Number);
-  return {
-    from: new Date(year, month - 1, 1),
-    to: new Date(year, month, 0),
-  };
-}
-
-function getCurrentMonthRange(): DateRange {
-  return getMonthRange(format(new Date(), 'yyyy-MM'));
-}
-
-function toApiDate(date: Date | undefined): string | undefined {
-  return date ? format(date, 'yyyy-MM-dd') : undefined;
-}
+const PAYROLL_STATUS_LABELS: Record<StaffPayrollStatus, string> = {
+  draft: 'BẢN NHÁP',
+  approved: 'ĐÃ CHỐT',
+  paid: 'ĐÃ TRẢ',
+  cancelled: 'ĐÃ HỦY',
+};
 
 function formatPeriodDate(value: string | undefined): string {
   if (!value) return '—';
@@ -90,6 +75,16 @@ function PayrollContent({
 }) {
   const grossPay =
     payroll.prorated_base_salary + payroll.total_commission + payroll.bonus_amount;
+  const isLive = payroll.source === 'live';
+  const statusLabel = payroll.payroll_status
+    ? PAYROLL_STATUS_LABELS[payroll.payroll_status]
+    : 'TẠM TÍNH';
+  const statusVariant =
+    payroll.payroll_status === 'approved' || payroll.payroll_status === 'paid'
+      ? 'success'
+      : payroll.payroll_status === 'cancelled'
+        ? 'error'
+        : 'warning';
   const deductionSub = getDeductionSub(payroll);
   const bankAccount =
     staff.bank_name && staff.bank_account_number
@@ -162,7 +157,7 @@ function PayrollContent({
           </p>
         </div>
         <div>
-          <p className="text-xs text-on-surface-variant">Tạm tính lương</p>
+          <p className="text-xs text-on-surface-variant">{isLive ? 'Tạm tính lương' : 'Lương gross'}</p>
           <p className="mt-2 font-semibold text-primary">{formatVND(grossPay)}</p>
           <p className="mt-0.5 text-[11px] text-on-surface-variant">
             Cứng {formatVND(payroll.prorated_base_salary)} + hoa hồng
@@ -205,11 +200,11 @@ function PayrollContent({
               Trạng thái kỳ lương
             </p>
             <div className="mt-2 flex items-center gap-2">
-              <Tag variant={settled ? 'success' : 'warning'} shape="pill" size="md">
-                {settled ? 'ĐÃ CHỐT' : 'TẠM TÍNH'}
+              <Tag variant={statusVariant} shape="pill" size="md">
+                {statusLabel}
               </Tag>
               <span className="text-[11px] text-on-surface-variant">
-                Đến {formatPeriodDate(payroll.date_to)}
+                {isLive ? 'Số liệu tạm tính' : `Đến ${formatPeriodDate(payroll.date_to)}`}
               </span>
             </div>
             <Button
@@ -218,11 +213,7 @@ function PayrollContent({
               onClick={onSettle}
               className="mt-3.5 w-full"
               title={
-                settled
-                  ? 'Kỳ lương này đã được chốt'
-                  : canSettle
-                    ? 'Chốt bảng lương cho kỳ đã chọn'
-                    : 'Chọn chế độ Tháng để chốt lương'
+                settled ? 'Kỳ lương này đã được chốt' : 'Chốt bảng lương cho kỳ đã chọn'
               }
             >
               {settled ? 'Đã chốt lương' : isSettling ? 'Đang chốt...' : 'Chốt lương'}
@@ -257,11 +248,7 @@ function PayrollContent({
 }
 
 export default function StaffPayrollTab({ staff }: { staff: Staff }) {
-  const [cycleMode, setCycleMode] = React.useState<'month' | 'custom'>('month');
   const [cycle, setCycle] = React.useState(() => format(new Date(), 'yyyy-MM'));
-  const [customRange, setCustomRange] = React.useState<DateRange | undefined>(
-    getCurrentMonthRange,
-  );
   const [confirmSettleOpen, setConfirmSettleOpen] = React.useState(false);
   const [advanceOpen, setAdvanceOpen] = React.useState(false);
   const [settledCycle, setSettledCycle] = React.useState<string | null>(null);
@@ -276,25 +263,22 @@ export default function StaffPayrollTab({ staff }: { staff: Staff }) {
     });
   }, []);
 
-  const activeRange = cycleMode === 'month' ? getMonthRange(cycle) : customRange;
-  const dateFrom = toApiDate(activeRange?.from);
-  const dateTo = toApiDate(activeRange?.to);
-  const ready = Boolean(dateFrom && dateTo);
-
   const { data, isLoading, isFetching, isError, error, refetch } = useStaffPayroll(
     staff.id,
-    dateFrom,
-    dateTo,
-    STANDARD_WORKING_DAYS,
+    cycle,
   );
 
+  const cycleLabel = cycle.split('-').reverse().join('/');
   const periodLabel = data
     ? `${formatPeriodDate(data.date_from)} - ${formatPeriodDate(data.date_to)}`
-    : '—';
+    : `Tháng ${cycleLabel}`;
 
-  const canSettle = cycleMode === 'month';
-  const settled = settledCycle === cycle;
-  const cycleLabel = cycle.split('-').reverse().join('/');
+  const payrollLocked =
+    data?.payroll_status === 'approved' ||
+    data?.payroll_status === 'paid' ||
+    data?.payroll_status === 'cancelled';
+  const settled = payrollLocked || settledCycle === cycle;
+  const canSettle = !settled;
 
   const handleSettle = () => {
     settleMutate(
@@ -332,32 +316,13 @@ export default function StaffPayrollTab({ staff }: { staff: Staff }) {
       </div>
 
       <div className="flex flex-wrap items-center gap-2 rounded-xl border border-outline bg-surface-container-low p-2">
-        <DashTabs
-          value={cycleMode}
-          onValueChange={(value) => {
-            const nextMode = value as 'month' | 'custom';
-            if (nextMode === 'custom') setCustomRange(getMonthRange(cycle));
-            setCycleMode(nextMode);
-          }}
-          items={[
-            { value: 'month', label: 'Tháng' },
-            { value: 'custom', label: 'Tùy chọn' },
-          ]}
+        <span className="pl-2 text-xs font-medium text-on-surface-variant">Kỳ lương</span>
+        <DashSelect
+          value={cycle}
+          onValueChange={setCycle}
+          triggerClassName="w-40"
+          options={monthOptions}
         />
-        {cycleMode === 'month' ? (
-          <DashSelect
-            value={cycle}
-            onValueChange={setCycle}
-            triggerClassName="w-40"
-            options={monthOptions}
-          />
-        ) : (
-          <DashDateRangePicker
-            value={customRange}
-            onValueChange={setCustomRange}
-            triggerClassName="min-w-[240px]"
-          />
-        )}
         {isFetching && (
           <span className="text-xs text-on-surface-variant" aria-live="polite">
             Đang tải...
@@ -374,18 +339,14 @@ export default function StaffPayrollTab({ staff }: { staff: Staff }) {
         </Button>
       </div>
 
-      {!ready ? (
-        <div className="rounded-xl border border-dashed border-outline bg-white p-6 text-center text-sm text-on-surface-variant">
-          Chọn đầy đủ khoảng ngày để xem bảng lương.
-        </div>
-      ) : isError ? (
+      {isError ? (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
           <span>Không tải được bảng lương: {getApiErrorMessage(error)}</span>
           <Button size="sm" variant="outline" onClick={() => refetch()}>
             Thử lại
           </Button>
         </div>
-      ) : isLoading && !data ? (
+      ) : isLoading ? (
         <StaffPayrollSkeleton />
       ) : data ? (
         <PayrollContent
@@ -397,7 +358,11 @@ export default function StaffPayrollTab({ staff }: { staff: Staff }) {
           isSettling={isSettling}
           onSettle={() => setConfirmSettleOpen(true)}
         />
-      ) : null}
+      ) : (
+        <div className="rounded-xl border border-dashed border-outline bg-white p-6 text-center text-sm text-on-surface-variant">
+          Nhân viên chưa vào làm trong kỳ lương tháng {cycleLabel}.
+        </div>
+      )}
 
       <DashDialog
         open={confirmSettleOpen}

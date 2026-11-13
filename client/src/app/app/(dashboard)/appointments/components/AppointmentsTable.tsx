@@ -6,7 +6,7 @@ import { endOfDay, startOfDay } from 'date-fns';
 import DashTable from '@/components/dashboard/DashTable';
 import { TableSkeleton } from '@/components/dashboard/DashboardSkeletons';
 import { getApiErrorMessage } from '@/services/apiClient';
-import useAppointments from '@/hooks/use-appointments';
+import { useAppointments } from '@/hooks/appointment';
 import type { Appointment, AppointmentStatus } from '@/types/appointment';
 import { buildAppointmentColumns } from './columns';
 

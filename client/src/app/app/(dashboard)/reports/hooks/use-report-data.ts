@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useSearchParams } from 'next/navigation';
-import useRevenueReport from '@/hooks/use-revenue-report';
+import { useRevenueReport } from '@/hooks/report';
 import { resolveReportRange } from '../lib/report-data';
 
 export default function useReportData() {

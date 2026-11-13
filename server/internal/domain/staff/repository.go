@@ -3,6 +3,8 @@ package staff
 import (
 	"context"
 	"errors"
+
+	settingDomain "github.com/daidat02/server/internal/domain/setting"
 )
 
 var ErrMissingOrganizationID = errors.New("missing organization_id in context")
@@ -12,6 +14,8 @@ var ErrMissingOrganizationID = errors.New("missing organization_id in context")
 var ErrStaffNotFound = errors.New("staff not found")
 
 var ExistingPayrollOfStaffAndPeriod = errors.New("existing payroll of staff and period")
+
+var ErrPayrollNotFound = errors.New("payroll not found")
 
 var ErrAdjustmentLockedOrNotFound = errors.New("adjustment is locked or not found")
 
@@ -23,12 +27,15 @@ type StaffRepository interface {
 	GetStaffByOrgID(ctx context.Context, orgID string, search string, status string, sort string, limit, offset int) ([]*Staff, error)
 	GetStaffByID(ctx context.Context, orgID, id string) (*Staff, error)
 	GetStaffPayroll(ctx context.Context, orgID, staffID, dateFrom, dateTo string, standardWorkingDays int) (*StaffPayrollResponse, error)
+	GetPayrollByPeriod(ctx context.Context, orgID, staffID, periodMonth string) (*Payroll, error)
+	GetPayrollSettings(ctx context.Context, orgID string) (*settingDomain.PayrollSettings, error)
 	GetStaffServiceHistory(ctx context.Context, orgID, staffID, dateFrom, dateTo, search string, limit, offset int) (*StaffServiceHistorySummary, []*StaffServiceHistoryItem, int64, error)
 	CountStaffsByOrgID(ctx context.Context, orgID string, search string, status string) (int64, error)
 	UpdateStaff(ctx context.Context, staff *Staff) error
 	DeleteStaff(ctx context.Context, orgID, id string) error
 	CreatePayroll(ctx context.Context, payroll *Payroll, staffInfo *StaffBasicInfo) error
 	GetStaffBasicByID(ctx context.Context, orgID, staffID string) (*StaffBasicInfo, error)
+	ListStaffForPayrollDraft(ctx context.Context, orgID string, periodEnd string) ([]*Staff, error)
 
 	CreateSalaryAdjustment(ctx context.Context, adjustment *SalaryAdjustment) error
 	GetSalaryAdjustments(ctx context.Context, orgID, staffID, periodMonth string) ([]*SalaryAdjustment, error)

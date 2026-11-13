@@ -20,7 +20,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Tag } from '@/components/ui/tag';
 import { toast } from '@/components/ui/toast';
-import { usePaymentSettings, useUpdatePaymentSettings } from '@/hooks/use-settings';
+import { usePaymentSettings, useUpdatePaymentSettings } from '@/hooks/settings';
 import type {
   PaymentSettingsResponse,
   ReceiptSettings,

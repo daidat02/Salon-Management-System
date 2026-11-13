@@ -99,6 +99,7 @@ func LoadConfig() (*Config, error) {
 	}
 
 	viper.SetDefault("REFRESH_COOKIE_SAMESITE", "lax")
+	viper.SetDefault("REFRESH_COOKIE_DOMAIN", "")
 	if !viper.IsSet("REFRESH_COOKIE_SECURE") {
 		viper.SetDefault("REFRESH_COOKIE_SECURE", config.App.Env == "production")
 	}

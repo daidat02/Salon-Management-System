@@ -12,9 +12,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import useCashflowChartData, {
-  createCashflowChartPlaceholder,
-} from '@/hooks/use-cashflow-chart-data';
+import { useCashflowChartData, createCashflowChartPlaceholder } from '@/hooks/cashflow';
 
 type ChartTooltipEntry = { dataKey?: string; value?: number | string };
 

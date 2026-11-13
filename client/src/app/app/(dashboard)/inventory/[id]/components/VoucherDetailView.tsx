@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useParams } from 'next/navigation';
-import useInventoryDocument from '@/hooks/use-inventory-document';
+import { useInventoryDocument } from '@/hooks/inventory';
 import { getApiErrorMessage } from '@/services/apiClient';
 import { DashboardSkeleton } from '@/components/dashboard/DashboardSkeletons';
 import VoucherTypeBanner from '../../(create)/components/VoucherTypeBanner';

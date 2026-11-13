@@ -5,8 +5,8 @@ import { BadgePercent, Banknote, CreditCard, QrCode, Smartphone } from 'lucide-r
 import { DashDialog, DashDialogFooter } from '@/components/dashboard/DashDialog';
 import { DashInput } from '@/components/dashboard/DashInput';
 import { Button } from '@/components/ui/button';
-import { useConfirmPayment } from '@/hooks/use-confirm-payment';
-import { usePaymentSettings } from '@/hooks/use-settings';
+import { useConfirmPayment } from '@/hooks/order';
+import { usePaymentSettings } from '@/hooks/settings';
 import { getApiErrorMessage } from '@/services/apiClient';
 import { toast } from '@/components/ui/toast';
 import type { InitPaymentResponse, PaymentMethod } from '@/services/order';

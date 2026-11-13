@@ -9,7 +9,8 @@ import { Tag } from '@/components/ui/tag';
 import type { Customer } from '@/types/customer';
 import type { Order, OrderDetailPayment } from '@/types/order';
 import type { InitPaymentResponse } from '@/services/order';
-import { useInitPayment } from '@/hooks/use-init-payment';
+import { useInitPayment } from '@/hooks/order';
+import { queryKeys } from '@/hooks/query-keys';
 import { getApiErrorMessage } from '@/services/apiClient';
 import type { EnrichedRetailLine, EnrichedServiceLine, OrderProfit, StaffCommission } from './orderDetailUtils';
 import { customerTier } from './orderDetailUtils';
@@ -112,8 +113,8 @@ export default function OrderDetailSide({
 
   const handleCustomerAssigned = React.useCallback(() => {
     setPickerOpen(false);
-    void queryClient.invalidateQueries({ queryKey: ['order-detail', order.id] });
-    void queryClient.invalidateQueries({ queryKey: ['customers'] });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.order.detail(order.id) });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.customer.lists() });
   }, [queryClient, order.id]);
 
   return (

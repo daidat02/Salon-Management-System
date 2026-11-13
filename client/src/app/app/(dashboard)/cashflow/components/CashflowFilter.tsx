@@ -3,8 +3,7 @@
 import * as React from 'react';
 import DashToolbar from '@/components/dashboard/DashToolbar';
 import { useRouter, useSearchParams } from 'next/navigation';
-import useCashFlowCategories from '@/hooks/use-cashflow-categories';
-import useFunds from '@/hooks/use-funds';
+import { useCashFlowCategories, useFunds } from '@/hooks/cashflow';
 
 const KIND_OPTIONS = [
   { value: '', label: 'Tất cả phiếu' },

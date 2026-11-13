@@ -4,7 +4,7 @@ import * as React from 'react';
 import { Wallet } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Tag } from '@/components/ui/tag';
-import useCashFlowCategories from '@/hooks/use-cashflow-categories';
+import { useCashFlowCategories } from '@/hooks/cashflow';
 import type { CashFlowCategory } from '@/types/cashflow';
 import { cn } from 'cn';
 import { DEFAULT_FINANCE_FLAGS, type MockFinanceFlags } from './mock-data';

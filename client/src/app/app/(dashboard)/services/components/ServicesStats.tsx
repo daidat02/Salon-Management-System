@@ -2,7 +2,7 @@
 
 import { BadgeCheck, PauseCircle, Scissors, Wallet } from 'lucide-react';
 import StatCard from '@/components/dashboard/StatCard';
-import useServiceStats from '@/hooks/use-service-stats';
+import { useServiceStats } from '@/hooks/service';
 
 /** 4 thẻ số liệu dịch vụ từ API stats thật. */
 export default function ServicesStats() {

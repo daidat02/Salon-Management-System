@@ -16,6 +16,7 @@ func RegisterStaffRoutes(r *gin.Engine, h *StaffHandler, basePath string) {
 		group.GET("/:id/service-history", h.GetStaffServiceHistory)
 		group.GET("/:id/leaves", h.GetStaffLeaves)
 		group.POST("", middlewares.VertifyRole(userDomain.RoleOwner, userDomain.RoleManager), h.CreateStaff)
+		group.POST("/payrolls-draft", middlewares.VertifyRole(userDomain.RoleOwner), h.CreatePayrollDrafts)
 		group.POST("/:id/payroll", middlewares.VertifyRole(userDomain.RoleOwner), h.CreatePayroll)
 		group.POST("/:id/leaves", middlewares.VertifyRole(userDomain.RoleOwner, userDomain.RoleManager), h.CreateStaffLeave)
 		group.PUT("/:id", middlewares.VertifyRole(userDomain.RoleOwner, userDomain.RoleManager), h.UpdateStaff)

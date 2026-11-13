@@ -4,7 +4,7 @@ import * as React from "react"
 import DashTable from "@/components/dashboard/DashTable"
 import { serviceColumns } from "./columns"
 import { useRouter, useSearchParams } from 'next/navigation'
-import useService from "@/hooks/use-service"
+import { useService } from '@/hooks/service';
 import { TableSkeleton } from "@/components/dashboard/DashboardSkeletons"
 import { getApiErrorMessage } from "@/services/apiClient"
 import type { Service } from "@/types/service"

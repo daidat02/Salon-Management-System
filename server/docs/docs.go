@@ -5160,6 +5160,69 @@ const docTemplate = `{
                 }
             }
         },
+        "/staff/payrolls-draft": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Yêu cầu vai trò: owner. Bỏ qua nhân viên đã có bảng lương trong kỳ.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Staff"
+                ],
+                "summary": "Tạo bảng lương nháp hàng loạt",
+                "parameters": [
+                    {
+                        "description": "Kỳ lương (yyyy-MM)",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/internal_delivery_http_staff.CreatePayrollDraftsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Tạo bảng lương nháp thành công",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Kỳ lương không hợp lệ hoặc ở tương lai",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Thiếu token / token không hợp lệ",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Không có quyền truy cập",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Lỗi server",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_daidat02_server_pkg_response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/staff/salary-adjustment": {
             "post": {
                 "security": [
@@ -5624,21 +5687,10 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Từ ngày (yyyy-MM-dd hoặc RFC3339), mặc định đầu tháng",
-                        "name": "date_from",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Đến ngày (yyyy-MM-dd hoặc RFC3339), mặc định cuối tháng",
-                        "name": "date_to",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Số ngày công chuẩn (mặc định 26)",
-                        "name": "standard_working_days",
-                        "in": "query"
+                        "description": "Kỳ lương (yyyy-MM)",
+                        "name": "period_month",
+                        "in": "query",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -5703,7 +5755,7 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "description": "Kỳ bảng lương (yyyy-MM)",
+                        "description": "Kỳ bảng lương (yyyy-MM) và trạng thái (draft | approved)",
                         "name": "body",
                         "in": "body",
                         "required": true,
@@ -6869,6 +6921,9 @@ const docTemplate = `{
                 "organization": {
                     "$ref": "#/definitions/github_com_daidat02_server_internal_domain_setting.OrganizationInfo"
                 },
+                "payroll": {
+                    "$ref": "#/definitions/github_com_daidat02_server_internal_domain_setting.PayrollSettings"
+                },
                 "working_hours": {
                     "$ref": "#/definitions/github_com_daidat02_server_internal_domain_setting.WorkingHours"
                 }
@@ -6990,6 +7045,20 @@ const docTemplate = `{
                 },
                 "receipt": {
                     "$ref": "#/definitions/github_com_daidat02_server_internal_domain_setting.ReceiptSettings"
+                }
+            }
+        },
+        "github_com_daidat02_server_internal_domain_setting.PayrollSettings": {
+            "type": "object",
+            "properties": {
+                "auto_draft_cutoff_day": {
+                    "type": "integer"
+                },
+                "standard_working_days": {
+                    "type": "integer"
+                },
+                "start_day": {
+                    "type": "integer"
                 }
             }
         },
@@ -7326,12 +7395,30 @@ const docTemplate = `{
                 }
             }
         },
+        "internal_delivery_http_staff.CreatePayrollDraftsRequest": {
+            "type": "object",
+            "required": [
+                "target_month"
+            ],
+            "properties": {
+                "target_month": {
+                    "type": "string"
+                }
+            }
+        },
         "internal_delivery_http_staff.CreatePayrollRequest": {
             "type": "object",
             "required": [
                 "target_month"
             ],
             "properties": {
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "draft",
+                        "approved"
+                    ]
+                },
                 "target_month": {
                     "type": "string"
                 }

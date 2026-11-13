@@ -6,7 +6,7 @@ import { DashInput } from '@/components/dashboard/DashInput';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/components/ui/toast';
-import useCreateSupplier from '@/hooks/use-create-supplier';
+import { useCreateSupplier } from '@/hooks/supplier';
 import { getApiErrorMessage } from '@/services/apiClient';
 import type { Supplier } from '@/types/supplier';
 

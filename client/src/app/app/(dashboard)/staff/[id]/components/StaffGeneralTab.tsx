@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/toast';
 import type { Staff, StaffEmploymentType, StaffGender } from '@/types/staff';
 import { getApiErrorMessage } from '@/services/apiClient';
-import useUpdateStaff from '@/hooks/use-update-staff';
+import { useUpdateStaff } from '@/hooks/staff';
 import useAuth from '@/hooks/use-auth';
 import {
   StaffForm,

@@ -1,6 +1,6 @@
 'use client';
 import DashToolbar from '@/components/dashboard/DashToolbar';
-import useCategory from '@/hooks/use-category';
+import { useCategory } from '@/hooks/category';
 import React, { useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 const ProductToolbar = () => {

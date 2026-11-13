@@ -47,17 +47,13 @@ export const getStaffById = async (id: string) => {
 };
 
 export type GetStaffPayrollParams = {
-  dateFrom?: string;
-  dateTo?: string;
-  standardWorkingDays?: number;
+  periodMonth: string;
 };
 
-export const getStaffPayroll = async (id: string, params: GetStaffPayrollParams = {}) => {
-  const res = await apiClient.get<ApiResponse<StaffPayroll>>(`/staff/${id}/payroll`, {
+export const getStaffPayroll = async (id: string, params: GetStaffPayrollParams) => {
+  const res = await apiClient.get<ApiResponse<StaffPayroll | null>>(`/staff/${id}/payroll`, {
     params: {
-      date_from: params.dateFrom,
-      date_to: params.dateTo,
-      standard_working_days: params.standardWorkingDays,
+      period_month: params.periodMonth,
     },
   });
   return res.data.data;

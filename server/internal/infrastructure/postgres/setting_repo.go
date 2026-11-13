@@ -42,6 +42,8 @@ func (r *PostgresSettingRepository) InsertSetting(ctx context.Context, tx pgx.Tx
 		 ON CONFLICT (organization_id) DO NOTHING`,
 		`INSERT INTO receipt_settings (organization_id) VALUES ($1)
 		 ON CONFLICT (organization_id) DO NOTHING`,
+		`INSERT INTO payroll_settings (organization_id) VALUES ($1)
+		 ON CONFLICT (organization_id) DO NOTHING`,
 	}
 	for _, query := range queries {
 		if _, err := tx.Exec(ctx, query, orgID); err != nil {
@@ -71,33 +73,40 @@ const insertDefaultBusinessHoursQuery = `
 const getGeneralSettingsQuery = `
 	SELECT o.id, o.name, o.slug, o.phone, o.email, o.website, o.address,
 	       o.tax_code, o.slogan, o.logo_url, o.timezone, o.status, o.is_demo,
-	       COALESCE(bh.open_time_minutes, 510) AS open_time_minutes,
+		COALESCE(bh.open_time_minutes, 510) AS open_time_minutes,
 	       COALESCE(bh.close_time_minutes, 1230) AS close_time_minutes,
-	       bh.break_start_minutes, bh.break_end_minutes, bh.days
+	       bh.break_start_minutes, bh.break_end_minutes, bh.days,
+	       COALESCE(ps.start_day, 26) AS payroll_start_day,
+	       COALESCE(ps.standard_working_days, 26) AS payroll_standard_working_days,
+	       COALESCE(ps.auto_draft_cutoff_day, 7) AS payroll_auto_draft_cutoff_day
 	FROM organizations o
 	LEFT JOIN business_hours bh ON bh.organization_id = o.id
+	LEFT JOIN payroll_settings ps ON ps.organization_id = o.id
 	WHERE o.id = $1
 `
 
 type generalSettingsRow struct {
-	ID                string  `db:"id"`
-	Name              string  `db:"name"`
-	Slug              string  `db:"slug"`
-	Phone             *string `db:"phone"`
-	Email             *string `db:"email"`
-	Website           *string `db:"website"`
-	Address           *string `db:"address"`
-	TaxCode           *string `db:"tax_code"`
-	Slogan            *string `db:"slogan"`
-	LogoURL           *string `db:"logo_url"`
-	Timezone          string  `db:"timezone"`
-	Status            string  `db:"status"`
-	IsDemo            bool    `db:"is_demo"`
-	OpenTimeMinutes   int     `db:"open_time_minutes"`
-	CloseTimeMinutes  int     `db:"close_time_minutes"`
-	BreakStartMinutes *int    `db:"break_start_minutes"`
-	BreakEndMinutes   *int    `db:"break_end_minutes"`
-	Days              []byte  `db:"days"`
+	ID                         string  `db:"id"`
+	Name                       string  `db:"name"`
+	Slug                       string  `db:"slug"`
+	Phone                      *string `db:"phone"`
+	Email                      *string `db:"email"`
+	Website                    *string `db:"website"`
+	Address                    *string `db:"address"`
+	TaxCode                    *string `db:"tax_code"`
+	Slogan                     *string `db:"slogan"`
+	LogoURL                    *string `db:"logo_url"`
+	Timezone                   string  `db:"timezone"`
+	Status                     string  `db:"status"`
+	IsDemo                     bool    `db:"is_demo"`
+	OpenTimeMinutes            int     `db:"open_time_minutes"`
+	CloseTimeMinutes           int     `db:"close_time_minutes"`
+	BreakStartMinutes          *int    `db:"break_start_minutes"`
+	BreakEndMinutes            *int    `db:"break_end_minutes"`
+	Days                       []byte  `db:"days"`
+	PayrollStartDay            int     `db:"payroll_start_day"`
+	PayrollStandardWorkingDays int     `db:"payroll_standard_working_days"`
+	PayrollAutoDraftCutoffDay  int     `db:"payroll_auto_draft_cutoff_day"`
 }
 
 func (r *PostgresSettingRepository) GetGeneralSettings(ctx context.Context, orgID string) (*settingDomain.GeneralSettingsResponse, error) {
@@ -137,6 +146,11 @@ func (r *PostgresSettingRepository) GetGeneralSettings(ctx context.Context, orgI
 			IsDemo:   row.IsDemo,
 		},
 		WorkingHours: workingHours,
+		Payroll: settingDomain.PayrollSettings{
+			StartDay:            row.PayrollStartDay,
+			StandardWorkingDays: row.PayrollStandardWorkingDays,
+			AutoDraftCutoffDay:  row.PayrollAutoDraftCutoffDay,
+		},
 	}, nil
 }
 
@@ -335,6 +349,18 @@ const updateOrganizationInfoQuery = `
 	WHERE id = $1
 `
 
+const upsertPayrollSettingsQuery = `
+	INSERT INTO payroll_settings (
+		organization_id, start_day, standard_working_days, auto_draft_cutoff_day
+	)
+	VALUES ($1, $2, $3, $4)
+	ON CONFLICT (organization_id) DO UPDATE SET
+		start_day = EXCLUDED.start_day,
+		standard_working_days = EXCLUDED.standard_working_days,
+		auto_draft_cutoff_day = EXCLUDED.auto_draft_cutoff_day,
+		updated_at = now()
+`
+
 const upsertBusinessHoursQuery = `
 	INSERT INTO business_hours (
 		organization_id, open_time_minutes, close_time_minutes,
@@ -395,6 +421,18 @@ func (r *PostgresSettingRepository) UpdateGeneralSettings(ctx context.Context, o
 		days,
 	); err != nil {
 		return fmt.Errorf("lỗi khi cập nhật giờ làm việc: %w", err)
+	}
+
+	payroll := settings.Payroll
+	if _, err := tx.Exec(
+		ctx,
+		upsertPayrollSettingsQuery,
+		orgID,
+		payroll.StartDay,
+		payroll.StandardWorkingDays,
+		payroll.AutoDraftCutoffDay,
+	); err != nil {
+		return fmt.Errorf("lỗi khi cập nhật cài đặt lương: %w", err)
 	}
 
 	if err := tx.Commit(ctx); err != nil {

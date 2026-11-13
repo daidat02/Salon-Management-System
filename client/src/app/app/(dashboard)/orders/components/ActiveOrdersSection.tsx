@@ -3,13 +3,12 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { useActiveOrders } from '@/hooks/order';
 import { Clock3, Plus, Receipt } from 'lucide-react';
 import { Tag } from '@/components/ui/tag';
 import { Button } from '@/components/ui/button';
 import { getApiErrorMessage } from '@/services/apiClient';
-import { getOrdersByOrgID } from '@/services/order';
-import useCustomer from '@/hooks/use-customer';
+import { useCustomer } from '@/hooks/customer';
 import type { Order, OrderStatus } from '@/types/order';
 import { formatDateTime, formatVND } from '@/lib/format';
 
@@ -34,13 +33,7 @@ export default function ActiveOrdersSection() {
   const router = useRouter();
   const [expanded, setExpanded] = React.useState(false);
 
-  const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
-    queryKey: ['orders', 'active'],
-    queryFn: () => getOrdersByOrgID({ page: 1, pageSize: 50 }),
-    placeholderData: keepPreviousData,
-    staleTime: 10 * 1000,
-    refetchInterval: 10 * 1000,
-  });
+  const { data, isLoading, isError, error, refetch, isFetching } = useActiveOrders();
 
   const { data: customerData } = useCustomer({ page: 1, pageSize: 100 });
   const customerMap = React.useMemo(() => {

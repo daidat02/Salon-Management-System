@@ -3,6 +3,7 @@ package staff
 import (
 	"context"
 
+	settingDomain "github.com/daidat02/server/internal/domain/setting"
 	domain "github.com/daidat02/server/internal/domain/staff"
 	"github.com/stretchr/testify/mock"
 )
@@ -41,6 +42,22 @@ func (m *MockStaffRepository) GetStaffPayroll(ctx context.Context, orgID, staffI
 	return args.Get(0).(*domain.StaffPayrollResponse), args.Error(1)
 }
 
+func (m *MockStaffRepository) GetPayrollByPeriod(ctx context.Context, orgID, staffID, periodMonth string) (*domain.Payroll, error) {
+	args := m.Called(ctx, orgID, staffID, periodMonth)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*domain.Payroll), args.Error(1)
+}
+
+func (m *MockStaffRepository) GetPayrollSettings(ctx context.Context, orgID string) (*settingDomain.PayrollSettings, error) {
+	args := m.Called(ctx, orgID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*settingDomain.PayrollSettings), args.Error(1)
+}
+
 func (m *MockStaffRepository) GetStaffServiceHistory(ctx context.Context, orgID, staffID, dateFrom, dateTo, search string, limit, offset int) (*domain.StaffServiceHistorySummary, []*domain.StaffServiceHistoryItem, int64, error) {
 	args := m.Called(ctx, orgID, staffID, dateFrom, dateTo, search, limit, offset)
 	var summary *domain.StaffServiceHistorySummary
@@ -73,6 +90,14 @@ func (m *MockStaffRepository) CreatePayroll(ctx context.Context, payroll *domain
 	args := m.Called(ctx, payroll, staffInfo)
 	return args.Error(0)
 }
+func (m *MockStaffRepository) ListStaffForPayrollDraft(ctx context.Context, orgID string, periodEnd string) ([]*domain.Staff, error) {
+	args := m.Called(ctx, orgID, periodEnd)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*domain.Staff), args.Error(1)
+}
+
 func (m *MockStaffRepository) GetStaffBasicByID(ctx context.Context, orgID, staffID string) (*domain.StaffBasicInfo, error) {
 	args := m.Called(ctx, orgID, staffID)
 	if args.Get(0) == nil {

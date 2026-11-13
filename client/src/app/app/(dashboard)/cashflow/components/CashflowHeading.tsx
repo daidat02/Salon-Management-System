@@ -7,8 +7,7 @@ import { Download, Plus } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import PageHeading from '@/components/dashboard/PageHeading';
 import { DashDateRangePicker } from '@/components/dashboard/DashDateRangePicker';
-import useCashFlowCategories from '@/hooks/use-cashflow-categories';
-import useFunds from '@/hooks/use-funds';
+import { useCashFlowCategories, useFunds } from '@/hooks/cashflow';
 import { CashflowCreateDialog } from './CashflowCreateDialog';
 import useAuth from '@/hooks/use-auth';
 

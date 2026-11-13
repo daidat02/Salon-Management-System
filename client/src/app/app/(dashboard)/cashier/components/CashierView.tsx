@@ -2,13 +2,12 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { useCashierOrders } from '@/hooks/order';
 import { ArrowRight, BadgeCheck, Clock3, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import DashToolbar from '@/components/dashboard/DashToolbar';
 import { getApiErrorMessage } from '@/services/apiClient';
-import { getOrdersByOrgID } from '@/services/order';
-import useCustomer from '@/hooks/use-customer';
+import { useCustomer } from '@/hooks/customer';
 import type { Order, OrderStatus } from '@/types/order';
 import { formatVND } from '@/lib/format';
 import CashierOrderCard from './CashierOrderCard';
@@ -23,13 +22,7 @@ export default function CashierView() {
   const [tab, setTab] = React.useState<TabKey>('all');
   const [keyword, setKeyword] = React.useState('');
 
-  const { data, isLoading, isError, error, refetch } = useQuery({
-    queryKey: ['orders', 'cashier'],
-    queryFn: () => getOrdersByOrgID({ page: 1, pageSize: 50 }),
-    placeholderData: keepPreviousData,
-    staleTime: 10 * 1000,
-    refetchInterval: 15 * 1000,
-  });
+  const { data, isLoading, isError, error, refetch } = useCashierOrders();
 
   const { data: customerData } = useCustomer({ page: 1, pageSize: 100 });
   const customerMap = React.useMemo(() => {

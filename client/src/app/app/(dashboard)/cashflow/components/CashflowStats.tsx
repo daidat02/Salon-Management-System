@@ -5,7 +5,7 @@ import { Landmark, Settings, TrendingDown, TrendingUp, Wallet } from 'lucide-rea
 import { useSearchParams } from 'next/navigation';
 import StatCard from '@/components/dashboard/StatCard';
 import TextButton from '@/components/dashboard/TextButton';
-import useCashFlowStats from '@/hooks/use-cashflow-stats';
+import { useCashFlowStats } from '@/hooks/cashflow';
 import { formatVND } from '@/lib/format';
 import { FundSettingsDialog } from './FundSettingsDialog';
 import useAuth from '@/hooks/use-auth';

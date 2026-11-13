@@ -21,15 +21,16 @@ import {
   type SaveItemStaffPayload,
   type SaveOrderMaterialPayload,
 } from '@/services/order';
-import useOrderDetail from '@/hooks/use-order-detail';
-import { useGeneralSettings, usePaymentSettings } from '@/hooks/use-settings';
+import { useOrderDetail } from '@/hooks/order';
+import { queryKeys } from '@/hooks/query-keys';
+import { useGeneralSettings, usePaymentSettings } from '@/hooks/settings';
 import { useAppSelector } from '@/store/hook';
 import { selectAuthUser } from '@/store/slices/authSlice';
 import { printInvoice } from '@/lib/invoice';
-import useCustomer from '@/hooks/use-customer';
-import useService from '@/hooks/use-service';
-import useProduct from '@/hooks/use-product';
-import useStaff from '@/hooks/use-staff';
+import { useCustomer } from '@/hooks/customer';
+import { useService } from '@/hooks/service';
+import { useProduct } from '@/hooks/product';
+import { useStaff } from '@/hooks/staff';
 import useAuth from '@/hooks/use-auth';
 import type { Customer } from '@/types/customer';
 import type { Product } from '@/types/product';
@@ -143,7 +144,7 @@ export default function OrderDetailContent() {
         });
         throw err;
       }
-      await queryClient.invalidateQueries({ queryKey: ['order-detail', id] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.order.detail(id) });
       toast.add({
         title: 'Đã đổi số lượng',
         description: 'Dòng hàng và giữ chỗ kho đã đồng bộ.',
@@ -180,8 +181,8 @@ export default function OrderDetailContent() {
     try {
       const acted = orderAction === 'cancel' ? await cancelOrder(id) : await refundOrder(id);
       setOrderAction(null);
-      await queryClient.invalidateQueries({ queryKey: ['order-detail', id] });
-      await queryClient.invalidateQueries({ queryKey: ['orders'] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.order.detail(id) });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.order.lists() });
       toast.add({
         title: orderAction === 'cancel' ? 'Đã hủy đơn hàng' : 'Đã hoàn đơn hàng',
         description: `Đơn ${acted.code} — kho và trạng thái đã cập nhật.`,
@@ -218,7 +219,7 @@ export default function OrderDetailContent() {
       setIsDeleting(false);
     }
     setDeleteTarget(null);
-    await queryClient.invalidateQueries({ queryKey: ['order-detail', id] });
+    await queryClient.invalidateQueries({ queryKey: queryKeys.order.detail(id) });
     toast.add({
       title: 'Đã xóa dòng hàng',
       description: `"${deleteTarget.name}" đã gỡ khỏi đơn, kho và tổng tiền cập nhật theo.`,
@@ -249,7 +250,7 @@ export default function OrderDetailContent() {
         throw err;
       }
       // Server là nguồn đúng — refetch để hiện phân công vừa lưu.
-      await queryClient.invalidateQueries({ queryKey: ['order-detail', id] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.order.detail(id) });
       toast.add({
         title: 'Đã lưu nhân viên thực hiện',
         description: 'Phân công và hoa hồng đã đồng bộ lên server.',
@@ -371,7 +372,7 @@ export default function OrderDetailContent() {
     setMaterialOverrides({});
     setDeletedMaterialIds([]);
     setLocalMaterials([]);
-    await queryClient.invalidateQueries({ queryKey: ['order-detail', id] });
+    await queryClient.invalidateQueries({ queryKey: queryKeys.order.detail(id) });
     toast.add({
       title: 'Đã lưu vật tư',
       description: 'Vật tư đã đồng bộ, kho giữ chỗ cập nhật theo.',

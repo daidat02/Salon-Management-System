@@ -5,8 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import DashTable from '@/components/dashboard/DashTable';
 import { TableSkeleton } from '@/components/dashboard/DashboardSkeletons';
 import { getApiErrorMessage } from '@/services/apiClient';
-import useOrders from '@/hooks/use-order';
-import useCustomer from '@/hooks/use-customer';
+import { useOrders } from '@/hooks/order';
+import { useCustomer } from '@/hooks/customer';
 import { buildOrderColumns, type CustomerLookup } from './columns';
 import { TERMINAL_STATUSES } from './ActiveOrdersSection';
 

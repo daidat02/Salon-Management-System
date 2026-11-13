@@ -7,8 +7,8 @@ import { DashDatePicker } from '@/components/dashboard/DashDatePicker';
 import { DashInput } from '@/components/dashboard/DashInput';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/components/ui/toast';
-import { useBookingSettings, useGeneralSettings } from '@/hooks/use-settings';
-import { useRescheduleAppointment } from '@/hooks/use-reschedule-appointment';
+import { useBookingSettings, useGeneralSettings } from '@/hooks/settings';
+import { useRescheduleAppointment } from '@/hooks/appointment';
 import { describeWorkingHours, validateBookingWindow, workingDayFor } from '@/lib/booking';
 import type { Appointment } from '@/types/appointment';
 

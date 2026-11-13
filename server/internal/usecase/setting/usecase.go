@@ -33,6 +33,7 @@ func (u *SettingUseCase) GetGeneralSettings(ctx context.Context) (*domain.Genera
 		log.Println("Error getting general settings:", err)
 		return nil, apperror.New(500, "Lỗi khi lấy cài đặt chung", err)
 	}
+	result.Payroll.Normalize()
 	return result, nil
 }
 
@@ -149,6 +150,7 @@ func (u *SettingUseCase) UpdateGeneralSettings(ctx context.Context, req *domain.
 	if req == nil {
 		return nil, apperror.New(400, "Dữ liệu không hợp lệ", nil)
 	}
+	req.Payroll.Normalize()
 	if err := req.Validate(); err != nil {
 		return nil, apperror.New(400, err.Error(), err)
 	}

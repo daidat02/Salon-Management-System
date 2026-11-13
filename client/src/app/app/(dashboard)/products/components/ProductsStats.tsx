@@ -2,7 +2,7 @@
 
 import { Package, TriangleAlert, Wallet } from 'lucide-react';
 import StatCard from '@/components/dashboard/StatCard';
-import useProductStats from '@/hooks/use-product-stats';
+import { useProductStats } from '@/hooks/product';
 
 /** 4 thẻ số liệu sản phẩm/kho từ API stats thật. */
 export default function ProductsStats() {

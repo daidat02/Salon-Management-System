@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	settingDomain "github.com/daidat02/server/internal/domain/setting"
 	domain "github.com/daidat02/server/internal/domain/staff"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
@@ -155,6 +156,29 @@ func (r *PostgresStaffRepository) GetStaffPayroll(ctx context.Context, orgID, st
 		return nil, fmt.Errorf("lỗi khi lấy bảng lương nhân viên: %w", err)
 	}
 	return &payroll, nil
+}
+
+func (r *PostgresStaffRepository) GetPayrollByPeriod(ctx context.Context, orgID, staffID, periodMonth string) (*domain.Payroll, error) {
+	var payroll domain.Payroll
+	if err := r.qx.GetContext(ctx, &payroll, getPayrollByPeriodQuery, orgID, staffID, periodMonth); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, domain.ErrPayrollNotFound
+		}
+		return nil, fmt.Errorf("lỗi khi lấy bảng lương theo kỳ: %w", err)
+	}
+	return &payroll, nil
+}
+
+func (r *PostgresStaffRepository) GetPayrollSettings(ctx context.Context, orgID string) (*settingDomain.PayrollSettings, error) {
+	var settings settingDomain.PayrollSettings
+	if err := r.qx.GetContext(ctx, &settings, getPayrollSettingsQuery, orgID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			defaults := settingDomain.DefaultPayrollSettings()
+			return &defaults, nil
+		}
+		return nil, fmt.Errorf("lỗi khi lấy cấu hình kỳ lương: %w", err)
+	}
+	return &settings, nil
 }
 
 func (r *PostgresStaffRepository) GetStaffServiceHistory(
@@ -305,70 +329,121 @@ func (r *PostgresStaffRepository) GetStaffBasicByID(ctx context.Context, orgID, 
 	return &info, nil
 }
 
+func (r *PostgresStaffRepository) ListStaffForPayrollDraft(ctx context.Context, orgID string, periodEnd string) ([]*domain.Staff, error) {
+	staffs := make([]*domain.Staff, 0)
+	if err := r.qx.SelectContext(ctx, &staffs, listStaffForPayrollDraftQuery, orgID, periodEnd); err != nil {
+		return nil, fmt.Errorf("lỗi khi lấy danh sách nhân viên tạo bảng lương nháp: %w", err)
+	}
+	return staffs, nil
+}
+
 func (r *PostgresStaffRepository) CreatePayroll(ctx context.Context, payroll *domain.Payroll, staffInfo *domain.StaffBasicInfo) error {
-	// 1. Bắt đầu Transaction ngay từ đầu
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("lỗi khi bắt đầu transaction tạo bảng lương: %w", err)
 	}
-	defer tx.Rollback(ctx) // Tự động hoàn tác nếu có lỗi và chưa Commit
+	defer tx.Rollback(ctx)
 
-	// 2. Kiểm tra tồn tại
-	isExist := false
-	// Lưu ý: Nếu dùng sqlx, hàm của tx là tx.GetContext. Nếu pgx, dùng tx.QueryRow(ctx).Scan(&isExist)
-	err = tx.QueryRow(ctx, existPayrollOfStaffAndPeriodQuery, payroll.OrganizationID, payroll.StaffID, payroll.PeriodMonth).Scan(&isExist)
+	var existingID, existingStatus string
+	var existingNetPay float64
+	err = tx.QueryRow(
+		ctx,
+		getPayrollForUpdateQuery,
+		payroll.OrganizationID,
+		payroll.StaffID,
+		payroll.PeriodMonth,
+	).Scan(&existingID, &existingStatus, &existingNetPay)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return fmt.Errorf("lỗi khi kiểm tra bảng lương tồn tại: %w", err)
 	}
+	hasExisting := err == nil && existingStatus != domain.PayrollStatusCancelled
 
-	if isExist {
-		return fmt.Errorf("bảng lương tháng %s của nhân viên này đã tồn tại: %w", payroll.PeriodMonth, domain.ExistingPayrollOfStaffAndPeriod)
+	insertPayroll := func(cashFlowID *string) error {
+		_, insertErr := tx.Exec(
+			ctx,
+			createPayrollQuery,
+			payroll.ID,
+			payroll.OrganizationID,
+			payroll.StaffID,
+			payroll.PeriodMonth,
+			payroll.BaseSalary,
+			payroll.CommissionAmount,
+			payroll.BonusAmount,
+			payroll.AdvanceAmount,
+			payroll.DeductionAmount,
+			payroll.NetPay,
+			payroll.Status,
+			cashFlowID,
+			payroll.CreatedBy,
+			payroll.ApprovedBy,
+			payroll.StandardWorkingDays,
+			payroll.TotalLeaveDays,
+			payroll.ActualWorkingDays,
+			payroll.PenaltyAmount,
+			payroll.AdjustmentDeduction,
+			payroll.TotalOrders,
+			payroll.TotalItems,
+			payroll.TotalAmountValue,
+		)
+		if insertErr != nil {
+			if isUniqueViolation(insertErr) {
+				return fmt.Errorf("bảng lương tháng %s của nhân viên này đã tồn tại: %w", payroll.PeriodMonth, domain.ExistingPayrollOfStaffAndPeriod)
+			}
+			return fmt.Errorf("lỗi khi tạo bảng lương: %w", insertErr)
+		}
+		return nil
 	}
 
-	// 3. TẠO PHIẾU CHI TRƯỚC (Để lấy cashFlowID)
+	lockPayrollData := func(payrollID string) error {
+		if _, lockErr := tx.Exec(ctx, updateStaffSalaryAdjustmentsQuery, payroll.OrganizationID, payroll.StaffID, payroll.PeriodMonth, payrollID); lockErr != nil {
+			return fmt.Errorf("lỗi khi cập nhật payroll_id cho các điều chỉnh lương: %w", lockErr)
+		}
+		if _, lockErr := tx.Exec(ctx, updateAttendancesQuery, payroll.OrganizationID, payroll.StaffID, payroll.PeriodMonth, payrollID); lockErr != nil {
+			return fmt.Errorf("lỗi khi cập nhật payroll_id cho bảng chấm công: %w", lockErr)
+		}
+		return nil
+	}
+
+	if payroll.Status == domain.PayrollStatusDraft {
+		if hasExisting {
+			return fmt.Errorf("bảng lương tháng %s của nhân viên này đã tồn tại: %w", payroll.PeriodMonth, domain.ExistingPayrollOfStaffAndPeriod)
+		}
+		if err := insertPayroll(nil); err != nil {
+			return err
+		}
+		return tx.Commit(ctx)
+	}
+
+	if hasExisting {
+		if existingStatus != domain.PayrollStatusDraft {
+			return fmt.Errorf("bảng lương tháng %s của nhân viên này đã tồn tại: %w", payroll.PeriodMonth, domain.ExistingPayrollOfStaffAndPeriod)
+		}
+
+		cashFlowID, err := insertPayrollExpenseVoucherTx(ctx, tx, payroll.OrganizationID, staffInfo.ID, staffInfo.FullName, existingNetPay)
+		if err != nil {
+			return fmt.Errorf("lỗi khi tạo phiếu chi bảng lương: %w", err)
+		}
+		if _, err := tx.Exec(ctx, promotePayrollDraftQuery, existingID, payroll.OrganizationID, cashFlowID, payroll.ApprovedBy); err != nil {
+			return fmt.Errorf("lỗi khi chốt bảng lương nháp: %w", err)
+		}
+		if err := lockPayrollData(existingID); err != nil {
+			return err
+		}
+		return tx.Commit(ctx)
+	}
+
 	cashFlowID, err := insertPayrollExpenseVoucherTx(ctx, tx, payroll.OrganizationID, staffInfo.ID, staffInfo.FullName, payroll.NetPay)
 	if err != nil {
 		return fmt.Errorf("lỗi khi tạo phiếu chi bảng lương: %w", err)
 	}
-
-	// 4. TẠO BẢNG LƯƠNG (Gắn luôn cashFlowID, bỏ được 1 lệnh UPDATE)
-	if _, err := tx.Exec(
-		ctx,
-		createPayrollQuery,
-		payroll.ID,
-		payroll.OrganizationID,
-		payroll.StaffID,
-		payroll.PeriodMonth,
-		payroll.BaseSalary,
-		payroll.CommissionAmount,
-		payroll.BonusAmount,
-		payroll.AdvanceAmount,
-		payroll.DeductionAmount,
-		payroll.NetPay,
-		payroll.Status,
-		cashFlowID, // Đưa thẳng ID vừa tạo vào đây
-		payroll.CreatedBy,
-		payroll.ApprovedBy,
-	); err != nil {
-		return fmt.Errorf("lỗi khi tạo bảng lương: %w", err)
+	if err := insertPayroll(cashFlowID); err != nil {
+		return err
+	}
+	if err := lockPayrollData(payroll.ID); err != nil {
+		return err
 	}
 
-	// 5. Khóa các khoản Thưởng/Phạt
-	if _, err = tx.Exec(ctx, updateStaffSalaryAdjustmentsQuery, payroll.OrganizationID, payroll.StaffID, payroll.PeriodMonth, payroll.ID); err != nil {
-		return fmt.Errorf("lỗi khi cập nhật payroll_id cho các điều chỉnh lương: %w", err)
-	}
-
-	// 6. Khóa Bảng chấm công
-	if _, err = tx.Exec(ctx, updateAttendancesQuery, payroll.OrganizationID, payroll.StaffID, payroll.PeriodMonth, payroll.ID); err != nil {
-		return fmt.Errorf("lỗi khi cập nhật payroll_id cho bảng chấm công: %w", err) // Đã sửa message
-	}
-
-	// 7. Hoàn tất
-	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("lỗi khi commit tạo bảng lương: %w", err)
-	}
-
-	return nil
+	return tx.Commit(ctx)
 }
 
 func (r *PostgresStaffRepository) CreateSalaryAdjustment(ctx context.Context, adjustment *domain.SalaryAdjustment) error {

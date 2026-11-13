@@ -2,7 +2,7 @@
 
 import { Package, TriangleAlert, Truck, Wallet } from 'lucide-react';
 import StatCard from '@/components/dashboard/StatCard';
-import useInventoryStats from '@/hooks/use-inventory-stats';
+import { useInventoryStats } from '@/hooks/inventory';
 
 export default function InventoryStats() {
   const { data, isLoading } = useInventoryStats();

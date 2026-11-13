@@ -10,7 +10,7 @@ import { DashInput } from '@/components/dashboard/DashInput';
 import { DashSelect } from '@/components/dashboard/DashSelect';
 import { DashCombobox } from '@/components/dashboard/DashCombobox';
 import { toast } from '@/components/ui/toast';
-import useCreateCashFlow from '@/hooks/use-create-cashflow';
+import { useCreateCashFlow } from '@/hooks/cashflow';
 import { getApiErrorMessage } from '@/services/apiClient';
 import { formatVND } from '@/lib/format';
 import { cn } from 'cn';

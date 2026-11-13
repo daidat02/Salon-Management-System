@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { DashCombobox } from '@/components/dashboard/DashCombobox';
 import { toast } from '@/components/ui/toast';
 import { getApiErrorMessage } from '@/services/apiClient';
-import { useReplaceServiceMaterials } from '@/hooks/use-replace-service-materials';
+import { useReplaceServiceMaterials } from '@/hooks/service';
 import {
   buildUnitOptions,
   priceForUnit,

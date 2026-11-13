@@ -75,7 +75,6 @@ export function proxy(req: NextRequest) {
     if (isLegacyAppPath(pathname)) {
       return redirectTo(req, host, stripLegacyPrefix(pathname), search);
     }
-
     // Chốt chặn vòng ngoài: chỉ đọc được cookie refresh_token httpOnly do Go set.
     // Verify access_token thật vẫn làm ở Server Component / route handler gọi API Go.
     if (!isPublicAppPath(pathname) && !req.cookies.get('refresh_token')) {

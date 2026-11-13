@@ -3,7 +3,7 @@
 import * as React from 'react';
 import DashTable, { type DashColumn } from '@/components/dashboard/DashTable';
 import { TableSkeleton } from '@/components/dashboard/DashboardSkeletons';
-import useStaffServiceHistory from '@/hooks/use-staff-service-history';
+import { useStaffServiceHistory } from '@/hooks/staff';
 import { getApiErrorMessage } from '@/services/apiClient';
 import { formatVND } from '@/lib/format';
 import type { StaffServiceHistoryItem } from '@/types/staff';

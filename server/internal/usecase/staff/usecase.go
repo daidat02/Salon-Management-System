@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	settingDomain "github.com/daidat02/server/internal/domain/setting"
 	domain "github.com/daidat02/server/internal/domain/staff"
 	"github.com/daidat02/server/internal/usecase/shared"
 	"github.com/daidat02/server/pkg/apperror"
@@ -181,10 +182,19 @@ func parseDateParam(raw, field string) (*time.Time, error) {
 	return &parsed, nil
 }
 
-func (u *StaffUsecase) GetStaffPayroll(ctx context.Context, id, dateFrom, dateTo string, standardWorkingDays int) (*domain.StaffPayrollResponse, error) {
+func (u *StaffUsecase) GetStaffPayroll(ctx context.Context, id, periodMonth string) (*domain.StaffPayrollResponse, error) {
 	id = strings.TrimSpace(id)
 	if id == "" {
 		return nil, apperror.New(400, "Thiếu id nhân viên", nil)
+	}
+
+	periodMonth = strings.TrimSpace(periodMonth)
+	if periodMonth == "" {
+		return nil, apperror.New(400, "Thiếu kỳ lương (period_month)", nil)
+	}
+	periodDate, err := time.Parse("2006-01", periodMonth)
+	if err != nil {
+		return nil, apperror.New(400, "Kỳ lương không hợp lệ (yyyy-MM)", err)
 	}
 
 	orgID, err := shared.RequireOrgID(ctx)
@@ -192,32 +202,48 @@ func (u *StaffUsecase) GetStaffPayroll(ctx context.Context, id, dateFrom, dateTo
 		return nil, err
 	}
 
-	from, err := parseDateParam(dateFrom, "date_from")
+	settings, err := u.userRepo.GetPayrollSettings(ctx, orgID)
 	if err != nil {
-		return nil, err
+		log.Println("Error getting payroll settings:", err)
+		defaults := settingDomain.DefaultPayrollSettings()
+		settings = &defaults
 	}
-	to, err := parseDateParam(dateTo, "date_to")
+	settings.Normalize()
+
+	dateFrom, dateTo, err := CalculatePayrollCycle(periodMonth, settings.StartDay)
 	if err != nil {
-		return nil, err
-	}
-	if from != nil && to != nil && from.After(*to) {
-		return nil, apperror.New(400, "Khoảng thời gian không hợp lệ (date_from phải trước hoặc bằng date_to)", nil)
+		return nil, apperror.New(400, "Kỳ lương không hợp lệ", err)
 	}
 
-	if standardWorkingDays == 0 {
-		standardWorkingDays = 26
-	}
-	if standardWorkingDays < 1 || standardWorkingDays > 31 {
-		return nil, apperror.New(400, "Số ngày công chuẩn phải nằm trong khoảng 1 đến 31", nil)
+	staff, err := u.userRepo.GetStaffByID(ctx, orgID, id)
+	if err != nil {
+		log.Println("Error getting staff by ID:", err)
+		if errors.Is(err, domain.ErrStaffNotFound) {
+			return nil, apperror.New(404, "Không tìm thấy nhân viên", err)
+		}
+		return nil, apperror.New(500, "Lỗi khi lấy thông tin nhân viên", err)
 	}
 
-	payroll, err := u.userRepo.GetStaffPayroll(
+	if !payrollEligible(staff, dateTo) {
+		return nil, nil
+	}
+
+	payroll, err := u.userRepo.GetPayrollByPeriod(ctx, orgID, id, periodDate.Format("2006-01-02"))
+	if err != nil && !errors.Is(err, domain.ErrPayrollNotFound) {
+		log.Println("Error getting payroll by period:", err)
+		return nil, apperror.New(500, "Lỗi khi lấy bảng lương nhân viên", err)
+	}
+	if err == nil && payroll != nil && payroll.Status != domain.PayrollStatusCancelled {
+		return payrollToResponse(payroll, dateFrom, dateTo), nil
+	}
+
+	live, err := u.userRepo.GetStaffPayroll(
 		ctx,
 		orgID,
 		id,
-		strings.TrimSpace(dateFrom),
-		strings.TrimSpace(dateTo),
-		standardWorkingDays,
+		dateFrom.Format("2006-01-02"),
+		dateTo.Format("2006-01-02"),
+		settings.StandardWorkingDays,
 	)
 	if err != nil {
 		log.Println("Error getting staff payroll:", err)
@@ -226,8 +252,50 @@ func (u *StaffUsecase) GetStaffPayroll(ctx context.Context, id, dateFrom, dateTo
 		}
 		return nil, apperror.New(500, "Lỗi khi lấy bảng lương nhân viên", err)
 	}
+	if live == nil {
+		return nil, nil
+	}
+	live.Source = "live"
+	live.PayrollStatus = nil
+	return live, nil
+}
 
-	return payroll, nil
+// payrollEligible kiểm tra nhân viên đã vào làm trước hoặc trong ngày kết thúc kỳ.
+func payrollEligible(staff *domain.Staff, periodEnd time.Time) bool {
+	gate := staff.HireDate
+	if gate.IsZero() && staff.CreatedAt != nil {
+		gate = *staff.CreatedAt
+	}
+	if gate.IsZero() {
+		return true
+	}
+	return gate.Format("2006-01-02") <= periodEnd.Format("2006-01-02")
+}
+
+func payrollToResponse(p *domain.Payroll, dateFrom, dateTo time.Time) *domain.StaffPayrollResponse {
+	status := p.Status
+	return &domain.StaffPayrollResponse{
+		StaffID:             p.StaffID,
+		DateFrom:            dateFrom,
+		DateTo:              dateTo,
+		BaseSalary:          p.BaseSalary,
+		StandardWorkingDays: p.StandardWorkingDays,
+		TotalLeaveDays:      p.TotalLeaveDays,
+		ActualWorkingDays:   p.ActualWorkingDays,
+		ProratedBaseSalary:  p.BaseSalary,
+		BonusAmount:         p.BonusAmount,
+		AdjustmentDeduction: p.AdjustmentDeduction,
+		PenaltyAmount:       p.PenaltyAmount,
+		AdvanceAmount:       p.AdvanceAmount,
+		TotalDeduction:      p.DeductionAmount,
+		TotalOrders:         p.TotalOrders,
+		TotalItems:          p.TotalItems,
+		TotalCommission:     p.CommissionAmount,
+		TotalAmountValue:    p.TotalAmountValue,
+		NetPay:              p.NetPay,
+		Source:              "payroll",
+		PayrollStatus:       &status,
+	}
 }
 
 func (u *StaffUsecase) GetStaffServiceHistory(
@@ -335,65 +403,260 @@ func CalculatePayrollCycle(targetMonth string, startDay int) (time.Time, time.Ti
 	return startDate, endDate, nil
 }
 
-func (u *StaffUsecase) CreatePayroll(ctx context.Context, staff_id string, targetMonth string) error {
+func normalizePayrollCreateStatus(raw string) (string, error) {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "", domain.PayrollStatusApproved:
+		return domain.PayrollStatusApproved, nil
+	case domain.PayrollStatusDraft:
+		return domain.PayrollStatusDraft, nil
+	default:
+		return "", apperror.New(400, "Trạng thái bảng lương không hợp lệ (draft | approved)", nil)
+	}
+}
+
+func payrollFromLive(data *domain.StaffPayrollResponse, orgID, staffID string, periodMonth time.Time, status string) *domain.Payroll {
+	return &domain.Payroll{
+		ID:                  utils.NewID(),
+		OrganizationID:      orgID,
+		StaffID:             staffID,
+		PeriodMonth:         &periodMonth,
+		BaseSalary:          data.ProratedBaseSalary,
+		CommissionAmount:    data.TotalCommission,
+		BonusAmount:         data.BonusAmount,
+		AdvanceAmount:       data.AdvanceAmount,
+		DeductionAmount:     data.TotalDeduction,
+		NetPay:              data.NetPay,
+		Status:              status,
+		StandardWorkingDays: data.StandardWorkingDays,
+		TotalLeaveDays:      data.TotalLeaveDays,
+		ActualWorkingDays:   data.ActualWorkingDays,
+		PenaltyAmount:       data.PenaltyAmount,
+		AdjustmentDeduction: data.AdjustmentDeduction,
+		TotalOrders:         data.TotalOrders,
+		TotalItems:          data.TotalItems,
+		TotalAmountValue:    data.TotalAmountValue,
+	}
+}
+
+func payrollRepoError(err error) error {
+	if errors.Is(err, domain.ExistingPayrollOfStaffAndPeriod) {
+		return apperror.New(409, "Bảng lương của nhân viên trong kỳ này đã tồn tại", err)
+	}
+	log.Println("Error creating payroll:", err)
+	return apperror.New(500, "Lỗi khi tạo bảng lương", err)
+}
+
+func (u *StaffUsecase) CreatePayroll(ctx context.Context, staffID string, targetMonth string, status string) error {
+	staffID = strings.TrimSpace(staffID)
+	if staffID == "" {
+		return apperror.New(400, "Thiếu id nhân viên", nil)
+	}
+
 	orgID, err := shared.RequireOrgID(ctx)
 	if err != nil {
 		return err
 	}
 
-	staff_info, err := u.LoadStaffBasicInfo(ctx, orgID, staff_id)
+	status, err = normalizePayrollCreateStatus(status)
 	if err != nil {
 		return err
 	}
-	// Truy xuất cấu hình của tổ chức từ DB. Tạm thời hardcode cho MVP.
-	// settings, _ := u.orgRepo.GetSettings(ctx, orgID)
-	payrollStartDay := 26
-	standardWorkingDays := 26
 
-	// Tính toán tự động from/to
-	dateFrom, dateTo, err := CalculatePayrollCycle(targetMonth, payrollStartDay)
+	targetMonth = strings.TrimSpace(targetMonth)
+	periodMonthDate, err := time.Parse("2006-01", targetMonth)
+	if err != nil {
+		return apperror.New(400, "Tháng không hợp lệ (yyyy-MM)", err)
+	}
+
+	staffInfo, err := u.LoadStaffBasicInfo(ctx, orgID, staffID)
+	if err != nil {
+		if errors.Is(err, domain.ErrStaffNotFound) {
+			return apperror.New(404, "Không tìm thấy nhân viên", err)
+		}
+		return apperror.New(500, "Lỗi khi lấy thông tin nhân viên", err)
+	}
+
+	settings, err := u.userRepo.GetPayrollSettings(ctx, orgID)
+	if err != nil {
+		log.Println("Error getting payroll settings:", err)
+		defaults := settingDomain.DefaultPayrollSettings()
+		settings = &defaults
+	}
+	settings.Normalize()
+
+	dateFrom, dateTo, err := CalculatePayrollCycle(targetMonth, settings.StartDay)
 	if err != nil {
 		return apperror.New(400, "Tháng không hợp lệ", err)
 	}
 
-	// Format về chuỗi RFC3339 hoặc truyền thẳng biến time.Time xuống DB (Khuyến nghị)
-	strFrom := dateFrom.Format(time.RFC3339)
-	strTo := dateTo.Format(time.RFC3339)
-
-	// Lấy số liệu
-	payrollData, err := u.userRepo.GetStaffPayroll(ctx, orgID, staff_id, strFrom, strTo, standardWorkingDays)
-	if err != nil {
-		return err
+	existing, err := u.userRepo.GetPayrollByPeriod(ctx, orgID, staffID, periodMonthDate.Format("2006-01-02"))
+	if err != nil && !errors.Is(err, domain.ErrPayrollNotFound) {
+		log.Println("Error getting payroll by period:", err)
+		return apperror.New(500, "Lỗi khi lấy bảng lương nhân viên", err)
+	}
+	if err == nil && existing != nil && existing.Status != domain.PayrollStatusCancelled && status == domain.PayrollStatusDraft {
+		return apperror.New(409, "Bảng lương của nhân viên trong kỳ này đã tồn tại", nil)
 	}
 
-	// Parse lại targetMonth để lưu cứng vào db là mùng 1 của tháng (VD: 2026-10-01)
-	periodMonthDate, _ := time.Parse("2006-01", targetMonth)
-
-	payroll := &domain.Payroll{
-		ID:               utils.NewID(),
-		OrganizationID:   orgID,
-		StaffID:          staff_id,
-		PeriodMonth:      &periodMonthDate,
-		BaseSalary:       payrollData.BaseSalary,
-		CommissionAmount: payrollData.TotalCommission,
-		BonusAmount:      payrollData.BonusAmount,
-		AdvanceAmount:    payrollData.AdvanceAmount,
-		DeductionAmount:  payrollData.TotalDeduction,
-		NetPay:           payrollData.NetPay,
-		Status:           domain.PayrollStatusApproved,
-		CashFlowID:       nil,
-		CreatedBy:        nil,
-		ApprovedBy:       nil,
-	}
-	err = u.userRepo.CreatePayroll(ctx, payroll, staff_info)
-	if err != nil {
-		if errors.Is(err, domain.ExistingPayrollOfStaffAndPeriod) {
-			return apperror.New(409, err.Error(), err)
+	if status == domain.PayrollStatusApproved && err == nil && existing != nil {
+		if existing.Status == domain.PayrollStatusDraft {
+			payroll := &domain.Payroll{
+				ID:             existing.ID,
+				OrganizationID: orgID,
+				StaffID:        staffID,
+				PeriodMonth:    &periodMonthDate,
+				Status:         domain.PayrollStatusApproved,
+			}
+			if createErr := u.userRepo.CreatePayroll(ctx, payroll, staffInfo); createErr != nil {
+				return payrollRepoError(createErr)
+			}
+			return nil
 		}
-		log.Println("Error creating payroll:", err)
-		return apperror.New(500, "Lỗi khi tạo bảng lương", err)
+		if existing.Status != domain.PayrollStatusCancelled {
+			return apperror.New(409, "Bảng lương của nhân viên trong kỳ này đã tồn tại", nil)
+		}
+	}
+
+	payrollData, err := u.userRepo.GetStaffPayroll(
+		ctx,
+		orgID,
+		staffID,
+		dateFrom.Format("2006-01-02"),
+		dateTo.Format("2006-01-02"),
+		settings.StandardWorkingDays,
+	)
+	if err != nil {
+		if errors.Is(err, domain.ErrStaffNotFound) {
+			return apperror.New(404, "Không tìm thấy nhân viên", err)
+		}
+		log.Println("Error getting staff payroll:", err)
+		return apperror.New(500, "Lỗi khi tính bảng lương nhân viên", err)
+	}
+
+	payroll := payrollFromLive(payrollData, orgID, staffID, periodMonthDate, status)
+	if createErr := u.userRepo.CreatePayroll(ctx, payroll, staffInfo); createErr != nil {
+		return payrollRepoError(createErr)
 	}
 	return nil
+}
+
+func (u *StaffUsecase) CreatePayrollDrafts(ctx context.Context, targetMonth string) (*domain.BulkPayrollDraftResponse, error) {
+	orgID, err := shared.RequireOrgID(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	targetMonth = strings.TrimSpace(targetMonth)
+	periodMonthDate, err := time.Parse("2006-01", targetMonth)
+	if err != nil {
+		return nil, apperror.New(400, "Tháng không hợp lệ (yyyy-MM)", err)
+	}
+
+	loc, err := time.LoadLocation("Asia/Ho_Chi_Minh")
+	if err != nil {
+		loc = time.FixedZone("UTC+7", 7*60*60)
+	}
+	if targetMonth > time.Now().In(loc).Format("2006-01") {
+		return nil, apperror.New(400, "Không thể tạo bảng lương cho kỳ tương lai", nil)
+	}
+
+	settings, err := u.userRepo.GetPayrollSettings(ctx, orgID)
+	if err != nil {
+		log.Println("Error getting payroll settings:", err)
+		defaults := settingDomain.DefaultPayrollSettings()
+		settings = &defaults
+	}
+	settings.Normalize()
+
+	dateFrom, dateTo, err := CalculatePayrollCycle(targetMonth, settings.StartDay)
+	if err != nil {
+		return nil, apperror.New(400, "Tháng không hợp lệ", err)
+	}
+
+	staffs, err := u.userRepo.ListStaffForPayrollDraft(ctx, orgID, dateTo.Format("2006-01-02"))
+	if err != nil {
+		log.Println("Error listing staff for payroll draft:", err)
+		return nil, apperror.New(500, "Lỗi khi lấy danh sách nhân viên", err)
+	}
+
+	result := &domain.BulkPayrollDraftResponse{
+		TargetMonth: targetMonth,
+		Items:       make([]domain.BulkPayrollDraftItem, 0, len(staffs)),
+	}
+
+	for _, staff := range staffs {
+		item := domain.BulkPayrollDraftItem{
+			StaffID:   staff.ID,
+			StaffCode: staff.Code,
+			StaffName: staff.FullName,
+		}
+
+		existing, findErr := u.userRepo.GetPayrollByPeriod(ctx, orgID, staff.ID, periodMonthDate.Format("2006-01-02"))
+		if findErr != nil && !errors.Is(findErr, domain.ErrPayrollNotFound) {
+			item.Result = "failed"
+			item.Reason = "Không kiểm tra được bảng lương hiện có"
+			result.Failed++
+			result.Items = append(result.Items, item)
+			continue
+		}
+		if findErr == nil && existing != nil && existing.Status != domain.PayrollStatusCancelled {
+			item.Result = "skipped"
+			item.Reason = "Đã có bảng lương trong kỳ"
+			result.Skipped++
+			result.Items = append(result.Items, item)
+			continue
+		}
+
+		payrollData, calcErr := u.userRepo.GetStaffPayroll(
+			ctx,
+			orgID,
+			staff.ID,
+			dateFrom.Format("2006-01-02"),
+			dateTo.Format("2006-01-02"),
+			settings.StandardWorkingDays,
+		)
+		if calcErr != nil {
+			item.Result = "failed"
+			item.Reason = "Không tính được bảng lương"
+			result.Failed++
+			result.Items = append(result.Items, item)
+			continue
+		}
+
+		payroll := payrollFromLive(
+			payrollData,
+			orgID,
+			staff.ID,
+			periodMonthDate,
+			domain.PayrollStatusDraft,
+		)
+		staffInfo := &domain.StaffBasicInfo{
+			ID:       staff.ID,
+			Code:     staff.Code,
+			FullName: staff.FullName,
+			Position: staff.Position,
+		}
+		if createErr := u.userRepo.CreatePayroll(ctx, payroll, staffInfo); createErr != nil {
+			if errors.Is(createErr, domain.ExistingPayrollOfStaffAndPeriod) {
+				item.Result = "skipped"
+				item.Reason = "Đã có bảng lương trong kỳ"
+				result.Skipped++
+			} else {
+				log.Println("Error creating draft payroll:", createErr)
+				item.Result = "failed"
+				item.Reason = "Không tạo được bảng lương nháp"
+				result.Failed++
+			}
+			result.Items = append(result.Items, item)
+			continue
+		}
+
+		item.Result = "created"
+		result.Created++
+		result.Items = append(result.Items, item)
+	}
+
+	return result, nil
 }
 
 func (u *StaffUsecase) GetSalaryAdjustments(ctx context.Context, staffID, periodMonth string) ([]*domain.SalaryAdjustment, error) {

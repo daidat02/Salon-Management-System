@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { CalendarClock, Clock3, MapPin } from 'lucide-react';
 import { cn } from 'cn';
-import useWeeklySchedule from '@/hooks/use-weekly-schedule';
+import { useWeeklySchedule } from '@/hooks/appointment';
 import { getApiErrorMessage } from '@/services/apiClient';
 import type { Appointment, AppointmentStatus } from '@/types/appointment';
 

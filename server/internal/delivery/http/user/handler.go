@@ -2,9 +2,10 @@ package user
 
 import (
 	"errors"
+	"log"
 	"net/http"
 
-	"github.com/daidat02/server/configs"
+	config "github.com/daidat02/server/configs"
 	domain "github.com/daidat02/server/internal/domain/user"
 	uc "github.com/daidat02/server/internal/usecase/user"
 	"github.com/daidat02/server/pkg/apperror"
@@ -80,6 +81,7 @@ func (h *UserHandler) setRefreshTokenCookie(c *gin.Context, refreshToken string)
 		h.jwtCfg.CookieSecure,
 		true,
 	)
+	log.Printf("Set refresh token cookie: domain: %s, secure: %t, samesite: %s", h.jwtCfg.CookieDomain, h.jwtCfg.CookieSecure, h.jwtCfg.CookieSameSite)
 }
 
 func (h *UserHandler) clearRefreshTokenCookie(c *gin.Context) {
@@ -145,6 +147,7 @@ func (h *UserHandler) Login(c *gin.Context) {
 func (h *UserHandler) RefreshToken(c *gin.Context) {
 	refreshToken, err := c.Cookie("refresh_token")
 	if err != nil {
+		log.Printf("Error retrieving refresh token cookie: %v", err)
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
@@ -158,6 +161,7 @@ func (h *UserHandler) RefreshToken(c *gin.Context) {
 		response.Error(c, err)
 		return
 	}
+
 
 	h.setRefreshTokenCookie(c, *newrefreshToken)
 	response.Success(c, http.StatusOK, "Làm mới token thành công", gin.H{

@@ -82,12 +82,20 @@ type Payroll struct {
 	OrganizationID   string     `json:"organization_id" db:"organization_id"`
 	StaffID          string     `json:"staff_id" db:"staff_id"`
 	PeriodMonth      *time.Time `json:"period_month" db:"period_month"`
-	BaseSalary       float64    `json:"base_salary" db:"base_salary"`
-	CommissionAmount float64    `json:"commission_amount" db:"commission_amount"`
-	BonusAmount      float64    `json:"bonus_amount" db:"bonus_amount"`
-	AdvanceAmount    float64    `json:"advance_amount" db:"advance_amount"`
-	DeductionAmount  float64    `json:"deduction_amount" db:"deduction_amount"`
-	NetPay           float64    `json:"net_pay" db:"net_pay"`
+	BaseSalary          float64    `json:"base_salary" db:"base_salary"`
+	CommissionAmount    float64    `json:"commission_amount" db:"commission_amount"`
+	BonusAmount         float64    `json:"bonus_amount" db:"bonus_amount"`
+	AdvanceAmount       float64    `json:"advance_amount" db:"advance_amount"`
+	DeductionAmount     float64    `json:"deduction_amount" db:"deduction_amount"`
+	NetPay              float64    `json:"net_pay" db:"net_pay"`
+	StandardWorkingDays int        `json:"standard_working_days" db:"standard_working_days"`
+	TotalLeaveDays      int        `json:"total_leave_days" db:"total_leave_days"`
+	ActualWorkingDays   int        `json:"actual_working_days" db:"actual_working_days"`
+	PenaltyAmount       float64    `json:"penalty_amount" db:"penalty_amount"`
+	AdjustmentDeduction float64    `json:"adjustment_deduction" db:"adjustment_deduction"`
+	TotalOrders         int64      `json:"total_orders" db:"total_orders"`
+	TotalItems          int64      `json:"total_items" db:"total_items"`
+	TotalAmountValue    float64    `json:"total_amount_value" db:"total_amount_value"`
 	Status           string     `json:"status" db:"status"`
 	CashFlowID       *string    `json:"cash_flow_id" db:"cash_flow_id"`
 	PaidAt           *time.Time `json:"paid_at" db:"paid_at"`

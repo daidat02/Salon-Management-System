@@ -3,7 +3,7 @@
 import { Clock3, Receipt, Undo2, Wallet } from 'lucide-react';
 import StatCard from '@/components/dashboard/StatCard';
 import { formatPlain, formatVND } from '@/lib/format';
-import useOrderStats from '@/hooks/use-order-stats';
+import { useOrderStats } from '@/hooks/order';
 
 function changeText(pct: number): string {
   if (pct > 0) return `↗ +${pct.toFixed(1)}% so với hôm qua`;

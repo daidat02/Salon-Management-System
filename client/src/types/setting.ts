@@ -28,9 +28,16 @@ export type WorkingHours = {
   days: WorkingHourDay[];
 };
 
+export type PayrollSettings = {
+  start_day: number;
+  standard_working_days: number;
+  auto_draft_cutoff_day: number;
+};
+
 export type GeneralSettingsResponse = {
   organization: OrganizationInfo;
   working_hours: WorkingHours;
+  payroll: PayrollSettings;
 };
 
 export type ReceiptSettings = {

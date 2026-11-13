@@ -5,7 +5,7 @@ import DashTable from '@/components/dashboard/DashTable';
 import { staffColumns } from './columns';
 import type { Staff } from '@/types/staff';
 import { useRouter, useSearchParams } from 'next/navigation';
-import useStaff from '@/hooks/use-staff';
+import { useStaff } from '@/hooks/staff';
 import { getApiErrorMessage } from '@/services/apiClient';
 import { TableSkeleton } from '@/components/dashboard/DashboardSkeletons';
 

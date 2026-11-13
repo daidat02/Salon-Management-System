@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { Clock, Users, Wallet } from 'lucide-react';
 import StatCard from '@/components/dashboard/StatCard';
-import useAppointments from '@/hooks/use-appointments';
+import { useAppointments } from '@/hooks/appointment';
 
 function startOfToday(): Date {
   const d = new Date();

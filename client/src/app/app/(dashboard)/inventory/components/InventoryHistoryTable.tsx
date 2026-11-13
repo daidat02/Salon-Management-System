@@ -6,7 +6,7 @@ import DashTable from '@/components/dashboard/DashTable';
 import DashToolbar from '@/components/dashboard/DashToolbar';
 import { TableSkeleton } from '@/components/dashboard/DashboardSkeletons';
 import { getApiErrorMessage } from '@/services/apiClient';
-import useInventoryDocuments from '@/hooks/use-inventory-documents';
+import { useInventoryDocuments } from '@/hooks/inventory';
 import { historyColumns } from './historyColumns';
 
 export const INVENTORY_HISTORY_ANCHOR = 'inventory-history';

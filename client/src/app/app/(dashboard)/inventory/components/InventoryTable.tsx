@@ -6,7 +6,7 @@ import DashTable from '@/components/dashboard/DashTable';
 import { inventoryColumns } from './columns';
 import { getInventoryStatus } from './inventoryUtils';
 import { useRouter, useSearchParams } from 'next/navigation';
-import useProduct from '@/hooks/use-product';
+import { useProduct } from '@/hooks/product';
 import { TableSkeleton } from '@/components/dashboard/DashboardSkeletons';
 import { getApiErrorMessage } from '@/services/apiClient';
 

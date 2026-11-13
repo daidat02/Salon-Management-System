@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { DashDialog, DashDialogFooter } from '@/components/dashboard/DashDialog';
-import { useCreateStaff } from '@/hooks/use-create-staff';
+import { useCreateStaff } from '@/hooks/staff';
 import { getApiErrorMessage } from '@/services/apiClient';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { toast } from '@/components/ui/toast';

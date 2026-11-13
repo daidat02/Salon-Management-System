@@ -4,7 +4,7 @@ import * as React from 'react';
 import DashTable from '@/components/dashboard/DashTable';
 import { productColumns } from './columns';
 import { useRouter, useSearchParams } from 'next/navigation';
-import useProduct from '@/hooks/use-product';
+import { useProduct } from '@/hooks/product';
 import { TableSkeleton } from '@/components/dashboard/DashboardSkeletons';
 import { getApiErrorMessage } from '@/services/apiClient';
 import type { Product } from '@/types/product';

@@ -5,7 +5,7 @@ import { AlertTriangle, Bell, CircleQuestionMark, Plus, Scissors, Sparkles } fro
 import { Button } from '@/components/ui/button';
 import { DashDialog } from '@/components/dashboard/DashDialog';
 import { toast } from '@/components/ui/toast';
-import { useDisableDemoData, useGeneralSettings } from '@/hooks/use-settings';
+import { useDisableDemoData, useGeneralSettings } from '@/hooks/settings';
 import { getApiErrorMessage } from '@/services/apiClient';
 import useAuth from '@/hooks/use-auth';
 

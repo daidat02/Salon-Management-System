@@ -2,7 +2,7 @@
 
 import { Crown, UserPlus, Users, Wallet } from 'lucide-react';
 import StatCard from '@/components/dashboard/StatCard';
-import useCustomerStats from '@/hooks/use-customer-stats';
+import { useCustomerStats } from '@/hooks/customer';
 
 /** 4 thẻ số liệu tệp khách: 3 thẻ từ API stats thật + thẻ VIP giữ số hiện tại. */
 export default function CustomersStats() {

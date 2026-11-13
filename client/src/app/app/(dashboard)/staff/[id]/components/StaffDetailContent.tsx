@@ -6,7 +6,7 @@ import { Award, CalendarDays, Download, History, User, Wallet } from 'lucide-rea
 import PageHeading from '@/components/dashboard/PageHeading';
 import { DashboardSkeleton } from '@/components/dashboard/DashboardSkeletons';
 import { getApiErrorMessage } from '@/services/apiClient';
-import useStaffDetail from '@/hooks/use-staff-detail';
+import { useStaffDetail } from '@/hooks/staff';
 import useAuth from '@/hooks/use-auth';
 import type { Staff } from '@/types/staff';
 import StaffProfileCard, { type StaffContact } from './StaffProfileCard';

@@ -8,7 +8,7 @@ import { DashSelect } from '@/components/dashboard/DashSelect';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/components/ui/toast';
-import { useCreateStaffSalaryAdjustment } from '@/hooks/use-create-staff-salary-adjustment';
+import { useCreateStaffSalaryAdjustment } from '@/hooks/staff';
 import { getApiErrorMessage } from '@/services/apiClient';
 import type { StaffSalaryAdjustmentType } from '@/types/staff';
 

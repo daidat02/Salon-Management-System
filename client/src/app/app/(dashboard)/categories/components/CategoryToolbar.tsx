@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import useCategory from '@/hooks/use-category';
+import { useCategory } from '@/hooks/category';
 import { Search, ShoppingBag, Sparkles } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import React, { useEffect } from 'react';

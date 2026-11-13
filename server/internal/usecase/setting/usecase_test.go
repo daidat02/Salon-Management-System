@@ -472,6 +472,60 @@ func TestSettingUseCase_UpdateGeneralSettings(t *testing.T) {
 		assert.Equal(t, 400, appErr.StatusCode)
 	})
 
+	t.Run("Thất bại - ngày bắt đầu kỳ lương ngoài khoảng", func(t *testing.T) {
+		uc := NewSettingUseCase(new(MockSettingRepository))
+		req := valid()
+		req.Payroll.StartDay = 29
+
+		res, err := uc.UpdateGeneralSettings(withOrgCtx("org-123"), req)
+
+		assert.Nil(t, res)
+		var appErr *apperror.AppError
+		assert.True(t, errors.As(err, &appErr))
+		assert.Equal(t, 400, appErr.StatusCode)
+	})
+
+	t.Run("Thất bại - số ngày công chuẩn ngoài khoảng", func(t *testing.T) {
+		uc := NewSettingUseCase(new(MockSettingRepository))
+		req := valid()
+		req.Payroll.StandardWorkingDays = 32
+
+		res, err := uc.UpdateGeneralSettings(withOrgCtx("org-123"), req)
+
+		assert.Nil(t, res)
+		var appErr *apperror.AppError
+		assert.True(t, errors.As(err, &appErr))
+		assert.Equal(t, 400, appErr.StatusCode)
+	})
+
+	t.Run("Thất bại - ngày tới hạn tạo nháp ngoài khoảng", func(t *testing.T) {
+		uc := NewSettingUseCase(new(MockSettingRepository))
+		req := valid()
+		req.Payroll.AutoDraftCutoffDay = 29
+
+		res, err := uc.UpdateGeneralSettings(withOrgCtx("org-123"), req)
+
+		assert.Nil(t, res)
+		var appErr *apperror.AppError
+		assert.True(t, errors.As(err, &appErr))
+		assert.Equal(t, 400, appErr.StatusCode)
+	})
+
+	t.Run("Thành công - giá trị 0 được thay bằng mặc định", func(t *testing.T) {
+		repo := new(MockSettingRepository)
+		req := valid()
+		repo.On("UpdateGeneralSettings", mock.Anything, "org-123", req).Return(nil).Once()
+
+		uc := NewSettingUseCase(repo)
+		res, err := uc.UpdateGeneralSettings(withOrgCtx("org-123"), req)
+
+		assert.NoError(t, err)
+		assert.Equal(t, 26, res.Payroll.StartDay)
+		assert.Equal(t, 26, res.Payroll.StandardWorkingDays)
+		assert.Equal(t, 7, res.Payroll.AutoDraftCutoffDay)
+		repo.AssertExpectations(t)
+	})
+
 	t.Run("Thất bại - giờ đóng trước giờ mở", func(t *testing.T) {
 		uc := NewSettingUseCase(new(MockSettingRepository))
 		req := valid()
