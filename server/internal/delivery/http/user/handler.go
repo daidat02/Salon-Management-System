@@ -81,7 +81,6 @@ func (h *UserHandler) setRefreshTokenCookie(c *gin.Context, refreshToken string)
 		h.jwtCfg.CookieSecure,
 		true,
 	)
-	log.Printf("Set refresh token cookie: domain: %s, secure: %t, samesite: %s", h.jwtCfg.CookieDomain, h.jwtCfg.CookieSecure, h.jwtCfg.CookieSameSite)
 }
 
 func (h *UserHandler) clearRefreshTokenCookie(c *gin.Context) {

@@ -113,7 +113,7 @@ jobs:
           done
           echo 'Backend không khởi động được:'; cat /tmp/salon-server.log; exit 1
 
-      - name: Provision E2E accounts & create .env.e2e
+      - name: Provision E2E accounts & set .env.e2e
         working-directory: client
         env:
           E2E_API_ORIGIN: http://localhost:8080
@@ -138,13 +138,6 @@ jobs:
 
           cat .env.e2e >> $GITHUB_ENV
 
-          cat << 'EOF' > .env.local
-          NEXT_PUBLIC_API_URL=http://localhost:8080/api/v1
-          EOF
-
-          echo "=== Nội dung .env.e2e ==="
-          cat .env.e2e
-
       - name: Install dependencies
         working-directory: client
         run: npm ci
@@ -158,7 +151,8 @@ jobs:
         working-directory: client
         env:
           CI: 'true'
-          NEXT_PUBLIC_API_URL: http://localhost:8080/api/v1
+          NEXT_PUBLIC_API_URL: /api
+          NEXT_PUBLIC_API_VERSION: v1
         run: |
           set -a
           source .env.e2e
@@ -170,7 +164,8 @@ jobs:
         working-directory: client
         env:
           CI: 'true'
-          NEXT_PUBLIC_API_URL: http://localhost:8080/api/v1
+          NEXT_PUBLIC_API_URL: /api
+          NEXT_PUBLIC_API_VERSION: v1
         run: |
           set -a
           source .env.e2e
@@ -182,7 +177,8 @@ jobs:
         working-directory: client
         env:
           CI: 'true'
-          NEXT_PUBLIC_API_URL: http://localhost:8080/api/v1
+          NEXT_PUBLIC_API_URL: /api
+          NEXT_PUBLIC_API_VERSION: v1
         run: |
           set -a
           source .env.e2e
