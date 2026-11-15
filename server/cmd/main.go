@@ -19,11 +19,6 @@ import (
 // @description     "Bearer {access_token}"
 
 func main() {
-	// Set Gin mode to Debug for development purposes
-	log.Println("Setting Gin mode to Debug...")
-	gin.SetMode(gin.DebugMode)
-
-	log.Println("🚀 Starting Salon Management server...")
 
 	// Load configuration
 	cfg, err := config.LoadConfig()
@@ -31,6 +26,23 @@ func main() {
 		log.Fatalf("Lỗi khi tải cấu hình: %v", err)
 	}
 
+	// Set Gin mode to Debug for development purposes
+	log.Println("Setting Gin mode to Debug...")
+	
+	ginMode := cfg.App.GinMode
+	
+	switch ginMode {
+	case gin.ReleaseMode:
+		gin.SetMode(gin.ReleaseMode)
+	case gin.TestMode:
+		gin.SetMode(gin.TestMode)
+	default:
+		gin.SetMode(gin.DebugMode)
+	}
+
+	log.Println("🚀 Starting Salon Management server...")
+
+	
 	// Kết nối cơ sở dữ liệu PostgreSQL
 	dsn := cfg.Database.DB_url
 	dbPool := database.NewPostgresDatabase(dsn)

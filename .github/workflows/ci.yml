@@ -9,6 +9,8 @@ on:
       - 'server/**'
       - '.github/workflows/ci.yml'
   pull_request:
+    branches:
+      - main
     paths:
       - 'client/**'
       - 'server/**'
@@ -28,19 +30,7 @@ concurrency:
 
 env:
   DB_URL: postgres://postgres:postgres@localhost:5432/salon_db?sslmode=disable
-  DB_USER: postgres
-  DB_PASSWORD: postgres
-  DB_NAME: salon_db
-  DB_HOST: localhost
-  DB_PORT: '5432'
-  PORT: '8080'
-  APP_ENV: test
-  GIN_MODE: release
-  API_BASE_PATH: /api/v1
-  JWT_SECRET: e2e-only-secret-change-me
-  ACCESS_TOKEN_EXPIRE: 60m
-  REFRESH_TOKEN_EXPIRE: 168h
-  CORS_ALLOWED_ORIGINS: http://app.localhost:3000,http://localhost:3000
+  E2E_DB_URL: postgres://postgres:postgres@localhost:5432/salon_db?sslmode=disable
   E2E_OWNER_PHONE: '0900000001'
   E2E_OWNER_PASSWORD: 'E2ePassw0rd!'
   E2E_MANAGER_PHONE: '0900000002'
@@ -48,7 +38,6 @@ env:
   E2E_RECEPTIONIST_PHONE: '0900000003'
   E2E_RECEPTIONIST_PASSWORD: 'E2ePassw0rd!'
   E2E_ORG_SLUG: e2e-ci-${{ github.run_id }}
-  E2E_DB_URL: postgres://postgres:postgres@localhost:5432/salon_db?sslmode=disable
 
 jobs:
   playwright:
@@ -92,28 +81,30 @@ jobs:
 
       - name: Start backend
         working-directory: server
-        env:
-          APP_ENV: test
-          PORT: '8080'
-          GIN_MODE: release
-          API_BASE_PATH: /api/v1
-          SERVER_URL: http://localhost:8080
-          CORS_ALLOWED_ORIGINS: http://app.localhost:3000,http://localhost:3000
-          DB_USER: postgres
-          DB_PASSWORD: postgres
-          DB_NAME: salon_db
-          DB_HOST: localhost
-          DB_PORT: '5432'
-          DB_URL: postgres://postgres:postgres@localhost:5432/salon_db?sslmode=disable
-          JWT_SECRET: e2e-only-secret-change-me
-          ACCESS_TOKEN_EXPIRE: 60m
-          REFRESH_TOKEN_EXPIRE: 168h
-          R2_ACCOUNT_ID: dummy-account-id
-          R2_ACCESS_KEY_ID: dummy-access-key
-          R2_ACCESS_KEY_SECRET: dummy-secret-key
-          R2_BUCKET_NAME: salon-test
-          R2_PUBLIC_URL: https://example.r2.dev
         run: |
+          cat << 'EOF' > .env
+          APP_ENV=test
+          PORT=8080
+          GIN_MODE=release
+          API_BASE_PATH=/api/v1
+          SERVER_URL=http://localhost:8080
+          CORS_ALLOWED_ORIGINS=http://app.localhost:3000,http://localhost:3000
+          DB_USER=postgres
+          DB_PASSWORD=postgres
+          DB_NAME=salon_db
+          DB_HOST=localhost
+          DB_PORT=5432
+          DB_URL=postgres://postgres:postgres@localhost:5432/salon_db?sslmode=disable
+          JWT_SECRET=e2e-only-secret-change-me-32-chars-min
+          ACCESS_TOKEN_EXPIRE=60m
+          REFRESH_TOKEN_EXPIRE=168h
+          R2_ACCOUNT_ID=dummy-account-id
+          R2_ACCESS_KEY_ID=dummy-access-key
+          R2_ACCESS_KEY_SECRET=dummy-secret-key
+          R2_BUCKET_NAME=salon-test
+          R2_PUBLIC_URL=https://example.r2.dev
+          EOF
+
           go build -o /tmp/salon-server ./cmd
           nohup /tmp/salon-server > /tmp/salon-server.log 2>&1 &
           for i in $(seq 1 30); do
@@ -126,7 +117,9 @@ jobs:
         working-directory: client
         env:
           E2E_API_ORIGIN: http://localhost:8080
-        run: bash e2e/support/provision.sh
+        run: |
+          bash e2e/support/provision.sh | tee /tmp/provision.out
+          grep "^export " /tmp/provision.out | sed 's/^export //' >> $GITHUB_ENV
 
       - name: Install dependencies
         working-directory: client
@@ -136,19 +129,28 @@ jobs:
         working-directory: client
         run: npx playwright install --with-deps chromium
 
-      - name: Run smoke (PR)
-        if: github.event_name == 'pull_request'
+      - name: Run smoke (PR & dev push)
+        if: github.event_name == 'pull_request' || github.event_name == 'push'
         working-directory: client
+        env:
+          CI: 'true'
+          NEXT_PUBLIC_API_URL: http://localhost:8080/api/v1
         run: npm run test:e2e:smoke
 
       - name: Run full suite (nightly / manual)
-        if: github.event_name != 'pull_request' && (github.event_name != 'workflow_dispatch' || inputs.suite == 'all')
+        if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.suite == 'all')
         working-directory: client
+        env:
+          CI: 'true'
+          NEXT_PUBLIC_API_URL: http://localhost:8080/api/v1
         run: npm run test:e2e
 
       - name: Run smoke (manual)
         if: github.event_name == 'workflow_dispatch' && inputs.suite == 'e2e/smoke'
         working-directory: client
+        env:
+          CI: 'true'
+          NEXT_PUBLIC_API_URL: http://localhost:8080/api/v1
         run: npm run test:e2e:smoke
 
       - name: Upload report

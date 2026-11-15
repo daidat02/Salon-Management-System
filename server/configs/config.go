@@ -17,10 +17,12 @@ type Config struct {
 }
 
 type AppConfig struct {
+	GinMode  string `mapstructure:"GIN_MODE"`
 	Env       string `mapstructure:"APP_ENV"`
 	Port      string `mapstructure:"APP_PORT"`
 	BasePath  string `mapstructure:"API_BASE_PATH"`
 	ServerURL string `mapstructure:"SERVER_URL"`
+
 }
 
 type DatabaseConfig struct {
@@ -51,7 +53,7 @@ func (c *JWTConfig) Validate(appEnv string) error {
 		return fmt.Errorf("ACCESS_TOKEN_EXPIRE phải lớn hơn 0")
 	}
 	if c.RefreshTokenExpire <= 0 {
-		return fmt.Errorf("REFRESH_TOKEN_EXPIRE phải lớn hơn 0")
+		return fmt.Errorf("REFRESH_TOKEN_EXPIRE phải lớn hơn 0") 
 	}
 	if c.RefreshTokenExpire <= c.AccessTokenExpire {
 		return fmt.Errorf("REFRESH_TOKEN_EXPIRE phải lớn hơn ACCESS_TOKEN_EXPIRE")
