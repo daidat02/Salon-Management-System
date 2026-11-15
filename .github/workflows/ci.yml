@@ -113,13 +113,37 @@ jobs:
           done
           echo 'Backend không khởi động được:'; cat /tmp/salon-server.log; exit 1
 
-      - name: Provision E2E accounts
+      - name: Provision E2E accounts & create .env.e2e
         working-directory: client
         env:
           E2E_API_ORIGIN: http://localhost:8080
         run: |
+          echo "127.0.0.1 app.localhost" | sudo tee -a /etc/hosts
+
           bash e2e/support/provision.sh | tee /tmp/provision.out
-          grep "^export " /tmp/provision.out | sed 's/^export //' >> $GITHUB_ENV
+
+          cat << EOF > .env.e2e
+          E2E_BASE_URL=http://app.localhost:3000
+          E2E_API_ORIGIN=http://localhost:8080
+          E2E_DB_URL=postgres://postgres:postgres@localhost:5432/salon_db?sslmode=disable
+          E2E_OWNER_PHONE=0900000001
+          E2E_OWNER_PASSWORD=E2ePassw0rd!
+          E2E_MANAGER_PHONE=0900000002
+          E2E_MANAGER_PASSWORD=E2ePassw0rd!
+          E2E_RECEPTIONIST_PHONE=0900000003
+          E2E_RECEPTIONIST_PASSWORD=E2ePassw0rd!
+          E2E_ORG_SLUG=e2e-ci-${{ github.run_id }}
+          EOF
+          grep "^export " /tmp/provision.out | sed 's/^export //' >> .env.e2e
+
+          cat .env.e2e >> $GITHUB_ENV
+
+          cat << 'EOF' > .env.local
+          NEXT_PUBLIC_API_URL=http://localhost:8080/api/v1
+          EOF
+
+          echo "=== Nội dung .env.e2e ==="
+          cat .env.e2e
 
       - name: Install dependencies
         working-directory: client
@@ -135,7 +159,11 @@ jobs:
         env:
           CI: 'true'
           NEXT_PUBLIC_API_URL: http://localhost:8080/api/v1
-        run: npm run test:e2e:smoke
+        run: |
+          set -a
+          source .env.e2e
+          set +a
+          npm run test:e2e:smoke
 
       - name: Run full suite (nightly / manual)
         if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.suite == 'all')
@@ -143,7 +171,11 @@ jobs:
         env:
           CI: 'true'
           NEXT_PUBLIC_API_URL: http://localhost:8080/api/v1
-        run: npm run test:e2e
+        run: |
+          set -a
+          source .env.e2e
+          set +a
+          npm run test:e2e
 
       - name: Run smoke (manual)
         if: github.event_name == 'workflow_dispatch' && inputs.suite == 'e2e/smoke'
@@ -151,7 +183,11 @@ jobs:
         env:
           CI: 'true'
           NEXT_PUBLIC_API_URL: http://localhost:8080/api/v1
-        run: npm run test:e2e:smoke
+        run: |
+          set -a
+          source .env.e2e
+          set +a
+          npm run test:e2e:smoke
 
       - name: Upload report
         if: always()
