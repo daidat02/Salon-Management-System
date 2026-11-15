@@ -180,10 +180,7 @@ function getToastVariant(type: string | undefined) {
 function ToastList() {
   const { toasts } = ToastPrimitive.useToastManager()
 
-  // Chỉ hiện toast success (theo yêu cầu: chỉ cần message thành công)
-  const visibleToasts = toasts.filter((t) => !t.type || t.type === "success")
-
-  return visibleToasts.map((toastItem) => (
+  return toasts.map((toastItem) => (
     <Toast
       key={toastItem.id}
       toast={toastItem}
@@ -191,8 +188,10 @@ function ToastList() {
     >
       <ToastContent className="flex-1 py-1">
         <ToastIcon type={toastItem.type} />
-        {/* Chỉ một dòng message */}
-        <ToastTitle className="flex-1 truncate text-[10px] font-medium leading-none" />
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <ToastTitle className="truncate text-[10px] font-medium leading-none" />
+          <ToastDescription className="truncate text-[9px] leading-none" />
+        </div>
         <ToastClose className="ml-1" />
       </ToastContent>
     </Toast>

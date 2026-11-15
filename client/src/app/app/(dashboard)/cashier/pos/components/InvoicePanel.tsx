@@ -281,7 +281,11 @@ export default function InvoicePanel({
                     </div>
                     <p className="text-on-surface-variant pl-2.5 text-[10px] leading-none">{it.desc}</p>
                   </div>
-                  <button onClick={() => onRemove(it.id)} className="shrink-0 p-0.5 text-slate-400 transition-colors hover:text-error">
+                  <button
+                    data-testid={`pos-cart-remove-${it.id}`}
+                    onClick={() => onRemove(it.id)}
+                    className="shrink-0 p-0.5 text-slate-400 transition-colors hover:text-error"
+                  >
                     <X className="h-3.5 w-3.5" />
                   </button>
                 </div>
@@ -289,11 +293,19 @@ export default function InvoicePanel({
                   <span className="text-primary text-[10px] font-semibold">{formatPrice(it.price)}</span>
                   <div className="flex items-center gap-1">
                     <div className="border-outline flex items-center rounded border bg-white">
-                      <button onClick={() => onQuantity(it.id, -1)} className="hover:bg-slate-100 flex h-5 w-5 items-center justify-center rounded-l text-on-surface-variant">
+                      <button
+                        data-testid={`pos-cart-decrease-${it.id}`}
+                        onClick={() => onQuantity(it.id, -1)}
+                        className="hover:bg-slate-100 flex h-5 w-5 items-center justify-center rounded-l text-on-surface-variant"
+                      >
                         <Minus className="h-2.5 w-2.5" />
                       </button>
                       <span className="w-6 text-center text-[11px] font-bold text-on-surface">{it.quantity}</span>
-                      <button onClick={() => onQuantity(it.id, 1)} className="hover:bg-slate-100 flex h-5 w-5 items-center justify-center rounded-r text-on-surface-variant">
+                      <button
+                        data-testid={`pos-cart-increase-${it.id}`}
+                        onClick={() => onQuantity(it.id, 1)}
+                        className="hover:bg-slate-100 flex h-5 w-5 items-center justify-center rounded-r text-on-surface-variant"
+                      >
                         <Plus className="h-2.5 w-2.5" />
                       </button>
                     </div>
@@ -319,6 +331,7 @@ export default function InvoicePanel({
       {/* Actions - cao hơn, đổi thành Tạo đơn */}
       <div className="bg-surface-container-low border-outline flex shrink-0 gap-2 border-t px-3 py-3">
         <Button
+          data-testid="pos-cart-clear"
           variant="outline"
           onClick={onClear}
           disabled={isPending}

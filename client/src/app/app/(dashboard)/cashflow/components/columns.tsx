@@ -111,6 +111,7 @@ export function buildCashflowColumns({
         <div className="flex items-center justify-center gap-1 text-slate-400">
           {row.status === 'pending' && onApprove && (
             <button
+              data-testid={`cashflow-approve-${row.code}`}
               type="button"
               title="Duyệt phiếu"
               aria-label={`Duyệt phiếu ${row.code}`}

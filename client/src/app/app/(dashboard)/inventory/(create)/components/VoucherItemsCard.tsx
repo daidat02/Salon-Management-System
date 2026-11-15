@@ -117,6 +117,7 @@ export default function VoucherItemsCard({
       cell: (row) => (
         <div onClick={(e) => e.stopPropagation()}>
           <select
+            data-testid={`voucher-unit-${row.productId}`}
             value={row.selectedUnit}
             onChange={(e) => {
               const nextUnit = e.target.value;
@@ -147,6 +148,7 @@ export default function VoucherItemsCard({
         return (
           <div className="flex flex-col items-center gap-0.5">
             <input
+              data-testid={`voucher-qty-${row.productId}`}
               type="number"
               min={0}
               step="0.01"
@@ -243,6 +245,7 @@ export default function VoucherItemsCard({
       className: 'w-10 text-center',
       cell: (row) => (
         <button
+          data-testid={`voucher-remove-${row.productId}`}
           type="button"
           title="Xóa dòng"
           onClick={() => onRemoveItem(row.productId)}

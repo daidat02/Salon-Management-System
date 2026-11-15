@@ -35,6 +35,7 @@ export function DashOptionPills({
             key={opt.value}
             type="button"
             disabled={disabled}
+            aria-label={opt.label}
             aria-pressed={selected}
             onClick={() => onChange(opt.value)}
             className={cn(

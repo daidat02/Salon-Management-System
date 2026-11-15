@@ -40,7 +40,15 @@ export default function CategoryDetail({ category, position, onClose, onEdit }: 
 
   const handleToggle = (checked: boolean) => {
     updateMutate(
-      { id: category.id, payload: { is_active: checked } },
+      {
+        id: category.id,
+        payload: {
+          type: category.type,
+          name: category.name,
+          description: category.description,
+          is_active: checked,
+        },
+      },
       {
         onSuccess: () => {
           toast.add({
@@ -123,7 +131,11 @@ export default function CategoryDetail({ category, position, onClose, onEdit }: 
               {category.is_active ? 'Đang kích hoạt và hiển thị cho nhân viên' : 'Đang tạm ẩn'}
             </span>
           </div>
-          <Switch checked={category.is_active} onCheckedChange={handleToggle} />
+          <Switch
+            data-testid="category-active-toggle"
+            checked={category.is_active}
+            onCheckedChange={handleToggle}
+          />
         </div>
         <div className="pt-2 border-t border-outline/50">
           <span className="text-on-surface-variant block mb-1">Mô tả hiển thị</span>

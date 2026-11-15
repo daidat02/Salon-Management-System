@@ -112,6 +112,15 @@ apiClient.interceptors.response.use(
       return Promise.reject(error);
     }
 
+    // Không refresh cho chính endpoint đăng nhập/đăng ký: 401 ở đây là sai
+    // credentials, không phải access token hết hạn.
+    if (
+      originalRequest.url?.includes('/login') ||
+      originalRequest.url?.includes('/register')
+    ) {
+      return Promise.reject(error);
+    }
+
     // Không retry nếu chính refresh endpoint bị 401 -> refresh_token hết hạn
     if (originalRequest.url?.includes('/refresh-token')) {
       clearAuthAndRedirect();

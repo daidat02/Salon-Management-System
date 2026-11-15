@@ -72,11 +72,13 @@ function ToggleRow({
   description,
   checked,
   onCheckedChange,
+  testId,
 }: {
   title: string;
   description?: string;
   checked: boolean;
   onCheckedChange: (checked: boolean) => void;
+  testId?: string;
 }) {
   return (
     <div className="border-outline flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5">
@@ -88,7 +90,7 @@ function ToggleRow({
           </p>
         )}
       </div>
-      <Switch checked={checked} onCheckedChange={onCheckedChange} />
+      <Switch data-testid={testId} checked={checked} onCheckedChange={onCheckedChange} />
     </div>
   );
 }
@@ -187,6 +189,7 @@ function PaymentMethodRow({
       </div>
 
       <Switch
+        data-testid={`settings-payment-method-${method.code}-toggle`}
         checked={method.is_active}
         onCheckedChange={onToggle}
         aria-label={`Bật ${method.name}`}
@@ -239,16 +242,19 @@ function ReceiptContent({
           </div>
 
           <ToggleRow
+            testId="settings-payment-auto-cut-toggle"
             title="Tự động cắt giấy"
             checked={receipt.auto_cut_paper}
             onCheckedChange={(checked) => onChange('auto_cut_paper', checked)}
           />
           <ToggleRow
+            testId="settings-payment-auto-print-toggle"
             title="Tự động in khi thanh toán"
             checked={receipt.auto_print_on_checkout}
             onCheckedChange={(checked) => onChange('auto_print_on_checkout', checked)}
           />
           <ToggleRow
+            testId="settings-payment-open-drawer-toggle"
             title="Mở két khi in"
             checked={receipt.open_cash_drawer}
             onCheckedChange={(checked) => onChange('open_cash_drawer', checked)}
@@ -259,6 +265,7 @@ function ReceiptContent({
           <h4 className="text-on-surface text-xs font-bold">Nội dung hóa đơn</h4>
 
           <ToggleRow
+            testId="settings-payment-logo-toggle"
             title="Hiển thị logo"
             checked={receipt.show_logo}
             onCheckedChange={(checked) => onChange('show_logo', checked)}
@@ -278,26 +285,31 @@ function ReceiptContent({
             onChange={(value) => onChange('header_text', value || null)}
           />
           <ToggleRow
+            testId="settings-payment-branch-address-toggle"
             title="Hiển thị địa chỉ chi nhánh"
             checked={receipt.show_branch_address}
             onCheckedChange={(checked) => onChange('show_branch_address', checked)}
           />
           <ToggleRow
+            testId="settings-payment-cashier-name-toggle"
             title="Hiển thị tên thu ngân"
             checked={receipt.show_cashier_name}
             onCheckedChange={(checked) => onChange('show_cashier_name', checked)}
           />
           <ToggleRow
+            testId="settings-payment-customer-info-toggle"
             title="Hiển thị thông tin khách hàng"
             checked={receipt.show_customer_info}
             onCheckedChange={(checked) => onChange('show_customer_info', checked)}
           />
           <ToggleRow
+            testId="settings-payment-mask-phone-toggle"
             title="Che số điện thoại khách"
             checked={receipt.mask_customer_phone}
             onCheckedChange={(checked) => onChange('mask_customer_phone', checked)}
           />
           <ToggleRow
+            testId="settings-payment-vietqr-toggle"
             title="Hiển thị VietQR"
             checked={receipt.show_vietqr}
             onCheckedChange={(checked) => onChange('show_vietqr', checked)}
@@ -318,6 +330,7 @@ function ReceiptContent({
           WiFi
         </h4>
         <ToggleRow
+          testId="settings-payment-wifi-toggle"
           title="Hiển thị thông tin WiFi"
           checked={receipt.show_wifi_info}
           onCheckedChange={(checked) => onChange('show_wifi_info', checked)}
@@ -507,6 +520,7 @@ export default function PaymentSettingsView() {
                 </div>
                 <div className="flex items-center gap-2">
                   <Button
+                    data-testid="settings-reset"
                     variant="outline"
                     onClick={() => setDraft(saved)}
                     className="border-outline text-slate-600 hover:bg-surface-container px-3 py-2 text-xs font-semibold"
@@ -515,6 +529,7 @@ export default function PaymentSettingsView() {
                     Khôi phục
                   </Button>
                   <Button
+                    data-testid="settings-save"
                     onClick={handleSave}
                     disabled={!hasActiveMethod || updateMutation.isPending}
                     className="bg-primary hover:bg-[#436b95] text-on-primary px-4 py-2 text-xs font-semibold shadow-sm"

@@ -4,7 +4,6 @@ import (
 	"crypto/rand"
 	"fmt"
 	"math/big"
-	"strings"
 	"time"
 )
 
@@ -27,12 +26,14 @@ func GenerateOrderCode() string {
 }
 
 // GenerateAppointmentCode sinh mã lịch hẹn vừa VARCHAR(20), vd APT-3F9A2C1D.
+// Phần đuôi là 4 byte ngẫu nhiên (8 ký tự hex), KHÔNG lấy từ NewID() vì UUIDv7
+// có 8 ký tự đầu là timestamp nên nhiều lịch tạo trong cùng ~1 phút sẽ trùng mã.
 func GenerateAppointmentCode() string {
-	id := strings.ReplaceAll(NewID(), "-", "")
-	if len(id) > 8 {
-		id = id[:8]
+	var b [4]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return fmt.Sprintf("APT-%08X", uint32(time.Now().UnixNano()))
 	}
-	return "APT-" + strings.ToUpper(id)
+	return fmt.Sprintf("APT-%X", b)
 }
 
 // GenerateCashFlowCode sinh mã phiếu thu/chi dạng PT-yyMM-XXXX (income)

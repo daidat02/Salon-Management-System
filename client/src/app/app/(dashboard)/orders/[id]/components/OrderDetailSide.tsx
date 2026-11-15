@@ -250,6 +250,7 @@ export default function OrderDetailSide({
         </div>
         {canPay && (
           <Button
+            data-testid="order-collect-payment"
             onClick={() => void startPayment()}
             disabled={isInitingPayment}
             className="mt-1 h-10 w-full text-sm font-bold"

@@ -62,6 +62,7 @@ export function DashDatePicker({
         >
           <Calendar
             mode="single"
+            required
             selected={value}
             onSelect={(date) => {
               onValueChange?.(date);

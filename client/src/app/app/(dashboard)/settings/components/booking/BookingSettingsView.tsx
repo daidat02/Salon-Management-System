@@ -126,11 +126,13 @@ function ToggleRow({
   description,
   checked,
   onCheckedChange,
+  testId,
 }: {
   title: string;
   description: string;
   checked: boolean;
   onCheckedChange: (checked: boolean) => void;
+  testId?: string;
 }) {
   return (
     <div className="border-outline flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5">
@@ -138,7 +140,7 @@ function ToggleRow({
         <p className="text-on-surface text-xs font-semibold">{title}</p>
         <p className="text-on-surface-variant mt-0.5 text-[11px] leading-relaxed">{description}</p>
       </div>
-      <Switch checked={checked} onCheckedChange={onCheckedChange} />
+      <Switch data-testid={testId} checked={checked} onCheckedChange={onCheckedChange} />
     </div>
   );
 }
@@ -360,12 +362,14 @@ export default function BookingSettingsView() {
 
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <ToggleRow
+            testId="settings-booking-online-toggle"
             title="Cho phép khách đặt lịch online"
             description="Khách có thể tự chọn dịch vụ, nhân viên và khung giờ trên trang đặt lịch."
             checked={draft.allowOnlineBooking}
             onCheckedChange={(checked) => update('allowOnlineBooking', checked)}
           />
           <ToggleRow
+            testId="settings-booking-auto-confirm-toggle"
             title="Tự động xác nhận lịch hẹn"
             description="Lịch đặt online được xác nhận ngay, không cần lễ tân duyệt lại."
             checked={draft.autoConfirm}
@@ -386,6 +390,7 @@ export default function BookingSettingsView() {
       >
         <div className="space-y-3">
           <ToggleRow
+            testId="settings-booking-allow-cancel-toggle"
             title="Cho phép khách tự hủy lịch"
             description="Khách có thể hủy trên trang đặt lịch thay vì gọi điện cho salon."
             checked={draft.allowCancel}
@@ -414,6 +419,7 @@ export default function BookingSettingsView() {
           </div>
 
           <ToggleRow
+            testId="settings-booking-allow-reschedule-toggle"
             title="Cho phép khách đổi lịch"
             description="Khách có thể chuyển lịch sang khung giờ khác nếu còn trống."
             checked={draft.allowReschedule}
@@ -441,6 +447,7 @@ export default function BookingSettingsView() {
       >
         <div className="space-y-3">
           <ToggleRow
+            testId="settings-booking-deposit-toggle"
             title="Bật đặt cọc cho khách no-show"
             description="Chỉ áp dụng khi khách đã vượt ngưỡng số lần không đến bên dưới."
             checked={draft.depositEnabled}
@@ -515,6 +522,7 @@ export default function BookingSettingsView() {
             </div>
             <div className="flex items-center gap-2">
               <Button
+                data-testid="settings-reset"
                 variant="outline"
                 onClick={() => setDraft(saved)}
                 className="border-outline text-slate-600 hover:bg-surface-container px-3 py-2 text-xs font-semibold"
@@ -523,6 +531,7 @@ export default function BookingSettingsView() {
                 Khôi phục
               </Button>
               <Button
+                data-testid="settings-save"
                 onClick={handleSave}
                 disabled={invalid || updateMutation.isPending}
                 className="bg-primary hover:bg-[#436b95] text-on-primary px-4 py-2 text-xs font-semibold shadow-sm"

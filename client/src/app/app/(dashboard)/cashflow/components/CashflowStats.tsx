@@ -102,6 +102,7 @@ export default function CashflowStats() {
             )}
             {can('cashflow:write') && (
               <TextButton
+                data-testid="cashflow-fund-settings"
                 icon={Settings}
                 onClick={() => setSettingsOpen(true)}
                 aria-haspopup="dialog"

@@ -107,7 +107,10 @@ export default function OverviewKpiCards({ kpi }: OverviewKpiCardsProps) {
   ];
 
   return (
-    <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <section
+      data-testid="overview-kpi"
+      className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"
+    >
       {cards.map((card) => {
         const dotted = card.badge.tone === 'warning' || card.badge.tone === 'error';
         const TrendIcon = card.badge.trend === 'down' ? TrendingDown : TrendingUp;

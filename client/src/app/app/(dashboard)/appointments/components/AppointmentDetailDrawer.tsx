@@ -218,6 +218,7 @@ export function AppointmentDetailDrawer({ open, onOpenChange, appointment }: Pro
       footer={
         <>
           <Button
+            data-testid="appointment-start-payment"
             className="flex-1 bg-primary text-on-primary hover:bg-[#436b95]"
             disabled={!canStartPayment}
             title={paymentBlockReason}
@@ -227,6 +228,7 @@ export function AppointmentDetailDrawer({ open, onOpenChange, appointment }: Pro
             Bắt đầu thanh toán
           </Button>
           <Button
+            data-testid="appointment-edit"
             variant="outline"
             className="border-outline text-slate-700"
             disabled={isDetailLoading}
@@ -239,6 +241,7 @@ export function AppointmentDetailDrawer({ open, onOpenChange, appointment }: Pro
             Cập nhật
           </Button>
           <Button
+            data-testid="appointment-reschedule"
             variant="outline"
             size="icon"
             aria-label="Đổi lịch"
@@ -250,6 +253,7 @@ export function AppointmentDetailDrawer({ open, onOpenChange, appointment }: Pro
             <CalendarClock className="h-4 w-4" />
           </Button>
           <Button
+            data-testid="appointment-cancel"
             variant="outline"
             size="icon"
             aria-label="Hủy lịch"

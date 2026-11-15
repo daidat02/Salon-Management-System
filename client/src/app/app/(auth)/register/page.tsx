@@ -13,8 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "/api/v1";
+import { API_BASE } from "@/constants";
 
 const ROLES = [
   { value: "manager", label: "Quản lý salon" },

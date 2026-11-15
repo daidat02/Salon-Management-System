@@ -804,6 +804,7 @@ export default function GeneralSettingsView() {
             </div>
             <div className="flex items-center gap-2">
               <Button
+                data-testid="settings-reset"
                 variant="outline"
                 onClick={handleReset}
                 className="border-outline text-slate-600 hover:bg-surface-container px-3 py-2 text-xs font-semibold"
@@ -812,6 +813,7 @@ export default function GeneralSettingsView() {
                 Khôi phục
               </Button>
               <Button
+                data-testid="settings-save"
                 onClick={handleSave}
                 disabled={invalid || updateMutation.isPending}
                 className="bg-primary hover:bg-[#436b95] text-on-primary px-4 py-2 text-xs font-semibold shadow-sm"

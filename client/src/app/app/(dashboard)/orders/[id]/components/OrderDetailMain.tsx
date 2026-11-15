@@ -36,12 +36,14 @@ function QtyEditor({
   saving,
   onConfirm,
   onCancel,
+  testId,
 }: {
   initial: number;
   unit?: string;
   saving: boolean;
   onConfirm: (qty: number) => void;
   onCancel: () => void;
+  testId?: string;
 }) {
   const [val, setVal] = React.useState(String(initial));
   return (
@@ -50,6 +52,7 @@ function QtyEditor({
       onClick={(e) => e.stopPropagation()}
     >
       <input
+        data-testid={testId ? `${testId}-input` : undefined}
         type="number"
         min={0}
         step="any"
@@ -59,6 +62,7 @@ function QtyEditor({
       />
       {unit ? <span className="text-[10px] text-on-surface-variant">{unit}</span> : null}
       <button
+        data-testid={testId ? `${testId}-confirm` : undefined}
         type="button"
         title="Xác nhận"
         disabled={saving}
@@ -71,6 +75,7 @@ function QtyEditor({
         <Check className="h-3.5 w-3.5" />
       </button>
       <button
+        data-testid={testId ? `${testId}-cancel` : undefined}
         type="button"
         title="Hủy"
         onClick={onCancel}
@@ -151,7 +156,11 @@ function serviceColumns(ctx: ServiceTableCtx): DashColumn<EnrichedServiceLine>[]
         <div className="flex items-center gap-1.5 whitespace-nowrap">
           <div className="text-xs text-on-surface">{row.staffName}</div>
           {ctx.canEdit && (
-            <TextButton title="Cập nhật nhân viên" onClick={() => ctx.onEditStaff(row)}>
+            <TextButton
+              data-testid={`order-edit-staff-${row.id}`}
+              title="Cập nhật nhân viên"
+              onClick={() => ctx.onEditStaff(row)}
+            >
               Chỉnh sửa
             </TextButton>
           )}
@@ -166,6 +175,7 @@ function serviceColumns(ctx: ServiceTableCtx): DashColumn<EnrichedServiceLine>[]
         ctx.editingId === row.id ? (
           <QtyEditor
             key={row.id}
+            testId={`order-qty-${row.id}`}
             initial={row.quantity}
             saving={ctx.saving}
             onConfirm={(q) => ctx.onConfirm(row.id, q)}
@@ -175,7 +185,11 @@ function serviceColumns(ctx: ServiceTableCtx): DashColumn<EnrichedServiceLine>[]
           <span className="inline-flex items-center gap-1 text-xs text-on-surface">
             x{row.quantity}
             {ctx.canEdit && (
-              <TextButton title="Đổi số lượng" onClick={() => ctx.onStartEdit(row.id)}>
+              <TextButton
+                data-testid={`order-edit-qty-${row.id}`}
+                title="Đổi số lượng"
+                onClick={() => ctx.onStartEdit(row.id)}
+              >
                 Chỉnh sửa
               </TextButton>
             )}
@@ -197,6 +211,7 @@ function serviceColumns(ctx: ServiceTableCtx): DashColumn<EnrichedServiceLine>[]
       cell: (row) =>
         ctx.canEdit ? (
           <TextButton
+            data-testid={`order-delete-line-${row.id}`}
             title="Xóa dòng"
             tone="danger"
             onClick={() => ctx.onDelete({ id: row.id, name: row.name })}
@@ -504,7 +519,12 @@ function materialColumns(ctx: MaterialTableCtx): DashColumn<MaterialRow>[] {
         }
         if (!ctx.canEdit) return null;
         return (
-          <TextButton title="Xóa dòng" tone="danger" onClick={() => ctx.onDelete(row.id)}>
+          <TextButton
+            data-testid={`order-delete-material-${row.id}`}
+            title="Xóa dòng"
+            tone="danger"
+            onClick={() => ctx.onDelete(row.id)}
+          >
             Xóa
           </TextButton>
         );
@@ -552,7 +572,11 @@ function retailColumns(ctx: RetailTableCtx): DashColumn<EnrichedRetailLine>[] {
         <div className="flex items-center gap-1.5 whitespace-nowrap">
           <div className="text-xs text-on-surface">{row.staffName}</div>
           {ctx.canEdit && (
-            <TextButton title="Cập nhật nhân viên" onClick={() => ctx.onEditStaff(row)}>
+            <TextButton
+              data-testid={`order-edit-staff-${row.id}`}
+              title="Cập nhật nhân viên"
+              onClick={() => ctx.onEditStaff(row)}
+            >
               Chỉnh sửa
             </TextButton>
           )}
@@ -567,6 +591,7 @@ function retailColumns(ctx: RetailTableCtx): DashColumn<EnrichedRetailLine>[] {
         ctx.editingId === row.id ? (
           <QtyEditor
             key={row.id}
+            testId={`order-qty-${row.id}`}
             initial={row.quantity}
             unit={row.unit}
             saving={ctx.saving}
@@ -577,7 +602,11 @@ function retailColumns(ctx: RetailTableCtx): DashColumn<EnrichedRetailLine>[] {
           <span className="inline-flex items-center gap-1 font-medium text-on-surface">
             {row.qtyText}
             {ctx.canEdit && (
-              <TextButton title="Đổi số lượng" onClick={() => ctx.onStartEdit(row.id)}>
+              <TextButton
+                data-testid={`order-edit-qty-${row.id}`}
+                title="Đổi số lượng"
+                onClick={() => ctx.onStartEdit(row.id)}
+              >
                 Chỉnh sửa
               </TextButton>
             )}
@@ -625,6 +654,7 @@ function retailColumns(ctx: RetailTableCtx): DashColumn<EnrichedRetailLine>[] {
       cell: (row) =>
         ctx.canEdit ? (
           <TextButton
+            data-testid={`order-delete-line-${row.id}`}
             title="Xóa dòng"
             tone="danger"
             onClick={() => ctx.onDelete({ id: row.id, name: row.name })}

@@ -264,6 +264,7 @@ export function ServiceMaterialsSection({
                     <td className="py-2 px-3 text-right">
                       {editable ? (
                         <input
+                          data-testid={`service-material-qty-${draft.key}`}
                           type="number"
                           min={0}
                           step="any"
@@ -282,6 +283,7 @@ export function ServiceMaterialsSection({
                     <td className="py-2 px-3 text-right">
                       {editable ? (
                         <select
+                          data-testid={`service-material-unit-${draft.key}`}
                           value={draft.unit}
                           onChange={(e) => updateDraft(draft.key, { unit: e.target.value })}
                           className="h-8 w-28 cursor-pointer rounded-md border border-outline bg-surface px-2 text-xs focus:border-primary focus:ring-1 focus:ring-primary/30 focus:outline-none"
@@ -304,6 +306,7 @@ export function ServiceMaterialsSection({
                     {editable ? (
                       <td className="py-2 px-2 text-right">
                         <Button
+                          data-testid={`service-material-remove-${draft.key}`}
                           variant="ghost"
                           size="icon-sm"
                           onClick={() => removeDraft(draft.key)}

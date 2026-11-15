@@ -75,6 +75,10 @@ export function proxy(req: NextRequest) {
     if (isLegacyAppPath(pathname)) {
       return redirectTo(req, host, stripLegacyPrefix(pathname), search);
     }
+    // Đã đăng nhập vào gốc app → vào thẳng dashboard.
+    if (pathname === '/' && req.cookies.get('refresh_token')) {
+      return redirectTo(req, host, '/overview', search);
+    }
     // Chốt chặn vòng ngoài: chỉ đọc được cookie refresh_token httpOnly do Go set.
     // Verify access_token thật vẫn làm ở Server Component / route handler gọi API Go.
     if (!isPublicAppPath(pathname) && !req.cookies.get('refresh_token')) {

@@ -94,6 +94,7 @@ function NotificationRow({
   checked,
   onCheckedChange,
   children,
+  testId,
 }: {
   icon: LucideIcon;
   title: string;
@@ -101,6 +102,7 @@ function NotificationRow({
   checked: boolean;
   onCheckedChange: (checked: boolean) => void;
   children?: React.ReactNode;
+  testId?: string;
 }) {
   return (
     <div className="border-outline rounded-lg border p-3.5">
@@ -116,7 +118,12 @@ function NotificationRow({
             </p>
           </div>
         </div>
-        <Switch checked={checked} onCheckedChange={onCheckedChange} aria-label={title} />
+        <Switch
+          data-testid={testId}
+          checked={checked}
+          onCheckedChange={onCheckedChange}
+          aria-label={title}
+        />
       </div>
       {checked && children && <div className="mt-3 ml-10">{children}</div>}
     </div>
@@ -253,6 +260,7 @@ export default function NotificationsSettingsView() {
       >
         <div className="space-y-3">
           <NotificationRow
+            testId="settings-notifications-reminder-toggle"
             icon={Clock3}
             title="Nhắc lịch hẹn trước giờ"
             description="Gửi SMS / Zalo ZNS nhắc khách trước giờ hẹn để giảm tỷ lệ quên lịch."
@@ -285,6 +293,7 @@ export default function NotificationsSettingsView() {
           </NotificationRow>
 
           <NotificationRow
+            testId="settings-notifications-birthday-toggle"
             icon={Cake}
             title="Chúc mừng sinh nhật kèm voucher"
             description="Tự động gửi lời chúc và mã ưu đãi cho khách có sinh nhật trong tháng."
@@ -301,6 +310,7 @@ export default function NotificationsSettingsView() {
       >
         <div className="space-y-3">
           <NotificationRow
+            testId="settings-notifications-new-booking-toggle"
             icon={BellRing}
             title="Chuông & push khi có lịch đặt online mới"
             description="Phát âm thanh và hiển thị thông báo trên máy thu ngân, tablet lễ tân."
@@ -309,6 +319,7 @@ export default function NotificationsSettingsView() {
           />
 
           <NotificationRow
+            testId="settings-notifications-low-stock-toggle"
             icon={Package}
             title="Cảnh báo tồn kho thấp"
             description="Thông báo khi số lượng sản phẩm chạm ngưỡng an toàn."
@@ -338,6 +349,7 @@ export default function NotificationsSettingsView() {
           </NotificationRow>
 
           <NotificationRow
+            testId="settings-notifications-daily-report-toggle"
             icon={Clock3}
             title="Báo cáo doanh thu cuối ngày"
             description="Gửi báo cáo tổng kết đơn hàng, doanh thu và hoa hồng cho quản lý."
@@ -380,6 +392,7 @@ export default function NotificationsSettingsView() {
             </div>
             <div className="flex items-center gap-2">
               <Button
+                data-testid="settings-reset"
                 variant="outline"
                 onClick={() => setDraft(saved)}
                 className="border-outline text-slate-600 hover:bg-surface-container px-3 py-2 text-xs font-semibold"
@@ -388,6 +401,7 @@ export default function NotificationsSettingsView() {
                 Khôi phục
               </Button>
               <Button
+                data-testid="settings-save"
                 onClick={handleSave}
                 disabled={invalid || updateMutation.isPending}
                 className="bg-primary hover:bg-[#436b95] text-on-primary px-4 py-2 text-xs font-semibold shadow-sm"

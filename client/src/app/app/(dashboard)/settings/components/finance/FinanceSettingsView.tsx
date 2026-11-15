@@ -200,6 +200,7 @@ export default function FinanceSettingsView() {
             </p>
           </div>
           <Switch
+            data-testid="settings-finance-shift-closing-toggle"
             checked={flags.require_shift_closing}
             onCheckedChange={(checked) =>
               setFlags((current) => ({ ...current, require_shift_closing: checked }))

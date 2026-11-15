@@ -8,7 +8,15 @@ import { useState } from 'react';
 const AppointmentToolbar = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [inputValue, setInputValue] = useState<string>(searchParams.get('search') || '');
+  const search = searchParams.get('search') || '';
+
+  const [inputValue, setInputValue] = useState<string>(search || '');
+
+  const [lastSearch, setLastSearch] = useState(search);
+  if (search !== lastSearch) {
+    setLastSearch(search);
+    setInputValue(search);
+  }
 
   const { setFilterParam } = useFilterParams();
   useDebounceSearch(inputValue, { paramName: 'search', delay: 400, resetPage: true });
@@ -48,7 +56,7 @@ const AppointmentToolbar = () => {
           onValueChange: (value) => handleFilterChange('status', value, 'Tất cả trạng thái'),
         },
       ]}
-      onReset={() => router.push('?', { scroll: false })}
+      onReset={() => router.push('/appointments?', { scroll: false })}
     />
   );
 };

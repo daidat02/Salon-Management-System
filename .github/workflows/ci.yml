@@ -1,0 +1,145 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - dev
+    paths:
+      - 'client/**'
+      - 'server/**'
+      - '.github/workflows/ci.yml'
+  pull_request:
+    paths:
+      - 'client/**'
+      - 'server/**'
+      - '.github/workflows/ci.yml'
+  schedule:
+    - cron: '0 18 * * *'
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: 'Playwright suite (all | e2e/smoke)'
+        required: false
+        default: 'all'
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DB_URL: postgres://postgres:postgres@localhost:5432/salon_db?sslmode=disable
+  DB_USER: postgres
+  DB_PASSWORD: postgres
+  DB_NAME: salon_db
+  DB_HOST: localhost
+  DB_PORT: '5432'
+  PORT: '8080'
+  APP_ENV: test
+  GIN_MODE: release
+  API_BASE_PATH: /api/v1
+  JWT_SECRET: e2e-only-secret-change-me
+  ACCESS_TOKEN_EXPIRE: 60m
+  REFRESH_TOKEN_EXPIRE: 168h
+  CORS_ALLOWED_ORIGINS: http://app.localhost:3000,http://localhost:3000
+  E2E_OWNER_PHONE: '0900000001'
+  E2E_OWNER_PASSWORD: 'E2ePassw0rd!'
+  E2E_MANAGER_PHONE: '0900000002'
+  E2E_MANAGER_PASSWORD: 'E2ePassw0rd!'
+  E2E_RECEPTIONIST_PHONE: '0900000003'
+  E2E_RECEPTIONIST_PASSWORD: 'E2ePassw0rd!'
+  E2E_ORG_SLUG: e2e-ci-${{ github.run_id }}
+  E2E_DB_URL: postgres://postgres:postgres@localhost:5432/salon_db?sslmode=disable
+
+jobs:
+  playwright:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: salon_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Migrate database
+        working-directory: server
+        run: |
+          go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@v4.18.1
+          "$(go env GOPATH)/bin/migrate" -path migrations -database "$DB_URL" up
+
+      - name: Start backend
+        working-directory: server
+        run: |
+          go build -o /tmp/salon-server ./cmd
+          nohup /tmp/salon-server > /tmp/salon-server.log 2>&1 &
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:8080/health >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          echo 'Backend không khởi động được:'; cat /tmp/salon-server.log; exit 1
+
+      - name: Provision E2E accounts
+        working-directory: client
+        env:
+          E2E_API_ORIGIN: http://localhost:8080
+        run: bash e2e/support/provision.sh
+
+      - name: Install dependencies
+        working-directory: client
+        run: npm ci
+
+      - name: Install Playwright browsers
+        working-directory: client
+        run: npx playwright install --with-deps chromium
+
+      - name: Run smoke (PR)
+        if: github.event_name == 'pull_request'
+        working-directory: client
+        run: npm run test:e2e:smoke
+
+      - name: Run full suite (nightly / manual)
+        if: github.event_name != 'pull_request' && (github.event_name != 'workflow_dispatch' || inputs.suite == 'all')
+        working-directory: client
+        run: npm run test:e2e
+
+      - name: Run smoke (manual)
+        if: github.event_name == 'workflow_dispatch' && inputs.suite == 'e2e/smoke'
+        working-directory: client
+        run: npm run test:e2e:smoke
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            client/playwright-report
+            client/test-results
+          retention-days: 7
+
+      - name: Backend logs
+        if: failure()
+        run: cat /tmp/salon-server.log
