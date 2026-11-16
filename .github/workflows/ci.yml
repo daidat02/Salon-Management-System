@@ -29,8 +29,11 @@ concurrency:
   cancel-in-progress: true
 
 env:
+  CI: 'true'
   DB_URL: postgres://postgres:postgres@localhost:5432/salon_db?sslmode=disable
   E2E_DB_URL: postgres://postgres:postgres@localhost:5432/salon_db?sslmode=disable
+  E2E_BASE_URL: http://app.localhost:3000
+  E2E_API_ORIGIN: http://localhost:8080
   E2E_OWNER_PHONE: '0900000001'
   E2E_OWNER_PASSWORD: 'E2ePassw0rd!'
   E2E_MANAGER_PHONE: '0900000002'
@@ -38,9 +41,57 @@ env:
   E2E_RECEPTIONIST_PHONE: '0900000003'
   E2E_RECEPTIONIST_PASSWORD: 'E2ePassw0rd!'
   E2E_ORG_SLUG: e2e-ci-${{ github.run_id }}
+  NEXT_PUBLIC_API_URL: /api
+  NEXT_PUBLIC_API_VERSION: v1
 
 jobs:
+  backend-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+
+      - name: go vet
+        working-directory: server
+        run: go vet ./...
+
+      - name: Run usecase tests
+        working-directory: server
+        run: go test -count=1 ./internal/usecase/...
+
+  client-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install dependencies
+        working-directory: client
+        run: npm ci
+
+      - name: Typecheck
+        working-directory: client
+        run: npm run typecheck
+
+      - name: ESLint
+        working-directory: client
+        run: npm run lint
+
   playwright:
+    needs: [backend-test, client-checks]
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -115,28 +166,10 @@ jobs:
 
       - name: Provision E2E accounts & set .env.e2e
         working-directory: client
-        env:
-          E2E_API_ORIGIN: http://localhost:8080
         run: |
           echo "127.0.0.1 app.localhost" | sudo tee -a /etc/hosts
-
           bash e2e/support/provision.sh | tee /tmp/provision.out
-
-          cat << EOF > .env.e2e
-          E2E_BASE_URL=http://app.localhost:3000
-          E2E_API_ORIGIN=http://localhost:8080
-          E2E_DB_URL=postgres://postgres:postgres@localhost:5432/salon_db?sslmode=disable
-          E2E_OWNER_PHONE=0900000001
-          E2E_OWNER_PASSWORD=E2ePassw0rd!
-          E2E_MANAGER_PHONE=0900000002
-          E2E_MANAGER_PASSWORD=E2ePassw0rd!
-          E2E_RECEPTIONIST_PHONE=0900000003
-          E2E_RECEPTIONIST_PASSWORD=E2ePassw0rd!
-          E2E_ORG_SLUG=e2e-ci-${{ github.run_id }}
-          EOF
-          grep "^export " /tmp/provision.out | sed 's/^export //' >> .env.e2e
-
-          cat .env.e2e >> $GITHUB_ENV
+          grep "^export " /tmp/provision.out | sed 's/^export //' | tee .env.e2e >> $GITHUB_ENV
 
       - name: Install dependencies
         working-directory: client
@@ -149,41 +182,17 @@ jobs:
       - name: Run smoke (PR & dev push)
         if: github.event_name == 'pull_request' || github.event_name == 'push'
         working-directory: client
-        env:
-          CI: 'true'
-          NEXT_PUBLIC_API_URL: /api
-          NEXT_PUBLIC_API_VERSION: v1
-        run: |
-          set -a
-          source .env.e2e
-          set +a
-          npm run test:e2e:smoke
+        run: npm run test:e2e:smoke
 
       - name: Run full suite (nightly / manual)
         if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.suite == 'all')
         working-directory: client
-        env:
-          CI: 'true'
-          NEXT_PUBLIC_API_URL: /api
-          NEXT_PUBLIC_API_VERSION: v1
-        run: |
-          set -a
-          source .env.e2e
-          set +a
-          npm run test:e2e
+        run: npm run test:e2e
 
       - name: Run smoke (manual)
         if: github.event_name == 'workflow_dispatch' && inputs.suite == 'e2e/smoke'
         working-directory: client
-        env:
-          CI: 'true'
-          NEXT_PUBLIC_API_URL: /api
-          NEXT_PUBLIC_API_VERSION: v1
-        run: |
-          set -a
-          source .env.e2e
-          set +a
-          npm run test:e2e:smoke
+        run: npm run test:e2e:smoke
 
       - name: Upload report
         if: always()
