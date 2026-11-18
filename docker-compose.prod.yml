@@ -1,0 +1,67 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: salon-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${DB_USER} -d ${DB_NAME}']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  migrate:
+    image: ${SERVER_IMAGE}
+    entrypoint: ['./migrate']
+    command: ['-path', './migrations', '-database', '${DB_URL}', 'up']
+    env_file:
+      - .env.prod
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  salon-server:
+    image: ${SERVER_IMAGE}
+    container_name: salon-server
+    restart: unless-stopped
+    env_file:
+      - .env.prod
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  salon-client:
+    image: ${CLIENT_IMAGE}
+    container_name: salon-client
+    restart: unless-stopped
+    env_file:
+      - .env.prod
+    depends_on:
+      salon-server:
+        condition: service_healthy
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: salon-nginx
+    restart: unless-stopped
+    environment:
+      ROOT_DOMAIN: ${ROOT_DOMAIN}
+    ports:
+      - '80:80'
+      - '443:443'
+    depends_on:
+      salon-client:
+        condition: service_started
+      salon-server:
+        condition: service_healthy
+    volumes:
+      - ./nginx/app.conf.template:/etc/nginx/templates/app.conf.template:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+
+volumes:
+  postgres_data:

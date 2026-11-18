@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      #- dev
 
   workflow_dispatch:
     inputs:
@@ -99,7 +100,6 @@ jobs:
           build-args: |
             NEXT_PUBLIC_ROOT_DOMAIN=${{ secrets.NEXT_PUBLIC_ROOT_DOMAIN }}
             NEXT_PUBLIC_APP_URL=${{ secrets.NEXT_PUBLIC_APP_URL }}
-            API_PROXY_TARGET = ${{ secrets.API_PROXY_TARGET }}
           tags: |
             ${{ env.REGISTRY }}/${{ env.CLIENT_IMAGE }}:latest
             ${{ env.REGISTRY }}/${{ env.CLIENT_IMAGE }}:${{ github.sha }}
@@ -127,6 +127,15 @@ jobs:
           source: 'docker-compose.prod.yml'
           target: '/opt/salon-app'
 
+      - name: Đẩy cấu hình Nginx template mới nhất sang EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: 'nginx'
+          target: '/opt/salon-app'
+
       - name: Pull image, chạy migration và khởi động lại container trên EC2
         uses: appleboy/ssh-action@v1.2.0
         with:
@@ -140,7 +149,13 @@ jobs:
             # Đăng nhập GHCR trên EC2 (dùng chung token tự động của GitHub Actions)
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
-            # Nạp các biến môi trường từ file .env.prod vào shell hiện tại (để lấy DATABASE_URL cho bước migrate)
+            # Ghi toàn bộ nội dung từ GitHub Secret ra file .env.prod
+            cat << 'EOF' > /opt/salon-app/.env.prod
+            ${{ secrets.ENV_PROD }}
+            EOF
+            chmod 600 /opt/salon-app/.env.prod
+
+            # Nạp các biến môi trường từ file .env.prod vào shell hiện tại
             set -a
             source .env.prod
             set +a
@@ -154,12 +169,14 @@ jobs:
             # Chạy migration nếu được bật (mặc định true khi push code)
             if [ "${{ inputs.run_migrations || 'true' }}" = "true" ]; then
               echo "Đang chạy database migrations..."
-              docker compose -f docker-compose.prod.yml run --rm --no-deps server \
-                /app/migrate -path=/app/migrations -database "$DATABASE_URL" up
+              docker compose -f docker-compose.prod.yml run --rm --no-deps migrate
             fi
 
             # Khởi động lại toàn bộ ứng dụng với image mới
             docker compose -f docker-compose.prod.yml up -d --remove-orphans
+
+            # Chỉ khởi động lại Nginx (không cần recreate các container khác) để load config mới
+            docker compose -f docker-compose.prod.yml up -d --force-recreate --no-deps nginx
 
             # Xóa các image cũ không còn dùng để giải phóng ổ cứng EC2
             docker image prune -f
