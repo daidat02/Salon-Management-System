@@ -397,9 +397,8 @@ func (u *OrderUsecase) GetOrdersByOrgID(ctx context.Context, page, pageSize int,
 	return pagination.NewResult(results, params, total), nil
 }
 
-// GetOrderStats lấy 4 số thẻ thống kê đơn: tổng + doanh thu hôm nay,
-// chờ thanh toán, hủy/hoàn. % so hôm qua và % hủy/hoàn tính ở đây
-// (chia cho 0 thì trả 0).
+// GetOrderStats lấy 4 thẻ thống kê đơn: đơn + doanh thu tháng, tỉ lệ hủy/hoàn,
+// chờ thanh toán hôm nay. % so hôm qua và % hủy/hoàn tính ở đây (chia 0 trả 0).
 func (u *OrderUsecase) GetOrderStats(ctx context.Context) (*domain.OrderStatsResponse, error) {
 	orgID, err := shared.RequireOrgID(ctx)
 	if err != nil {
@@ -465,7 +464,31 @@ func (u *OrderUsecase) GetOrderDetail(ctx context.Context, id string) (*domain.O
 	for _, p := range payments {
 		detail.Payments = append(detail.Payments, toPaymentResponse(p))
 	}
+
+	if order.CustomerID != nil && strings.TrimSpace(*order.CustomerID) != "" {
+		customer, cErr := u.customers.GetCustomerByID(ctx, orgID, strings.TrimSpace(*order.CustomerID))
+		if cErr != nil {
+			if !errors.Is(cErr, customerdomain.ErrCustomerNotFound) {
+				return nil, apperror.New(500, "Lỗi khi lấy thông tin khách hàng", cErr)
+			}
+		} else {
+			detail.Customer = toCustomerInfo(customer)
+		}
+	}
 	return detail, nil
+}
+
+// toCustomerInfo map khách hàng sang thông tin join trong chi tiết đơn.
+func toCustomerInfo(c *customerdomain.Customer) *domain.OrderCustomerInfo {
+	if c == nil {
+		return nil
+	}
+	return &domain.OrderCustomerInfo{
+		ID: c.ID, FullName: c.FullName, Phone: c.Phone, Gender: c.Gender,
+		BirthDate: c.BirthDate, Note: c.Note, TotalSpent: c.TotalSpent,
+		TotalVisits: c.TotalVisits, RewardPoints: c.RewardPoints,
+		IsFlaggedRisk: c.IsFlaggedRisk,
+	}
 }
 
 // ---------- 3. Hoàn tất / hủy / hoàn ----------

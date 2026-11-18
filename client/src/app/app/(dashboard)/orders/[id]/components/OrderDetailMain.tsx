@@ -6,15 +6,14 @@ import {
   Check,
   CheckCircle2,
   FlaskConical,
-  PlusCircle,
   Scissors,
-  Search,
   ShoppingBag,
   TrendingUp,
   X,
 } from 'lucide-react';
 import { TextButton } from '@/components/ui/text-button';
 import DashTable, { type DashColumn } from '@/components/dashboard/DashTable';
+import { DashCombobox } from '@/components/dashboard/DashCombobox';
 import { Button } from '@/components/ui/button';
 import { Tag } from '@/components/ui/tag';
 import type { Product } from '@/types/product';
@@ -672,6 +671,7 @@ export default function OrderDetailMain({
   retail,
   staffList,
   products,
+  productsLoading,
   hasPendingChanges,
   getInitialAssignments,
   onApplyStaff,
@@ -693,6 +693,7 @@ export default function OrderDetailMain({
   retail: EnrichedRetailLine[];
   staffList: Staff[];
   products: Product[];
+  productsLoading?: boolean;
   hasPendingChanges: boolean;
   getInitialAssignments: (itemId: string) => StaffAssignment[];
   onApplyStaff: (itemId: string, assignments: StaffAssignment[]) => Promise<void>;
@@ -718,6 +719,7 @@ export default function OrderDetailMain({
   } | null>(null);
   const [editingQtyId, setEditingQtyId] = React.useState<string | null>(null);
   const [savingQtyId, setSavingQtyId] = React.useState<string | null>(null);
+  const [selectedMaterialId, setSelectedMaterialId] = React.useState('');
   // Nháp sửa 1 dòng vật tư: chỉ stage vào mảng replace khi bấm tích xác nhận.
   const [editingMat, setEditingMat] = React.useState<MaterialDraft | null>(null);
 
@@ -755,9 +757,6 @@ export default function OrderDetailMain({
     },
     [editingMat, onUpdateMaterial],
   );
-  const [matQuery, setMatQuery] = React.useState('');
-  const [matFocused, setMatFocused] = React.useState(false);
-
   const cancelQtyEdit = React.useCallback(() => setEditingQtyId(null), []);
 
   const confirmServiceQty = React.useCallback(
@@ -798,21 +797,18 @@ export default function OrderDetailMain({
     return map;
   }, [products]);
 
-  // Vật tư thêm được: loại material/both, chưa có trong bảng.
+  // Vật tư thêm được: chưa có trong bảng (nguồn đã là material/both).
   const addedProductIds = React.useMemo(
     () => new Set(materials.map((m) => m.productId).filter(Boolean)),
     [materials],
   );
-  const matSuggestions = React.useMemo(() => {
-    const q = matQuery.trim().toLowerCase();
-    return products
-      .filter((p) => p.product_type !== 'retail' && !addedProductIds.has(p.id))
-      .filter(
-        (p) =>
-          q === '' || p.name.toLowerCase().includes(q) || (p.sku ?? '').toLowerCase().includes(q),
-      )
-      .slice(0, 6);
-  }, [products, addedProductIds, matQuery]);
+  const materialOptions = React.useMemo(
+    () =>
+      products
+        .filter((p) => !addedProductIds.has(p.id))
+        .map((p) => ({ value: p.id, label: `${p.name} • ${p.sku}` })),
+    [products, addedProductIds],
+  );
   const materialTotal = materials.reduce((s, l) => s + l.lineCost, 0);
   const retailRevenue = retail.reduce((s, l) => s + l.sellTotal, 0);
   const retailCost = retail.reduce((s, l) => s + l.costTotal, 0);
@@ -885,48 +881,22 @@ export default function OrderDetailMain({
               />
             </div>
             {canEditMaterials && (
-              <div className="relative w-full">
-                <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-on-surface-variant" />
-                <input
-                  value={matQuery}
-                  onChange={(e) => setMatQuery(e.target.value)}
-                  onFocus={() => setMatFocused(true)}
-                  onBlur={() => setTimeout(() => setMatFocused(false), 150)}
-                  placeholder="Thêm vật tư: tìm theo tên, SKU..."
-                  className="w-full rounded-lg bg-surface-container py-2 pr-3 pl-9 text-xs text-on-surface shadow-inner placeholder:text-on-surface-variant focus:ring-1 focus:ring-primary focus:outline-none"
+              <div className="w-full">
+                <DashCombobox
+                  options={materialOptions}
+                  value={selectedMaterialId}
+                  onValueChange={(value) => {
+                    if (value) onAddMaterial(value);
+                    setSelectedMaterialId('');
+                  }}
+                  placeholder={
+                    productsLoading ? 'Đang tải vật tư...' : 'Thêm vật tư: tìm theo tên, SKU...'
+                  }
+                  emptyMessage={
+                    productsLoading ? 'Đang tải danh sách vật tư...' : 'Không còn vật tư để thêm.'
+                  }
+                  disabled={productsLoading || isSavingMaterials}
                 />
-                {matFocused && (
-                  <div className="absolute inset-x-0 top-full z-10 mt-1 overflow-hidden rounded-lg border border-outline bg-surface shadow-md">
-                    {matSuggestions.length === 0 ? (
-                      <div className="px-3 py-2 text-xs text-on-surface-variant">
-                        Không tìm thấy vật tư phù hợp.
-                      </div>
-                    ) : (
-                      matSuggestions.map((p) => (
-                        <button
-                          key={p.id}
-                          type="button"
-                          onMouseDown={(e) => e.preventDefault()}
-                          onClick={() => {
-                            onAddMaterial(p.id);
-                            setMatQuery('');
-                          }}
-                          className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-xs transition-colors hover:bg-surface-container"
-                        >
-                          <span className="min-w-0">
-                            <span className="block truncate font-semibold text-on-surface">
-                              {p.name}
-                            </span>
-                            <span className="font-mono text-[11px] text-on-surface-variant">
-                              SKU: {p.sku} • {formatPlain(p.cost_price ?? 0)}đ
-                            </span>
-                          </span>
-                          <PlusCircle className="h-4 w-4 shrink-0 text-primary" />
-                        </button>
-                      ))
-                    )}
-                  </div>
-                )}
               </div>
             )}
           </div>

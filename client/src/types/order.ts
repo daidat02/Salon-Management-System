@@ -31,6 +31,20 @@ export interface OrderItemStaff {
   commission_amount: number;
 }
 
+export interface OrderItemServiceInfo {
+  name: string;
+  description: string | null;
+  duration_minutes: number;
+}
+
+export interface OrderItemProductInfo {
+  name: string;
+  sku: string;
+  unit: string | null;
+  net_unit: string | null;
+  net_amount: number | null;
+}
+
 export interface OrderDetailItem {
   id: string;
   item_type: 'service' | 'product';
@@ -42,6 +56,12 @@ export interface OrderDetailItem {
   unit?: string | null;
   unit_price: number;
   line_total: number;
+  /** Giá nhập tại thời điểm bán (chỉ dòng sản phẩm). */
+  cost_price: number | null;
+  /** Dịch vụ join sẵn từ server (null với dòng sản phẩm). */
+  service: OrderItemServiceInfo | null;
+  /** Sản phẩm join sẵn từ server (null với dòng dịch vụ). */
+  product: OrderItemProductInfo | null;
   /** NV thực hiện do server join sẵn (có thể vắng khi đơn cũ). */
   staff?: OrderItemStaff[] | null;
 }
@@ -54,6 +74,23 @@ export interface OrderDetailMaterial {
   unit_cost_at_time: number;
   /** Đơn vị của quantity (server trả kèm từ order_item_materials.unit). */
   unit?: string | null;
+  /** Tên dịch vụ mà vật tư dùng cho. */
+  service_name: string;
+  /** Sản phẩm vật tư join sẵn từ server. */
+  product: OrderItemProductInfo | null;
+}
+
+export interface OrderDetailCustomer {
+  id: string;
+  full_name: string;
+  phone: string;
+  gender: string;
+  birth_date: string | null;
+  note: string;
+  total_spent: number;
+  total_visits: number;
+  reward_points: number;
+  is_flagged_risk: boolean;
 }
 
 export interface OrderDetailPayment {
@@ -75,6 +112,8 @@ export interface OrderDetail {
   payments: OrderDetailPayment[];
   /** Hoa hồng do server tính lúc gán NV (client render trực tiếp, không tự tính). */
   commissions: OrderDetailCommission[];
+  /** Khách hàng join sẵn (null với khách lẻ). */
+  customer: OrderDetailCustomer | null;
 }
 
 export interface OrderDetailCommission {

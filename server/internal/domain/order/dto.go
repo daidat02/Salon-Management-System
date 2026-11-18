@@ -123,8 +123,29 @@ type OrderItemResponse struct {
 	Unit      *string `json:"unit"`
 	UnitPrice float64 `json:"unit_price"`
 	LineTotal float64 `json:"line_total"`
+	// CostPrice giá nhập tại thời điểm bán (chỉ dòng sản phẩm).
+	CostPrice *float64 `json:"cost_price"`
+	// Service/Product join sẵn từ server (nil theo item_type).
+	Service *OrderItemServiceInfo `json:"service"`
+	Product *OrderItemProductInfo `json:"product"`
 	// Staff NV thực hiện theo bảng order_item_staff (join sẵn ở query).
 	Staff []*OrderItemStaffInfo `json:"staff,omitempty"`
+}
+
+// OrderItemServiceInfo thông tin dịch vụ join tại thời điểm đọc chi tiết.
+type OrderItemServiceInfo struct {
+	Name            string  `json:"name"`
+	Description     *string `json:"description"`
+	DurationMinutes int     `json:"duration_minutes"`
+}
+
+// OrderItemProductInfo thông tin sản phẩm join tại thời điểm đọc chi tiết.
+type OrderItemProductInfo struct {
+	Name      string   `json:"name"`
+	SKU       string   `json:"sku"`
+	Unit      *string  `json:"unit"`
+	NetUnit   *string  `json:"net_unit"`
+	NetAmount *float64 `json:"net_amount"`
 }
 
 // OrderItemStaffInfo 1 NV trong 1 dòng đơn kèm tên hiển thị.
@@ -146,6 +167,10 @@ type OrderMaterialResponse struct {
 	// Unit đơn vị của Quantity (đơn vị nhỏ nhất sau quy đổi ở luồng gán lại;
 	// đơn vị định mức ở snapshot tự động từ dịch vụ).
 	Unit string `json:"unit"`
+	// ServiceName tên dịch vụ mà vật tư được dùng cho (join từ dòng đơn cha).
+	ServiceName string `json:"service_name"`
+	// Product thông tin sản phẩm vật tư join sẵn từ server.
+	Product *OrderItemProductInfo `json:"product"`
 }
 
 type PaymentResponse struct {
@@ -185,6 +210,22 @@ type OrderDetailResponse struct {
 	Materials   []*OrderMaterialResponse `json:"materials"`
 	Payments    []*PaymentResponse       `json:"payments"`
 	Commissions []*StaffCommission       `json:"commissions"`
+	// Customer thông tin khách hàng join sẵn (nil với khách lẻ).
+	Customer *OrderCustomerInfo `json:"customer"`
+}
+
+// OrderCustomerInfo thông tin khách hàng gắn với đơn (join sẵn khi đọc chi tiết).
+type OrderCustomerInfo struct {
+	ID            string     `json:"id"`
+	FullName      string     `json:"full_name"`
+	Phone         string     `json:"phone"`
+	Gender        string     `json:"gender"`
+	BirthDate     *time.Time `json:"birth_date"`
+	Note          string     `json:"note"`
+	TotalSpent    float64    `json:"total_spent"`
+	TotalVisits   int        `json:"total_visits"`
+	RewardPoints  int        `json:"reward_points"`
+	IsFlaggedRisk bool       `json:"is_flagged_risk"`
 }
 
 // StaffCommission 1 dòng hoa hồng trong mảng commissions của chi tiết đơn.
@@ -199,20 +240,28 @@ type StaffCommission struct {
 }
 
 // OrderStatsResponse 4 số thẻ thống kê đơn hàng:
-// tổng đơn + doanh thu hôm nay, chờ thanh toán, hủy/hoàn.
+// đơn + doanh thu tháng, tỉ lệ hủy/hoàn tiền, chờ thanh toán hôm nay.
 type OrderStatsResponse struct {
-	TodayTotal        int64   `json:"today_total" db:"today_total"`
-	TodayCompleted    int64   `json:"today_completed" db:"today_completed"`
-	TodayProcessing   int64   `json:"today_processing" db:"today_processing"`
-	TodayRevenue      float64 `json:"today_revenue" db:"today_revenue"`
-	YesterdayRevenue  float64 `json:"yesterday_revenue" db:"yesterday_revenue"`
-	RevenueChangePct  float64 `json:"revenue_change_pct"`
-	PendingCount      int64   `json:"pending_count" db:"pending_count"`
-	PendingAmount     float64 `json:"pending_amount" db:"pending_amount"`
+	TodayTotal       int64   `json:"today_total" db:"today_total"`
+	TodayCompleted   int64   `json:"today_completed" db:"today_completed"`
+	TodayProcessing  int64   `json:"today_processing" db:"today_processing"`
+	TodayRevenue     float64 `json:"today_revenue" db:"today_revenue"`
+	YesterdayRevenue float64 `json:"yesterday_revenue" db:"yesterday_revenue"`
+	RevenueChangePct float64 `json:"revenue_change_pct"`
+	// MonthTotal / MonthRevenue: đơn + doanh thu trong tháng hiện tại.
+	MonthTotal   int64   `json:"month_total" db:"month_total"`
+	MonthRevenue float64 `json:"month_revenue" db:"month_revenue"`
+	// Pending* : toàn bộ đơn còn nợ; PendingToday*: đơn tạo trong hôm nay.
+	PendingCount       int64   `json:"pending_count" db:"pending_count"`
+	PendingAmount      float64 `json:"pending_amount" db:"pending_amount"`
+	PendingTodayCount  int64   `json:"pending_today_count" db:"pending_today_count"`
+	PendingTodayAmount float64 `json:"pending_today_amount" db:"pending_today_amount"`
+	// CancelRefund* gộp hủy + hoàn; CancelMonth / RefundMonth tách riêng.
 	CancelRefundToday int64   `json:"cancel_refund_today" db:"cancel_refund_today"`
 	CancelRefundMonth int64   `json:"cancel_refund_month" db:"cancel_refund_month"`
+	CancelMonth       int64   `json:"cancel_month" db:"cancel_month"`
+	RefundMonth       int64   `json:"refund_month" db:"refund_month"`
 	CancelRefundRate  float64 `json:"cancel_refund_rate"`
-	MonthTotal        int64   `json:"month_total" db:"month_total"`
 }
 
 // StaffCommissionStats thống kê hoa hồng dịch vụ của 1 nhân viên trong khoảng ngày.

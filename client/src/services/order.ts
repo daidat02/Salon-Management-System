@@ -184,11 +184,16 @@ export type OrderStats = {
   pending_amount: number;
   cancel_refund_today: number;
   cancel_refund_month: number;
+  cancel_month: number;
+  refund_month: number;
   cancel_refund_rate: number;
   month_total: number;
+  month_revenue: number;
+  pending_today_count: number;
+  pending_today_amount: number;
 };
 
-/** Thống kê 4 thẻ đơn hàng (tổng/doanh thu hôm nay, chờ thanh toán, hủy/hoàn). */
+/** Thống kê 4 thẻ đơn hàng (đơn/doanh thu tháng, tỉ lệ hủy/hoàn, chờ thanh toán hôm nay). */
 export const getOrderStats = async (): Promise<OrderStats> => {
   const res = await apiClient.get<ApiResponse<OrderStats>>(ORDERS_ENDPOINT.GET_ORDER_STATS);
   return res.data.data;

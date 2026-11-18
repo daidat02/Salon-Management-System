@@ -187,6 +187,8 @@ type StaffStore interface {
 type CustomerStore interface {
 	// CustomerExistsInOrg kiểm tra khách thuộc đúng salon.
 	CustomerExistsInOrg(ctx context.Context, orgID, customerID string) (bool, error)
+	// GetCustomerByID lấy thông tin khách để join vào chi tiết đơn.
+	GetCustomerByID(ctx context.Context, orgID, customerID string) (*customerdomain.Customer, error)
 	// FindCustomerByPhone tìm khách theo SĐT để dedupe khi POS gửi new_customer.
 	// Không thấy trả về (nil, nil).
 	FindCustomerByPhone(ctx context.Context, orgID, phone string) (*customerdomain.Customer, error)

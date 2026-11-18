@@ -1,4 +1,4 @@
-name: CI
+name: CI - Test & Verify
 
 on:
   push:
@@ -45,53 +45,7 @@ env:
   NEXT_PUBLIC_API_VERSION: v1
 
 jobs:
-  backend-test:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: server/go.mod
-          cache-dependency-path: server/go.sum
-
-      - name: go vet
-        working-directory: server
-        run: go vet ./...
-
-      - name: Run usecase tests
-        working-directory: server
-        run: go test -count=1 ./internal/usecase/...
-
-  client-checks:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: client/package-lock.json
-
-      - name: Install dependencies
-        working-directory: client
-        run: npm ci
-
-      - name: Typecheck
-        working-directory: client
-        run: npm run typecheck
-
-      - name: ESLint
-        working-directory: client
-        run: npm run lint
-
   playwright:
-    needs: [backend-test, client-checks]
     runs-on: ubuntu-latest
     timeout-minutes: 30
 

@@ -85,8 +85,19 @@ type OrderItem struct {
 	Unit      *string `json:"unit" db:"unit"`
 	UnitPrice float64 `json:"unit_price" db:"unit_price"`
 	LineTotal float64 `json:"line_total" db:"line_total"`
+	// CostPrice giá nhập tại thời điểm bán (chỉ dòng sản phẩm; service = nil).
+	CostPrice *float64 `json:"cost_price" db:"cost_price"`
 	// Staff NV thực hiện (join từ order_item_staff, nil khi không query kèm).
 	Staff []*OrderItemStaffInfo `json:"staff,omitempty"`
+	// Thông tin danh mục join sẵn khi đọc chi tiết (không lưu ở order_items).
+	ServiceName            *string  `json:"-" db:"service_name"`
+	ServiceDescription     *string  `json:"-" db:"service_description"`
+	ServiceDurationMinutes *int     `json:"-" db:"service_duration_minutes"`
+	ProductName            *string  `json:"-" db:"product_name"`
+	ProductSKU             *string  `json:"-" db:"product_sku"`
+	ProductUnit            *string  `json:"-" db:"product_unit"`
+	ProductNetUnit         *string  `json:"-" db:"product_net_unit"`
+	ProductNetAmount       *float64 `json:"-" db:"product_net_amount"`
 }
 
 func (it *OrderItem) Validate() error {
@@ -95,6 +106,9 @@ func (it *OrderItem) Validate() error {
 	}
 	if it.UnitPrice < 0 {
 		return errors.New("Đơn giá dòng hàng không được âm")
+	}
+	if it.CostPrice != nil && *it.CostPrice < 0 {
+		return errors.New("Giá vốn dòng hàng không được âm")
 	}
 	switch it.ItemType {
 	case ItemTypeService:
@@ -126,6 +140,13 @@ type OrderItemMaterial struct {
 	UnitCostAtTime float64 `json:"unit_cost_at_time" db:"unit_cost_at_time"`
 	// Unit đơn vị của Quantity (VD tuýp khi snapshot theo định mức lớn, ml khi đã quy đổi).
 	Unit string `json:"unit" db:"unit"`
+	// Thông tin join sẵn khi đọc chi tiết (không lưu ở order_item_materials).
+	ProductName      *string  `json:"-" db:"product_name"`
+	ProductSKU       *string  `json:"-" db:"product_sku"`
+	ProductUnit      *string  `json:"-" db:"product_unit"`
+	ProductNetUnit   *string  `json:"-" db:"product_net_unit"`
+	ProductNetAmount *float64 `json:"-" db:"product_net_amount"`
+	ServiceName      *string  `json:"-" db:"service_name"`
 }
 
 func (m *OrderItemMaterial) Validate() error {

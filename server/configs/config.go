@@ -17,12 +17,13 @@ type Config struct {
 }
 
 type AppConfig struct {
-	GinMode  string `mapstructure:"GIN_MODE"`
-	Env       string `mapstructure:"APP_ENV"`
-	Port      string `mapstructure:"APP_PORT"`
-	BasePath  string `mapstructure:"API_BASE_PATH"`
-	ServerURL string `mapstructure:"SERVER_URL"`
-
+	GinMode  string 			`mapstructure:"GIN_MODE"`
+	Env       string 			`mapstructure:"APP_ENV"`
+	Port      string 			`mapstructure:"PORT"`
+	BasePath  string 			`mapstructure:"API_BASE_PATH"`
+	ServerURL string 			`mapstructure:"SERVER_URL"`
+	AllowedOriginsRaw string  	`mapstructure:"CORS_ALLOWED_ORIGINS"`
+	AllowedOrigins []string  	`mapstructure:"-"`
 }
 
 type DatabaseConfig struct {
@@ -30,7 +31,7 @@ type DatabaseConfig struct {
 	DB_PASSWORD string `mapstructure:"DB_PASSWORD"`
 	DB_NAME     string `mapstructure:"DB_NAME"`
 	DB_PORT     string `mapstructure:"DB_PORT"`
-	DB_url      string `mapstructure:"DB_URL"`
+	DB_URL      string `mapstructure:"DB_URL"`
 }
 
 type JWTConfig struct {
@@ -40,6 +41,14 @@ type JWTConfig struct {
 	CookieSecure       bool          `mapstructure:"REFRESH_COOKIE_SECURE"`
 	CookieSameSite     string        `mapstructure:"REFRESH_COOKIE_SAMESITE"`
 	CookieDomain       string        `mapstructure:"REFRESH_COOKIE_DOMAIN"`
+}
+
+type R2Config struct {
+	AccountID       string `mapstructure:"R2_ACCOUNT_ID"`
+	AccessKeyID     string `mapstructure:"R2_ACCESS_KEY_ID"`
+	SecretAccessKey string `mapstructure:"R2_ACCESS_KEY_SECRET"`
+	BucketName      string `mapstructure:"R2_BUCKET_NAME"`
+	PublicURL       string `mapstructure:"R2_PUBLIC_URL"`
 }
 
 func (c *JWTConfig) Validate(appEnv string) error {
@@ -70,13 +79,7 @@ func (c *JWTConfig) Validate(appEnv string) error {
 	return nil
 }
 
-type R2Config struct {
-	AccountID       string `mapstructure:"R2_ACCOUNT_ID"`
-	AccessKeyID     string `mapstructure:"R2_ACCESS_KEY_ID"`
-	SecretAccessKey string `mapstructure:"R2_ACCESS_KEY_SECRET"`
-	BucketName      string `mapstructure:"R2_BUCKET_NAME"`
-	PublicURL       string `mapstructure:"R2_PUBLIC_URL"`
-}
+
 
 // LoadConfig khởi tạo cấu hình từ các biến môi trường
 
@@ -85,7 +88,43 @@ func LoadConfig() (*Config, error) {
 	viper.SetConfigType("env")
 	viper.AutomaticEnv()
 
-	viper.SetDefault("APP_PORT", "8080")
+	envKeys := []string{
+		// AppConfig
+		"GIN_MODE",
+		"APP_ENV",
+		"PORT",
+		"API_BASE_PATH",
+		"SERVER_URL",
+		"CORS_ALLOWED_ORIGINS",
+		// DatabaseConfig
+		"DB_USER",
+		"DB_PASSWORD",
+		"DB_NAME",
+		"DB_PORT",
+		"DB_URL",
+
+		// JWTConfig
+		"JWT_SECRET",
+		"ACCESS_TOKEN_EXPIRE",
+		"REFRESH_TOKEN_EXPIRE",
+		"REFRESH_COOKIE_SECURE",
+		"REFRESH_COOKIE_SAMESITE",
+		"REFRESH_COOKIE_DOMAIN",
+
+		// R2Config
+		"R2_ACCOUNT_ID",
+		"R2_ACCESS_KEY_ID",
+		"R2_ACCESS_KEY_SECRET",
+		"R2_BUCKET_NAME",
+		"R2_PUBLIC_URL",
+	}
+
+	for _, key := range envKeys{
+		_ = viper.BindEnv(key)
+	}
+
+
+	viper.SetDefault("PORT", "8080")
 	viper.SetDefault("APP_ENV", "development")
 	viper.SetDefault("API_BASE_PATH", "/api/v1")
 	viper.SetDefault("SERVER_URL", "http://localhost:8080")
@@ -93,18 +132,29 @@ func LoadConfig() (*Config, error) {
 		log.Println("Không tìm thấy file .env, đang đọc trực tiếp từ Environment Variables của hệ thống")
 	}
 	var config Config
+
 	if err := viper.Unmarshal(&config.App); err != nil {
 		return nil, err
 	}
+
+	if config.App.AllowedOriginsRaw != "" {
+		for _, origin := range strings.Split(config.App.AllowedOriginsRaw, ","){
+			if trimmedOrigin := strings.TrimSpace(origin); trimmedOrigin != "" {
+				config.App.AllowedOrigins = append(config.App.AllowedOrigins, trimmedOrigin)
+			}
+		}
+	}
+
 	if err := viper.Unmarshal(&config.Database); err != nil {
 		return nil, err
 	}
-
+	
 	viper.SetDefault("REFRESH_COOKIE_SAMESITE", "lax")
 	viper.SetDefault("REFRESH_COOKIE_DOMAIN", "")
 	if !viper.IsSet("REFRESH_COOKIE_SECURE") {
 		viper.SetDefault("REFRESH_COOKIE_SECURE", config.App.Env == "production")
 	}
+
 	if err := viper.Unmarshal(&config.JWT); err != nil {
 		return nil, err
 	}

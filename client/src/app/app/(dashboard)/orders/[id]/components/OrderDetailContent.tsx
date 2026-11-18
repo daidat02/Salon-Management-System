@@ -27,14 +27,10 @@ import { useGeneralSettings, usePaymentSettings } from '@/hooks/settings';
 import { useAppSelector } from '@/store/hook';
 import { selectAuthUser } from '@/store/slices/authSlice';
 import { printInvoice } from '@/lib/invoice';
-import { useCustomer } from '@/hooks/customer';
-import { useService } from '@/hooks/service';
-import { useProduct } from '@/hooks/product';
+import { useMaterialProducts } from '@/hooks/product';
 import { useStaff } from '@/hooks/staff';
 import useAuth from '@/hooks/use-auth';
-import type { Customer } from '@/types/customer';
 import type { Product } from '@/types/product';
-import type { Service } from '@/types/service';
 import type { Staff } from '@/types/staff';
 import type { OrderDetailMaterial, OrderStatus } from '@/types/order';
 import OrderDetailMain from './OrderDetailMain';
@@ -77,9 +73,7 @@ export default function OrderDetailContent() {
   const id = params?.id;
 
   const { data: detail, isLoading, isError, error } = useOrderDetail(id);
-  const { data: customerData } = useCustomer({ page: 1, pageSize: 100 });
-  const { data: serviceData } = useService({ page: 1, pageSize: 100 });
-  const { data: productData } = useProduct({ page: 1, pageSize: 100 });
+  const { data: productData, isLoading: productsLoading } = useMaterialProducts();
   const { data: staffData } = useStaff({ page: 1, pageSize: 100 });
   const { data: generalSettings } = useGeneralSettings();
   const { data: paymentSettings } = usePaymentSettings();
@@ -87,17 +81,15 @@ export default function OrderDetailContent() {
   const { can } = useAuth();
   const canViewProfit = can('reports:profit-view');
 
-  const services = React.useMemo(() => toMap<Service>(serviceData?.data ?? []), [serviceData]);
-  const products = React.useMemo(() => toMap<Product>(productData?.data ?? []), [productData]);
+  const products = React.useMemo(() => toMap<Product>(productData ?? []), [productData]);
   const staff = React.useMemo(() => toMap<Staff>(staffData?.data ?? []), [staffData]);
-  const customers = React.useMemo(() => toMap<Customer>(customerData?.data ?? []), [customerData]);
 
   const staffList = React.useMemo(
     () => (staffData?.data ?? []).filter((s): s is Staff => s !== null && s !== undefined),
     [staffData],
   );
   const productList = React.useMemo(
-    () => (productData?.data ?? []).filter((p): p is Product => p !== null && p !== undefined),
+    () => (productData ?? []).filter((p): p is Product => p !== null && p !== undefined),
     [productData],
   );
 
@@ -166,9 +158,7 @@ export default function OrderDetailContent() {
   );
 
   // Nút Xóa ở 2 bảng: confirm dialog rồi gọi API xóa dòng (server nhả kho + chốt tổng).
-  const [deleteTarget, setDeleteTarget] = React.useState<{ id: string; name: string } | null>(
-    null,
-  );
+  const [deleteTarget, setDeleteTarget] = React.useState<{ id: string; name: string } | null>(null);
   const [isDeleting, setIsDeleting] = React.useState(false);
 
   // Hủy / Hoàn cả đơn: confirm dialog rồi gọi API (server xử lý kho + trạng thái).
@@ -253,7 +243,7 @@ export default function OrderDetailContent() {
       await queryClient.invalidateQueries({ queryKey: queryKeys.order.detail(id) });
       toast.add({
         title: 'Đã lưu nhân viên thực hiện',
-        description: 'Phân công và hoa hồng đã đồng bộ lên server.',
+        description: 'Phân công và hoa hồng đã được đồng bộ.',
         type: 'success',
       });
     },
@@ -383,21 +373,14 @@ export default function OrderDetailContent() {
   const enriched = React.useMemo(() => {
     if (!detail) return null;
     const items = detail.items;
-    const serviceLines = buildServiceLines(items, services, staff);
+    const serviceLines = buildServiceLines(items, staff);
     const serviceNameByItemId = new Map(
-      items.map((it) => {
-        const svc = it.service_id ? services.get(it.service_id) : undefined;
-        return [it.id, svc?.name ?? 'Dịch vụ'] as const;
-      }),
+      items.map((it) => [it.id, it.service?.name ?? 'Dịch vụ'] as const),
     );
     const visibleServerMaterials = detail.materials.filter(
       (m) => !deletedMaterialIds.includes(m.id),
     );
-    const serverMaterials = buildMaterialLines(
-      visibleServerMaterials,
-      products,
-      serviceNameByItemId,
-    ).map((l) => {
+    const serverMaterials = buildMaterialLines(visibleServerMaterials).map((l) => {
       const ov = materialOverrides[l.id];
       if (!ov) return l;
       const p = products.get(l.productId);
@@ -466,11 +449,21 @@ export default function OrderDetailContent() {
             product_id: lm.productId,
             quantity: lm.quantity,
             unit_cost_at_time: p ? priceForUnit(p, unit || p.unit) : 0,
+            service_name: serviceNameByItemId.get(lm.itemId) ?? '',
+            product: p
+              ? {
+                  name: p.name,
+                  sku: p.sku,
+                  unit: p.unit ?? null,
+                  net_unit: p.net_unit ?? null,
+                  net_amount: p.net_amount ?? null,
+                }
+              : null,
           } satisfies OrderDetailMaterial;
         }),
       ],
     };
-    const retailLines = buildRetailLines(items, products, staff);
+    const retailLines = buildRetailLines(items, staff);
     const profit = calcOrderProfit(adjustedDetail, retailLines);
     // Hoa hồng do server tính sẵn (detail.commissions) — client chỉ map hiển thị.
     const itemTypeById = new Map(items.map((it) => [it.id, it.item_type] as const));
@@ -495,22 +488,13 @@ export default function OrderDetailContent() {
           amount: Math.round(c.amount),
         };
       }),
-      customer: detail.order.customer_id ? customers.get(detail.order.customer_id) : undefined,
+      customer: detail.customer ?? undefined,
       hasPendingChanges:
         Object.keys(materialOverrides).length > 0 ||
         deletedMaterialIds.length > 0 ||
         localMaterials.length > 0,
     };
-  }, [
-    detail,
-    services,
-    products,
-    staff,
-    customers,
-    localMaterials,
-    materialOverrides,
-    deletedMaterialIds,
-  ]);
+  }, [detail, products, staff, localMaterials, materialOverrides, deletedMaterialIds]);
 
   React.useEffect(() => {
     enrichedRef.current = enriched;
@@ -541,19 +525,15 @@ export default function OrderDetailContent() {
   const canEditOrder = order.status === 'pending' || order.status === 'confirm';
 
   const handlePrintInvoice = () => {
-    const lines = detail.items.map((item) => {
-      const service = item.service_id ? services.get(item.service_id) : undefined;
-      const product = item.product_id ? products.get(item.product_id) : undefined;
-      return {
-        name:
-          service?.name ??
-          product?.name ??
-          (item.item_type === 'service' ? 'Dịch vụ' : 'Sản phẩm'),
-        quantity: item.quantity,
-        unit_price: item.unit_price,
-        line_total: item.line_total,
-      };
-    });
+    const lines = detail.items.map((item) => ({
+      name:
+        item.service?.name ??
+        item.product?.name ??
+        (item.item_type === 'service' ? 'Dịch vụ' : 'Sản phẩm'),
+      quantity: item.quantity,
+      unit_price: item.unit_price,
+      line_total: item.line_total,
+    }));
 
     const opened = printInvoice({
       order,
@@ -591,9 +571,7 @@ export default function OrderDetailContent() {
         description={
           <div className="mt-0.5 space-y-1 text-xs text-on-surface-variant">
             <p>Thời gian tạo đơn: {formatDateTime(order.created_at)}</p>
-            {order.description && (
-              <p className="max-w-3xl text-on-surface">{order.description}</p>
-            )}
+            {order.description && <p className="max-w-3xl text-on-surface">{order.description}</p>}
           </div>
         }
         actions={[
@@ -644,6 +622,7 @@ export default function OrderDetailContent() {
             retail={enriched.retailLines}
             staffList={staffList}
             products={productList}
+            productsLoading={productsLoading}
             hasPendingChanges={enriched.hasPendingChanges}
             canEditItems={canEditOrder}
             canEditMaterials={canEditOrder}
@@ -694,11 +673,7 @@ export default function OrderDetailContent() {
         maxWidth="max-w-[480px]"
         footer={
           <div className="flex w-full items-center justify-end gap-2.5">
-            <Button
-              variant="outline"
-              disabled={isDeleting}
-              onClick={() => setDeleteTarget(null)}
-            >
+            <Button variant="outline" disabled={isDeleting} onClick={() => setDeleteTarget(null)}>
               Hủy
             </Button>
             <Button
@@ -730,11 +705,7 @@ export default function OrderDetailContent() {
         maxWidth="max-w-[480px]"
         footer={
           <div className="flex w-full items-center justify-end gap-2.5">
-            <Button
-              variant="outline"
-              disabled={isActing}
-              onClick={() => setOrderAction(null)}
-            >
+            <Button variant="outline" disabled={isActing} onClick={() => setOrderAction(null)}>
               Hủy
             </Button>
             <Button
@@ -742,18 +713,12 @@ export default function OrderDetailContent() {
               onClick={() => void confirmOrderAction()}
               className="bg-error text-white hover:bg-error/90"
             >
-              {isActing
-                ? 'Đang xử lý...'
-                : orderAction === 'cancel'
-                  ? 'Hủy đơn'
-                  : 'Hoàn đơn'}
+              {isActing ? 'Đang xử lý...' : orderAction === 'cancel' ? 'Hủy đơn' : 'Hoàn đơn'}
             </Button>
           </div>
         }
       >
-        <p className="text-xs text-on-surface-variant">
-          Hành động này không thể hoàn tác.
-        </p>
+        <p className="text-xs text-on-surface-variant">Hành động này không thể hoàn tác.</p>
       </DashDialog>
     </div>
   );

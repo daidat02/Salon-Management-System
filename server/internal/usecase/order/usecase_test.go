@@ -90,6 +90,12 @@ func TestOrderUsecase_CreateOrder(t *testing.T) {
 	t.Run("Thành công - Đơn sản phẩm, giá server tính, trừ kho", func(t *testing.T) {
 		repo := new(MockOrderRepository)
 		repo.On("CreateOrder", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			Run(func(args mock.Arguments) {
+				items := args.Get(2).([]*domain.OrderItem)
+				assert.Len(t, items, 1)
+				assert.NotNil(t, items[0].CostPrice)
+				assert.Equal(t, 90000.0, *items[0].CostPrice)
+			}).
 			Return(nil)
 
 		uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), new(MockCustomerStore), new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
@@ -1074,6 +1080,33 @@ func TestOrderUsecase_GetOrderDetail_Commissions(t *testing.T) {
 	assert.Equal(t, 500000.0, res.Commissions[0].Amount)
 	assert.Equal(t, "it-1", res.Commissions[0].OrderItemID)
 	repo.AssertExpectations(t)
+}
+
+func TestOrderUsecase_GetOrderDetail_CustomerJoin(t *testing.T) {
+	repo := new(MockOrderRepository)
+	customers := new(MockCustomerStore)
+	order := &domain.Order{
+		ID: "ord-1", OrganizationID: "org-123", Code: "ORD-1", Status: domain.StatusPending,
+		CustomerID: strP("cus-1"), SubtotalAmount: 0, TotalAmount: 0,
+	}
+	repo.On("GetOrderByID", mock.Anything, "org-123", "ord-1").Return(order, nil)
+	repo.On("GetOrderItems", mock.Anything, "org-123", "ord-1").Return([]*domain.OrderItem{}, nil)
+	repo.On("GetOrderMaterials", mock.Anything, "ord-1").Return([]*domain.OrderItemMaterial{}, nil)
+	repo.On("GetOrderPayments", mock.Anything, "org-123", "ord-1").Return([]*domain.Payment{}, nil)
+	customers.On("GetCustomerByID", mock.Anything, "org-123", "cus-1").
+		Return(&customerdomain.Customer{ID: "cus-1", FullName: "Lan", Phone: "0901", TotalSpent: 500000, TotalVisits: 3}, nil)
+
+	uc := NewOrderUsecase(repo, catalogOK(), productsWithPricing(), new(MockServiceStore), customers, new(MockAppointmentStore), new(MockStaffStore), new(MockSettingStore))
+	res, err := uc.GetOrderDetail(withOrgCtx("org-123"), "ord-1")
+
+	assert.NoError(t, err)
+	assert.NotNil(t, res.Customer)
+	assert.Equal(t, "cus-1", res.Customer.ID)
+	assert.Equal(t, "Lan", res.Customer.FullName)
+	assert.Equal(t, 500000.0, res.Customer.TotalSpent)
+	assert.Equal(t, 3, res.Customer.TotalVisits)
+	repo.AssertExpectations(t)
+	customers.AssertExpectations(t)
 }
 
 func TestOrderUsecase_CreateOrder_CustomerStore(t *testing.T) {

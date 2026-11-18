@@ -78,7 +78,7 @@ func (h *OrderHandler) GetOrdersByOrgID(c *gin.Context) {
 }
 
 // GetOrderStats godoc
-// @Summary      Thống kê đơn hàng (tổng/doanh thu hôm nay, chờ thanh toán, hủy/hoàn)
+// @Summary      Thống kê đơn hàng (đơn/doanh thu tháng, tỉ lệ hủy/hoàn, chờ thanh toán hôm nay)
 // @Tags         Orders
 // @Produce      json
 // @Security     BearerAuth
@@ -112,6 +112,7 @@ func (h *OrderHandler) GetOrderDetail(c *gin.Context) {
 
 	result, err := h.uc.GetOrderDetail(c.Request.Context(), id)
 	if err != nil {
+		log.Println("Error getting order detail:", err)
 		response.Error(c, err)
 		c.Abort()
 		return

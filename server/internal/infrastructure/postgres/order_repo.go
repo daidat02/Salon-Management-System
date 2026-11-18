@@ -59,18 +59,27 @@ func isUniqueViolation(err error) bool {
 // orderItemRow hứng 1 dòng order_items kèm JSON nhân viên (cột staff);
 // map sang domain.OrderItem sau khi unmarshal (sqlx không scan JSON vào slice).
 type orderItemRow struct {
-	ID             string  `db:"id"`
-	OrganizationID string  `db:"organization_id"`
-	OrderID        string  `db:"order_id"`
-	ItemType       string  `db:"item_type"`
-	ServiceID      *string `db:"service_id"`
-	ProductID      *string `db:"product_id"`
-	StaffID        *string `db:"staff_id"`
-	Quantity       float64 `db:"quantity"`
-	Unit           *string `db:"unit"`
-	UnitPrice      float64 `db:"unit_price"`
-	LineTotal      float64 `db:"line_total"`
-	StaffJSON      string  `db:"staff"`
+	ID                     string   `db:"id"`
+	OrganizationID         string   `db:"organization_id"`
+	OrderID                string   `db:"order_id"`
+	ItemType               string   `db:"item_type"`
+	ServiceID              *string  `db:"service_id"`
+	ProductID              *string  `db:"product_id"`
+	StaffID                *string  `db:"staff_id"`
+	Quantity               float64  `db:"quantity"`
+	Unit                   *string  `db:"unit"`
+	UnitPrice              float64  `db:"unit_price"`
+	LineTotal              float64  `db:"line_total"`
+	CostPrice              *float64 `db:"cost_price"`
+	ServiceName            *string  `db:"service_name"`
+	ServiceDescription     *string  `db:"service_description"`
+	ServiceDurationMinutes *int     `db:"service_duration_minutes"`
+	ProductName            *string  `db:"product_name"`
+	ProductSKU             *string  `db:"product_sku"`
+	ProductUnit            *string  `db:"product_unit"`
+	ProductNetUnit         *string  `db:"product_net_unit"`
+	ProductNetAmount       *float64 `db:"product_net_amount"`
+	StaffJSON              string   `db:"staff"`
 }
 
 // orderListFilter dựng mệnh đề lọc status cho list/count (trả về SQL + args,
@@ -181,14 +190,14 @@ func bulkInsertOrderItems(ctx context.Context, tx pgx.Tx, items []*domain.OrderI
 	var placeholders []string
 	for _, it := range items {
 		placeholders = append(placeholders, fmt.Sprintf(
-			"($%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d)",
-			len(args)+1, len(args)+2, len(args)+3, len(args)+4, len(args)+5,
-			len(args)+6, len(args)+7, len(args)+8, len(args)+9, len(args)+10, len(args)+11,
+			"($%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d, $%d)",
+			len(args)+1, len(args)+2, len(args)+3, len(args)+4, len(args)+5, len(args)+6,
+			len(args)+7, len(args)+8, len(args)+9, len(args)+10, len(args)+11, len(args)+12,
 		))
 		args = append(args,
 			it.ID, it.OrganizationID, it.OrderID, it.ItemType,
 			nullableStr(it.ServiceID), nullableStr(it.ProductID), nullableStr(it.StaffID),
-			it.Quantity, it.UnitPrice, it.Unit, it.LineTotal,
+			it.Quantity, it.UnitPrice, it.Unit, it.LineTotal, it.CostPrice,
 		)
 	}
 	_, err := tx.Exec(ctx, bulkInsertOrderItemsQuery+strings.Join(placeholders, ", "), args...)
@@ -334,7 +343,11 @@ func (r *PostgresOrderRepository) GetOrderItems(ctx context.Context, orgID, orde
 			ID: row.ID, OrganizationID: row.OrganizationID, OrderID: row.OrderID,
 			ItemType: row.ItemType, ServiceID: row.ServiceID, ProductID: row.ProductID,
 			StaffID: row.StaffID, Quantity: row.Quantity, Unit: row.Unit, UnitPrice: row.UnitPrice,
-			LineTotal: row.LineTotal, Staff: staff,
+			LineTotal: row.LineTotal, CostPrice: row.CostPrice, Staff: staff,
+			ServiceName: row.ServiceName, ServiceDescription: row.ServiceDescription,
+			ServiceDurationMinutes: row.ServiceDurationMinutes,
+			ProductName:            row.ProductName, ProductSKU: row.ProductSKU, ProductUnit: row.ProductUnit,
+			ProductNetUnit: row.ProductNetUnit, ProductNetAmount: row.ProductNetAmount,
 		})
 	}
 	return items, nil
@@ -347,9 +360,14 @@ func (r *PostgresOrderRepository) GetOrderMaterials(ctx context.Context, orderID
 	// Lọc salon ở tầng usecase qua đơn cha, ở đây chỉ cần đúng đơn.
 	materials := make([]*domain.OrderItemMaterial, 0)
 	if err := r.qx.SelectContext(ctx, &materials, `
-		SELECT m.id, m.order_item_id, m.product_id, m.quantity, m.unit_cost_at_time, COALESCE(m.unit, '') AS unit
+		SELECT m.id, m.order_item_id, m.product_id, m.quantity, m.unit_cost_at_time, COALESCE(m.unit, '') AS unit,
+		       sv.name AS service_name,
+		       p.name AS product_name, p.sku AS product_sku, p.unit AS product_unit,
+		       p.net_unit AS product_net_unit, p.net_amount AS product_net_amount
 		FROM order_item_materials m
 		JOIN order_items i ON i.id = m.order_item_id
+		LEFT JOIN services sv ON sv.id = i.service_id
+		LEFT JOIN products p ON p.id = m.product_id
 		WHERE i.order_id = $1
 	`, orderID); err != nil {
 		return nil, fmt.Errorf("lỗi khi truy vấn vật tư đơn hàng: %w", err)

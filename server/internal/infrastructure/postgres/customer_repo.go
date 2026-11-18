@@ -115,6 +115,18 @@ func (r *PostgresCustomerRepository) GetCustomerDetailByID(ctx context.Context, 
 	return &out, nil
 }
 
+func (r *PostgresCustomerRepository) GetCustomerByID(ctx context.Context, orgID, customerID string) (*domain.Customer, error) {
+	var c domain.Customer
+
+	if err := r.qx.GetContext(ctx, &c, getCustomerQuery+withIDFilter, orgID, customerID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("khách hàng %s: %w", customerID, domain.ErrCustomerNotFound)
+		}
+		return nil, fmt.Errorf("lỗi khi lấy khách hàng theo id: %w", err)
+	}
+	return &c, nil
+}
+
 func (r *PostgresCustomerRepository) GetCustomerByPhone(ctx context.Context, orgID, phone string) (*domain.Customer, error) {
 	var c domain.Customer
 

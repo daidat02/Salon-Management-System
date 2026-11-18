@@ -283,6 +283,14 @@ func (m *MockCustomerStore) FindCustomerByPhone(ctx context.Context, orgID, phon
 	return args.Get(0).(*customerdomain.Customer), args.Error(1)
 }
 
+func (m *MockCustomerStore) GetCustomerByID(ctx context.Context, orgID, customerID string) (*customerdomain.Customer, error) {
+	args := m.Called(ctx, orgID, customerID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*customerdomain.Customer), args.Error(1)
+}
+
 func (m *MockCustomerStore) CreateCustomer(ctx context.Context, c *customerdomain.Customer) error {
 	args := m.Called(ctx, c)
 	return args.Error(0)

@@ -467,6 +467,7 @@ func buildOrderLines(orgID, orderID string, inputs []domain.OrderItemInput, pric
 	for _, in := range inputs {
 		itemType := strings.TrimSpace(in.ItemType)
 		var unitPrice float64
+		var costPrice *float64
 		var unit *string
 		quantity := in.Quantity
 		if itemType == domain.ItemTypeProduct {
@@ -494,6 +495,8 @@ func buildOrderLines(orgID, orderID string, inputs []domain.OrderItemInput, pric
 				large = 1
 			}
 			quantity, unitPrice = in.Quantity*factor/large, sell.SellPrice
+			cost := sell.CostPrice
+			costPrice = &cost
 			lu := strings.TrimSpace(pu.Unit)
 			unit = &lu
 			// Giữ chỗ kho tính bằng đơn vị nhỏ nhất (quy đổi riêng,
@@ -518,6 +521,7 @@ func buildOrderLines(orgID, orderID string, inputs []domain.OrderItemInput, pric
 			UnitPrice:      unitPrice,
 			Unit:           unit,
 			LineTotal:      quantity * unitPrice,
+			CostPrice:      costPrice,
 		}
 		if in.ServiceID != nil {
 			v := strings.TrimSpace(*in.ServiceID)
@@ -656,20 +660,51 @@ func toPaymentResponse(p *domain.Payment) *domain.PaymentResponse {
 
 // toItemResponse map entity OrderItem sang response.
 func toItemResponse(it *domain.OrderItem) *domain.OrderItemResponse {
-	return &domain.OrderItemResponse{
+	resp := &domain.OrderItemResponse{
 		ID: it.ID, ItemType: it.ItemType, ServiceID: it.ServiceID,
 		ProductID: it.ProductID, StaffID: it.StaffID,
 		Quantity: it.Quantity, Unit: it.Unit, UnitPrice: it.UnitPrice, LineTotal: it.LineTotal,
-		Staff: it.Staff,
+		CostPrice: it.CostPrice, Staff: it.Staff,
 	}
+	if it.ServiceName != nil {
+		duration := 0
+		if it.ServiceDurationMinutes != nil {
+			duration = *it.ServiceDurationMinutes
+		}
+		resp.Service = &domain.OrderItemServiceInfo{
+			Name: *it.ServiceName, Description: it.ServiceDescription, DurationMinutes: duration,
+		}
+	}
+	if it.ProductName != nil {
+		resp.Product = &domain.OrderItemProductInfo{
+			Name: *it.ProductName, SKU: derefString(it.ProductSKU), Unit: it.ProductUnit,
+			NetUnit: it.ProductNetUnit, NetAmount: it.ProductNetAmount,
+		}
+	}
+	return resp
+}
+
+func derefString(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }
 
 // toMaterialResponse map entity OrderItemMaterial sang response.
 func toMaterialResponse(m *domain.OrderItemMaterial) *domain.OrderMaterialResponse {
-	return &domain.OrderMaterialResponse{
+	resp := &domain.OrderMaterialResponse{
 		ID: m.ID, OrderItemID: m.OrderItemID, ProductID: m.ProductID,
 		Quantity: m.Quantity, UnitCostAtTime: m.UnitCostAtTime, Unit: m.Unit,
+		ServiceName: derefString(m.ServiceName),
 	}
+	if m.ProductName != nil {
+		resp.Product = &domain.OrderItemProductInfo{
+			Name: *m.ProductName, SKU: derefString(m.ProductSKU), Unit: m.ProductUnit,
+			NetUnit: m.ProductNetUnit, NetAmount: m.ProductNetAmount,
+		}
+	}
+	return resp
 }
 
 // toStaffResponse map entity StaffOrderItem sang response.

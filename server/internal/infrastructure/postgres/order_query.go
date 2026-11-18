@@ -14,7 +14,7 @@ const (
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 	`
 	bulkInsertOrderItemsQuery = `
-		INSERT INTO order_items (id, organization_id, order_id, item_type, service_id, product_id, staff_id, quantity, unit_price, unit,line_total)
+		INSERT INTO order_items (id, organization_id, order_id, item_type, service_id, product_id, staff_id, quantity, unit_price, unit, line_total, cost_price)
 		VALUES
 	`
 	bulkInsertOrderItemMaterialsQuery = `
@@ -52,7 +52,11 @@ const (
 	// để 1 item = 1 row; item chưa gán NV thì staff = []).
 	listOrderItemsQuery = `
 		SELECT i.id, i.organization_id, i.order_id, i.item_type, i.service_id, i.product_id,
-		       i.staff_id, i.quantity, i.unit, i.unit_price, i.line_total,
+		       i.staff_id, i.quantity, i.unit, i.unit_price, i.line_total, i.cost_price,
+		       sv.name AS service_name, sv.description AS service_description,
+		       sv.duration_minutes AS service_duration_minutes,
+		       p.name AS product_name, p.sku AS product_sku, p.unit AS product_unit,
+		       p.net_unit AS product_net_unit, p.net_amount AS product_net_amount,
 		       COALESCE(json_agg(
 		           json_build_object(
 		               'id', s.id,
@@ -64,16 +68,23 @@ const (
 		           ) ORDER BY s.created_at
 		       ) FILTER (WHERE s.id IS NOT NULL), '[]')::text AS staff
 		FROM order_items i
+		LEFT JOIN services sv ON sv.id = i.service_id
+		LEFT JOIN products p ON p.id = i.product_id
 		LEFT JOIN order_item_staff s ON s.order_item_id = i.id
 		LEFT JOIN staff st ON st.id = s.staff_id
 		WHERE i.organization_id = $1 AND i.order_id = $2
-		GROUP BY i.id
+		GROUP BY i.id, sv.id, p.id
 		ORDER BY i.id
 	`
 	listOrderMaterialsQuery = `
-		SELECT m.id, m.order_item_id, m.product_id, m.quantity, m.unit_cost_at_time, COALESCE(m.unit, '') AS unit
+		SELECT m.id, m.order_item_id, m.product_id, m.quantity, m.unit_cost_at_time, COALESCE(m.unit, '') AS unit,
+		       sv.name AS service_name,
+		       p.name AS product_name, p.sku AS product_sku, p.unit AS product_unit,
+		       p.net_unit AS product_net_unit, p.net_amount AS product_net_amount
 		FROM order_item_materials m
 		JOIN order_items i ON i.id = m.order_item_id
+		LEFT JOIN services sv ON sv.id = i.service_id
+		LEFT JOIN products p ON p.id = m.product_id
 		WHERE i.organization_id = $1 AND i.order_id = $2
 	`
 	listOrderPaymentsQuery = `
@@ -317,6 +328,8 @@ const (
 			COUNT(o.id) FILTER (WHERE o.status IN ('pending', 'confirm', 'delivery') AND DATE(o.created_at) = CURRENT_DATE) AS today_processing,
 			COALESCE(SUM(o.total_amount) FILTER (WHERE o.status = 'completed' AND DATE(o.created_at) = CURRENT_DATE), 0) AS today_revenue,
 			COALESCE(SUM(o.total_amount) FILTER (WHERE o.status = 'completed' AND DATE(o.created_at) = CURRENT_DATE - INTERVAL '1 day'), 0) AS yesterday_revenue,
+			COUNT(o.id) FILTER (WHERE date_trunc('month', o.created_at) = date_trunc('month', NOW())) AS month_total,
+			COALESCE(SUM(o.total_amount) FILTER (WHERE o.status = 'completed' AND date_trunc('month', o.created_at) = date_trunc('month', NOW())), 0) AS month_revenue,
 			COUNT(o.id) FILTER (WHERE o.status IN ('pending', 'confirm', 'delivery')) AS pending_count,
 			COALESCE((
 				SELECT SUM(GREATEST(o2.total_amount - COALESCE(p.paid, 0), 0))
@@ -330,9 +343,24 @@ const (
 				WHERE o2.organization_id = $1 
 					AND o2.status IN ('pending', 'confirm', 'delivery')
 			), 0) AS pending_amount,
+			COUNT(o.id) FILTER (WHERE o.status IN ('pending', 'confirm', 'delivery') AND DATE(o.created_at) = CURRENT_DATE) AS pending_today_count,
+			COALESCE((
+				SELECT SUM(GREATEST(o2.total_amount - COALESCE(p.paid, 0), 0))
+				FROM orders o2
+				LEFT JOIN (
+					SELECT order_id, SUM(amount) AS paid
+					FROM payments
+					WHERE status = 'succeeded'
+					GROUP BY order_id
+				) p ON p.order_id = o2.id
+				WHERE o2.organization_id = $1
+					AND o2.status IN ('pending', 'confirm', 'delivery')
+					AND DATE(o2.created_at) = CURRENT_DATE
+			), 0) AS pending_today_amount,
 			COUNT(o.id) FILTER (WHERE o.status IN ('cancelled', 'refunded') AND DATE(o.created_at) = CURRENT_DATE) AS cancel_refund_today,
 			COUNT(o.id) FILTER (WHERE o.status IN ('cancelled', 'refunded') AND date_trunc('month', o.created_at) = date_trunc('month', NOW())) AS cancel_refund_month,
-			COUNT(o.id) FILTER (WHERE date_trunc('month', o.created_at) = date_trunc('month', NOW())) AS month_total
+			COUNT(o.id) FILTER (WHERE o.status = 'cancelled' AND date_trunc('month', o.created_at) = date_trunc('month', NOW())) AS cancel_month,
+			COUNT(o.id) FILTER (WHERE o.status = 'refunded' AND date_trunc('month', o.created_at) = date_trunc('month', NOW())) AS refund_month
 		FROM orders o
 		WHERE o.organization_id = $1
 	`

@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import DashToolbar from '@/components/dashboard/DashToolbar';
+import { useFilterParams } from '@/hooks/use-filter-params';
 
 type OrdersToolbarProps = {
   /** Khi true: dropdown status chỉ hiện các trạng thái lịch sử (kết thúc). */
@@ -33,6 +34,9 @@ export default function OrdersToolbar({ historyOnly = false }: OrdersToolbarProp
   const status = searchParams.get('status') || '';
   const [inputValue, setInputValue] = React.useState(search);
   const [lastSearch, setLastSearch] = React.useState(search);
+  const date = searchParams.get('date') ? new Date(searchParams.get('date')!) : undefined;
+
+  const { setFilterParam } = useFilterParams();
 
   if (search !== lastSearch) {
     setLastSearch(search);
@@ -64,6 +68,13 @@ export default function OrdersToolbar({ historyOnly = false }: OrdersToolbarProp
       searchPlaceholder="Tìm mã đơn, tên khách, SĐT..."
       searchValue={inputValue}
       onSearchChange={setInputValue}
+      dateFilter={{
+        value: searchParams.get('date') ? new Date(searchParams.get('date')!) : undefined,
+        onValueChange: (date: Date | undefined) => {
+          const dateStr = date ? date.toISOString() : '';
+          setFilterParam('date', dateStr, { placeholder: '', resetPage: true });
+        },
+      }}
       filters={[
         {
           id: 'status',

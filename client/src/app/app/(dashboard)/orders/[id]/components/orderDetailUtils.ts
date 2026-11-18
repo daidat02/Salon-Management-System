@@ -2,9 +2,8 @@ import type {
   OrderDetail,
   OrderDetailItem,
   OrderDetailMaterial,
+  OrderItemProductInfo,
 } from '@/types/order';
-import type { Product } from '@/types/product';
-import type { Service } from '@/types/service';
 import type { Staff } from '@/types/staff';
 
 export type EnrichedServiceLine = {
@@ -36,9 +35,14 @@ export type EnrichedMaterialLine = {
   pending?: boolean;
 };
 
-export function materialSpec(p: { net_amount?: number | null; net_unit?: string | null; unit: string } | undefined): string {
+export function materialSpec(
+  p:
+    | Pick<OrderItemProductInfo, 'net_amount' | 'net_unit' | 'unit'>
+    | undefined
+    | null,
+): string {
   if (!p) return '';
-  return p.net_amount ? `${p.net_amount}${p.net_unit ?? ''}` : `Đơn vị: ${p.unit}`;
+  return p.net_amount ? `${p.net_amount}${p.net_unit ?? ''}` : `Đơn vị: ${p.unit ?? ''}`;
 }
 
 export type EnrichedRetailLine = {
@@ -94,13 +98,12 @@ export function staffInfoToAssignments(
 
 export function buildServiceLines(
   items: OrderDetailItem[],
-  services: Map<string, Service>,
   staff: Map<string, Staff>,
 ): EnrichedServiceLine[] {
   return items
     .filter((it) => it.item_type === 'service')
     .map((it) => {
-      const svc = it.service_id ? services.get(it.service_id) : undefined;
+      const svc = it.service;
       const assigned = resolveStaffDisplay(it, staff);
       return {
         id: it.id,
@@ -133,19 +136,15 @@ export function resolveStaffDisplay(
   };
 }
 
-export function buildMaterialLines(
-  materials: OrderDetailMaterial[],
-  products: Map<string, Product>,
-  serviceNameByItemId?: Map<string, string>,
-): EnrichedMaterialLine[] {
+export function buildMaterialLines(materials: OrderDetailMaterial[]): EnrichedMaterialLine[] {
   return materials.map((m) => {
-    const p = products.get(m.product_id);
+    const p = m.product;
     const unit = m.unit || p?.unit || '';
     return {
       id: m.id,
       productId: m.product_id,
       orderItemId: m.order_item_id,
-      serviceName: (m.order_item_id && serviceNameByItemId?.get(m.order_item_id)) || '—',
+      serviceName: m.service_name || '—',
       name: p?.name ?? 'Vật tư',
       sku: p?.sku ?? '—',
       spec: materialSpec(p),
@@ -160,24 +159,24 @@ export function buildMaterialLines(
 
 export function buildRetailLines(
   items: OrderDetailItem[],
-  products: Map<string, Product>,
   staff: Map<string, Staff>,
 ): EnrichedRetailLine[] {
   return items
     .filter((it) => it.item_type === 'product')
     .map((it) => {
-      const p = it.product_id ? products.get(it.product_id) : undefined;
-      const costUnit = p?.cost_price ?? 0;
+      const p = it.product;
+      const costUnit = it.cost_price ?? 0;
       const costTotal = it.quantity * costUnit;
+      const unit = it.unit ?? p?.unit ?? '';
       return {
         id: it.id,
         name: p?.name ?? 'Sản phẩm',
-        desc: p ? `Đơn vị: ${p.unit}` : '',
+        desc: p?.unit ? `Đơn vị: ${p.unit}` : '',
         sku: p?.sku ?? '—',
         ...resolveStaffDisplay(it, staff),
         quantity: it.quantity,
-        unit: it.unit ?? p?.unit ?? '',
-        qtyText: `x${it.quantity}${p ? ` ${p.unit}` : ''}`,
+        unit,
+        qtyText: `x${it.quantity}${unit ? ` ${unit}` : ''}`,
         sellTotal: it.line_total,
         sellUnit: it.quantity > 0 ? it.line_total / it.quantity : 0,
         costTotal,

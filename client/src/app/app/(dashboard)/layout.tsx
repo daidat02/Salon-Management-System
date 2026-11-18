@@ -28,7 +28,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <div className="flex min-h-0 flex-1">
         {/* Sidebar shadcn — active theo pathname (preview/admin_preview/index.html:156) */}
         <SidebarProvider className="contents">
-          <DashSidebar onLogout={handleLogout} />
+          <DashSidebar
+            onLogout={handleLogout}
+            onCreateAppointment={() => router.push('/appointments')}
+          />
         </SidebarProvider>
 
         {/* Vùng scroll duy nhất */}

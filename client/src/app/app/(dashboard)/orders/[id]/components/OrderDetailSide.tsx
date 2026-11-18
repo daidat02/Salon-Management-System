@@ -6,8 +6,7 @@ import { BadgeDollarSign, ChartColumn, ChevronDown, Phone, Star, User, UserPlus,
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/toast';
 import { Tag } from '@/components/ui/tag';
-import type { Customer } from '@/types/customer';
-import type { Order, OrderDetailPayment } from '@/types/order';
+import type { Order, OrderDetailCustomer, OrderDetailPayment } from '@/types/order';
 import type { InitPaymentResponse } from '@/services/order';
 import { useInitPayment } from '@/hooks/order';
 import { queryKeys } from '@/hooks/query-keys';
@@ -61,7 +60,7 @@ export default function OrderDetailSide({
   retail,
   canViewProfit,
 }: {
-  customer: Customer | undefined;
+  customer: OrderDetailCustomer | undefined;
   commissions: StaffCommission[];
   profit: OrderProfit;
   order: Order;
