@@ -1,8 +1,15 @@
+x-logging: &default-logging
+  driver: 'json-file'
+  options:
+    max-size: '20m'
+    max-file: '3'
+
 services:
   postgres:
     image: postgres:16-alpine
     container_name: salon-postgres
     restart: unless-stopped
+    logging: *default-logging
     environment:
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
@@ -19,6 +26,7 @@ services:
     image: ${SERVER_IMAGE}
     entrypoint: ['./migrate']
     command: ['-path', './migrations', '-database', '${DB_URL}', 'up']
+    logging: *default-logging
     env_file:
       - .env.prod
     depends_on:
@@ -29,6 +37,7 @@ services:
     image: ${SERVER_IMAGE}
     container_name: salon-server
     restart: unless-stopped
+    logging: *default-logging
     env_file:
       - .env.prod
     depends_on:
@@ -39,6 +48,7 @@ services:
     image: ${CLIENT_IMAGE}
     container_name: salon-client
     restart: unless-stopped
+    logging: *default-logging
     env_file:
       - .env.prod
     depends_on:
@@ -49,6 +59,7 @@ services:
     image: nginx:1.27-alpine
     container_name: salon-nginx
     restart: unless-stopped
+    logging: *default-logging
     environment:
       ROOT_DOMAIN: ${ROOT_DOMAIN}
     ports:
