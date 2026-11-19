@@ -1,10 +1,13 @@
 name: CD - Build & Deploy
 
 on:
-  push:
+  # Chỉ deploy sau khi workflow CI chạy thành công trên nhánh main
+  # (push code -> CI pass -> CD mới build & deploy).
+  workflow_run:
+    workflows: ['CI - Test & Verify']
+    types: [completed]
     branches:
       - main
-      #- dev
 
   workflow_dispatch:
     inputs:
@@ -33,7 +36,13 @@ jobs:
   # JOB 1: Build & Push Go Backend Image
   # ==========================================
   build-server:
-    if: ${{ github.event_name == 'push' || inputs.target_service == 'all' || inputs.target_service == 'server' }}
+    if: >-
+      (github.event_name == 'workflow_run'
+        && github.event.workflow_run.conclusion == 'success'
+        && github.event.workflow_run.event == 'push'
+        && github.event.workflow_run.head_branch == 'main')
+      || (github.event_name == 'workflow_dispatch'
+        && (inputs.target_service == 'all' || inputs.target_service == 'server'))
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -42,6 +51,8 @@ jobs:
     steps:
       - name: Checkout mã nguồn
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Thiết lập Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -70,7 +81,13 @@ jobs:
   # JOB 2: Build & Push Next.js Frontend Image
   # ==========================================
   build-client:
-    if: ${{ github.event_name == 'push' || inputs.target_service == 'all' || inputs.target_service == 'client' }}
+    if: >-
+      (github.event_name == 'workflow_run'
+        && github.event.workflow_run.conclusion == 'success'
+        && github.event.workflow_run.event == 'push'
+        && github.event.workflow_run.head_branch == 'main')
+      || (github.event_name == 'workflow_dispatch'
+        && (inputs.target_service == 'all' || inputs.target_service == 'client'))
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -79,6 +96,8 @@ jobs:
     steps:
       - name: Checkout mã nguồn
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Thiết lập Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -111,12 +130,21 @@ jobs:
   # ==========================================
   deploy:
     needs: [build-server, build-client]
-    if: ${{ !failure() && !cancelled() }}
+    if: >-
+      !cancelled() && (
+        (github.event_name == 'workflow_run'
+          && github.event.workflow_run.conclusion == 'success'
+          && github.event.workflow_run.event == 'push'
+          && github.event.workflow_run.head_branch == 'main')
+        || github.event_name == 'workflow_dispatch'
+      )
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout mã nguồn để lấy file Compose
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Đẩy file docker-compose.prod.yml mới nhất sang EC2
         uses: appleboy/scp-action@v0.1.7
