@@ -29,7 +29,8 @@ CREATE TABLE organizations (
     slogan VARCHAR(255),
     logo_url VARCHAR(500),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    is_demo BOOLEAN NOT NULL DEFAULT false
 );
 CREATE TRIGGER trg_organizations_updated_at
     BEFORE UPDATE ON organizations
@@ -59,6 +60,25 @@ CREATE TRIGGER trg_users_updated_at
 
 CREATE UNIQUE INDEX uq_users_org_email ON users(organization_id, email) WHERE email IS NOT NULL;
 CREATE UNIQUE INDEX uq_users_org_phone ON users(organization_id, phone) WHERE phone IS NOT NULL;
+
+-- ==========================================
+-- 2.1 REFRESH_TOKENS (xoay vòng refresh token, hỗ trợ thu hồi theo family)
+-- ==========================================
+CREATE TABLE refresh_tokens (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    family_id UUID NOT NULL,
+    token_hash VARCHAR(64) NOT NULL UNIQUE,
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    revoked_at TIMESTAMPTZ,
+    replaced_by_id UUID REFERENCES refresh_tokens(id) ON DELETE SET NULL,
+    user_agent TEXT,
+    ip INET
+);
+
+CREATE INDEX idx_refresh_tokens_family ON refresh_tokens(family_id);
+CREATE INDEX idx_refresh_tokens_expires_at ON refresh_tokens(expires_at);
 
 -- ==========================================
 -- 3. CUSTOMERS
@@ -389,6 +409,7 @@ CREATE TABLE orders (
     created_by UUID REFERENCES users(id) ON DELETE SET NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    description TEXT NOT NULL DEFAULT '',
     UNIQUE (organization_id, code),
     CHECK (total_amount = GREATEST(subtotal_amount - discount_amount, 0))
 );
@@ -414,6 +435,7 @@ CREATE TABLE order_items (
     unit VARCHAR(20),
     unit_price NUMERIC(14,2) NOT NULL CHECK (unit_price >= 0),
     line_total NUMERIC(14,2) NOT NULL CHECK (line_total >= 0),
+    cost_price NUMERIC(14,2) CHECK (cost_price >= 0),
     CHECK (
         (item_type = 'service' AND service_id IS NOT NULL AND product_id IS NULL) OR
         (item_type = 'product' AND product_id IS NOT NULL AND service_id IS NULL)
@@ -588,10 +610,32 @@ CREATE TABLE payrolls (
     approved_by UUID REFERENCES users(id) ON DELETE SET NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    UNIQUE (organization_id, staff_id, period_month)
+    standard_working_days SMALLINT NOT NULL DEFAULT 26,
+    total_leave_days INTEGER NOT NULL DEFAULT 0,
+    actual_working_days INTEGER NOT NULL DEFAULT 0,
+    penalty_amount NUMERIC(14,2) NOT NULL DEFAULT 0,
+    adjustment_deduction NUMERIC(14,2) NOT NULL DEFAULT 0,
+    total_orders INTEGER NOT NULL DEFAULT 0,
+    total_items INTEGER NOT NULL DEFAULT 0,
+    total_amount_value NUMERIC(14,2) NOT NULL DEFAULT 0
 );
 CREATE TRIGGER trg_payrolls_updated_at
     BEFORE UPDATE ON payrolls
+    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- ==========================================
+-- 20.1 PAYROLL_SETTINGS (1 dòng/org; cấu hình kỳ lương)
+-- ==========================================
+CREATE TABLE payroll_settings (
+    organization_id UUID PRIMARY KEY REFERENCES organizations(id) ON DELETE CASCADE,
+    start_day SMALLINT NOT NULL DEFAULT 26 CHECK (start_day BETWEEN 1 AND 28),
+    standard_working_days SMALLINT NOT NULL DEFAULT 26 CHECK (standard_working_days BETWEEN 1 AND 31),
+    auto_draft_cutoff_day SMALLINT NOT NULL DEFAULT 7 CHECK (auto_draft_cutoff_day BETWEEN 1 AND 28),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TRIGGER trg_payroll_settings_updated_at
+    BEFORE UPDATE ON payroll_settings
     FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- ==========================================
@@ -654,25 +698,42 @@ CREATE TRIGGER trg_staff_leaves_updated_at
 
 -- ==========================================
 -- 24. BUSINESS_HOURS (1 dòng/org; giờ làm việc 7 ngày lưu trong JSONB)
--- days là array đúng 7 phần tử, weekday 1=T2 .. 7=CN:
--- {weekday, is_open, open_time, close_time, break_start, break_end, note}
+-- days là array đúng 7 phần tử, weekday 1=T2 .. 7=CN: {weekday, is_open}.
+-- Giờ mở/đóng/nghỉ dùng chung cho cả tuần, lưu bằng số phút tính từ 00:00.
 -- Dùng giờ tường của salon (không timezone). Validate chi tiết ở usecase.
 -- ==========================================
 CREATE TABLE business_hours (
     organization_id UUID PRIMARY KEY REFERENCES organizations(id) ON DELETE CASCADE,
     days JSONB NOT NULL DEFAULT '[
-        {"weekday": 1, "is_open": true, "open_time": "08:30", "close_time": "20:30", "break_start": "12:30", "break_end": "13:30", "note": "Lịch thông thường"},
-        {"weekday": 2, "is_open": true, "open_time": "08:30", "close_time": "20:30", "break_start": "12:30", "break_end": "13:30", "note": "Lịch thông thường"},
-        {"weekday": 3, "is_open": true, "open_time": "08:30", "close_time": "20:30", "break_start": "12:30", "break_end": "13:30", "note": "Lịch thông thường"},
-        {"weekday": 4, "is_open": true, "open_time": "08:30", "close_time": "20:30", "break_start": "12:30", "break_end": "13:30", "note": "Lịch thông thường"},
-        {"weekday": 5, "is_open": true, "open_time": "08:30", "close_time": "21:00", "break_start": "12:30", "break_end": "13:30", "note": "Khung giờ cao điểm tối"},
-        {"weekday": 6, "is_open": true, "open_time": "08:00", "close_time": "21:30", "break_start": null, "break_end": null, "note": "Ngày đông khách - tăng ca"},
-        {"weekday": 7, "is_open": true, "open_time": "08:00", "close_time": "21:30", "break_start": null, "break_end": null, "note": "Ngày đông khách - tăng ca"}
+        {"weekday": 1, "is_open": true},
+        {"weekday": 2, "is_open": true},
+        {"weekday": 3, "is_open": true},
+        {"weekday": 4, "is_open": true},
+        {"weekday": 5, "is_open": true},
+        {"weekday": 6, "is_open": true},
+        {"weekday": 7, "is_open": true}
     ]'::jsonb,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    open_time_minutes SMALLINT NOT NULL DEFAULT 510,
+    close_time_minutes SMALLINT NOT NULL DEFAULT 1230,
+    break_start_minutes SMALLINT DEFAULT 750,
+    break_end_minutes SMALLINT DEFAULT 810,
     CONSTRAINT business_hours_days_is_array
-        CHECK (jsonb_typeof(days) = 'array' AND jsonb_array_length(days) = 7)
+        CHECK (jsonb_typeof(days) = 'array' AND jsonb_array_length(days) = 7),
+    CONSTRAINT business_hours_open_range
+        CHECK (open_time_minutes >= 0 AND close_time_minutes <= 1440
+               AND open_time_minutes < close_time_minutes),
+    CONSTRAINT business_hours_break_range
+        CHECK (
+            (break_start_minutes IS NULL AND break_end_minutes IS NULL)
+            OR (
+                break_start_minutes IS NOT NULL AND break_end_minutes IS NOT NULL
+                AND break_start_minutes >= open_time_minutes
+                AND break_end_minutes <= close_time_minutes
+                AND break_start_minutes < break_end_minutes
+            )
+        )
 );
 CREATE TRIGGER trg_business_hours_updated_at
     BEFORE UPDATE ON business_hours
@@ -897,6 +958,10 @@ CREATE INDEX idx_order_item_staff_staff ON order_item_staff(organization_id, sta
 CREATE INDEX idx_payments_org_id ON payments(organization_id);
 CREATE INDEX idx_payments_order_id ON payments(order_id);
 CREATE INDEX idx_payments_status ON payments(organization_id, status);
+-- Mỗi đơn chỉ được có tối đa 1 payment đang chờ xác nhận.
+CREATE UNIQUE INDEX uq_payments_pending_order
+    ON payments(order_id)
+    WHERE status = 'pending';
 
 CREATE INDEX idx_notifications_org_id ON notifications(organization_id);
 CREATE INDEX idx_notifications_status ON notifications(organization_id, status) WHERE status = 'queued';
@@ -914,6 +979,11 @@ CREATE INDEX idx_cash_flows_order ON cash_flows(order_id) WHERE order_id IS NOT 
 
 CREATE INDEX idx_payrolls_org_period ON payrolls(organization_id, period_month DESC);
 CREATE INDEX idx_payrolls_staff ON payrolls(staff_id, period_month DESC);
+-- Mỗi nhân viên chỉ có 1 bảng lương còn hiệu lực cho mỗi kỳ; bảng đã hủy
+-- được phép tạo lại (reenroll).
+CREATE UNIQUE INDEX idx_payrolls_unique_active_period
+    ON payrolls (organization_id, staff_id, period_month)
+    WHERE status <> 'cancelled';
 
 CREATE INDEX idx_salary_adjustments_staff_date ON staff_salary_adjustments(staff_id, effective_date);
 CREATE INDEX idx_attendances_staff_date ON attendances(staff_id, target_date);
