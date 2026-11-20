@@ -18,7 +18,7 @@ Dữ liệu được cô lập theo `organization_id` ngay từ đầu và **lu�
 
 ## Mục lục
 
-1. [Live Demo & Tài liệu API](#live-demo--tài-liệu-api)
+1. [Live Demo](#live-demo)
 2. [Ảnh chụp màn hình](#ảnh-chụp-màn-hình)
 3. [Tính năng nổi bật](#tính-năng-nổi-bật)
 4. [Kiến trúc hệ thống & triển khai](#kiến-trúc-hệ-thống--triển-khai)
@@ -28,14 +28,13 @@ Dữ liệu được cô lập theo `organization_id` ngay từ đầu và **lu�
 8. [Quy trình CI/CD](#quy-trình-cicd)
 9. [Phạm vi & hướng phát triển](#phạm-vi--hướng-phát-triển)
 
-## Live Demo & Tài liệu API
+## Live Demo
 
-| Mục               | Đường dẫn                                   |
-| ----------------- | ------------------------------------------- |
-| Landing page      | https://vietops.site                        |
-| Ứng dụng quản trị | https://app.vietops.site                    |
-| Swagger API Docs  | https://vietops.site/api/swagger/index.html |
-| Health check      | https://vietops.site/api/health             |
+| Mục               | Đường dẫn                |
+| ----------------- | ------------------------ |
+| Landing page      | https://vietops.site     |
+| Ứng dụng quản trị | https://app.vietops.site |
+| Health check      | https://vietops.site/api/health |
 
 Tài khoản demo local sau khi chạy `client/e2e/support/provision.sh`:
 
