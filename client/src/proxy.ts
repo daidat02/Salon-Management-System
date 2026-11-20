@@ -38,13 +38,20 @@ function stripLegacyPrefix(pathname: string) {
   return stripped === '' ? '/' : stripped;
 }
 
-function redirectTo(req: NextRequest, host: string, pathname: string, search: string) {
-  const url = new URL(req.url);
-  url.host = host;
+function buildExternalUrl(req: NextRequest, host: string, pathname: string, search: string) {
+  const proto =
+    req.headers.get('x-forwarded-proto') || (ROOT_DOMAIN === 'localhost' ? 'http' : 'https');
+  // Tạo URL mới hoàn toàn từ proto và host (không kế thừa port 8080 của req.url)
+  const url = new URL(`${proto}://${host}`);
   url.pathname = pathname;
   url.search = search;
-  // 308 giữ nguyên method và query cho bookmark/link cũ.
-  return NextResponse.redirect(url, 308);
+  return url;
+}
+
+function redirectTo(req: NextRequest, host: string, pathname: string, search: string) {
+  const url = buildExternalUrl(req, host, pathname, search);
+  // Dùng 307 thay vì 308 để tránh trình duyệt cache cứng redirect khi thay đổi trạng thái đăng nhập
+  return NextResponse.redirect(url, 307);
 }
 
 function rewriteToApp(req: NextRequest, pathname: string, search: string) {
@@ -84,7 +91,7 @@ export function proxy(req: NextRequest) {
     if (!isPublicAppPath(pathname) && !req.cookies.get('refresh_token')) {
       const loginUrl = new URL('/login', req.url);
       loginUrl.searchParams.set('next', `${pathname}${search}`);
-      return NextResponse.redirect(loginUrl);
+      return NextResponse.redirect(loginUrl, 307);
     }
 
     return rewriteToApp(req, pathname, search);
