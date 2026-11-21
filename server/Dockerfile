@@ -60,7 +60,7 @@ EXPOSE 8080
 
 # Kiểm tra sức khỏe container mỗi 30s bằng cách gọi endpoint /health nội bộ
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-    CMD wget -qO- http://127.0.0.1:8080/health >/dev/null 2>&1 || exit 1
+    CMD wget -qO- http://127.0.0.1:8080/api/health >/dev/null 2>&1 || exit 1
 
 # Lệnh mặc định khởi chạy Go server khi container bật lên
 CMD ["/app/server"]
