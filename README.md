@@ -1,5 +1,7 @@
 # Salon Management System
 
+![](docs/screenshots/01-landing.png)
+
 ![CI](https://github.com/daidat02/Salon-Management-System/actions/workflows/ci.yml/badge.svg?branch=main)
 ![CD](https://github.com/daidat02/Salon-Management-System/actions/workflows/cd.yml/badge.svg?branch=main)
 ![Go](https://img.shields.io/badge/Go-1.27-00ADD8?logo=go&logoColor=white)
@@ -30,10 +32,10 @@ Dữ liệu được cô lập theo `organization_id` ngay từ đầu và **lu�
 
 ## Live Demo
 
-| Mục               | Đường dẫn                |
-| ----------------- | ------------------------ |
-| Landing page      | https://vietops.site     |
-| Ứng dụng quản trị | https://app.vietops.site |
+| Mục               | Đường dẫn                       |
+| ----------------- | ------------------------------- |
+| Landing page      | https://vietops.site            |
+| Ứng dụng quản trị | https://app.vietops.site        |
 | Health check      | https://vietops.site/api/health |
 
 Tài khoản demo local sau khi chạy `client/e2e/support/provision.sh`:
