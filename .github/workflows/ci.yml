@@ -160,7 +160,7 @@ jobs:
           go build -o /tmp/salon-server ./cmd
           nohup /tmp/salon-server > /tmp/salon-server.log 2>&1 &
           for i in $(seq 1 30); do
-            if curl -fsS http://localhost:8080/health >/dev/null; then exit 0; fi
+            if curl -fsS http://localhost:8080/api/health >/dev/null; then exit 0; fi
             sleep 1
           done
           echo 'Backend không khởi động được:'; cat /tmp/salon-server.log; exit 1
