@@ -139,7 +139,6 @@ jobs:
         || github.event_name == 'workflow_dispatch'
       )
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout mã nguồn để lấy file Compose
         uses: actions/checkout@v4
@@ -193,12 +192,6 @@ jobs:
 
             # Đảm bảo PostgreSQL đã bật và khỏe mạnh trước khi chạy migration
             docker compose -f docker-compose.prod.yml up -d postgres
-
-            # Chạy migration nếu được bật (mặc định true khi push code)
-            if [ "${{ inputs.run_migrations || 'true' }}" = "true" ]; then
-              echo "Đang chạy database migrations..."
-              docker compose -f docker-compose.prod.yml run --rm --no-deps migrate
-            fi
 
             # Khởi động lại toàn bộ ứng dụng với image mới
             docker compose -f docker-compose.prod.yml up -d --remove-orphans

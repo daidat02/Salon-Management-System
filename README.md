@@ -1,5 +1,7 @@
 # Salon Management System
 
+![](docs/screenshots/01-landing.png)
+
 ![CI](https://github.com/daidat02/Salon-Management-System/actions/workflows/ci.yml/badge.svg?branch=main)
 ![CD](https://github.com/daidat02/Salon-Management-System/actions/workflows/cd.yml/badge.svg?branch=main)
 ![Go](https://img.shields.io/badge/Go-1.27-00ADD8?logo=go&logoColor=white)
@@ -10,7 +12,8 @@
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
 ![Nginx](https://img.shields.io/badge/Nginx-Reverse_Proxy-009639?logo=nginx&logoColor=white)
 ![AWS](https://img.shields.io/badge/AWS-EC2-FF9900?logo=amazonaws&logoColor=white)
-![JWT](https://img.shields.io/badge/Auth-JWT_+_Refresh_Rotation-000000?logo=jsonwebtokens&logoColor=white)
+
+> > > > > > > ![JWT](https://img.shields.io/badge/Auth-JWT_+_Refresh_Rotation-000000?logo=jsonwebtokens&logoColor=white)
 
 **Salon Management System** là nền tảng quản trị salon tóc & spa, hợp nhất lịch hẹn, POS/đơn hàng, kho – vật tư, thu chi và bảng lương trong một hệ thống duy nhất. Backend Go theo Clean Architecture, frontend Next.js App Router, triển khai thật trên AWS EC2 sau Cloudflare + Nginx.
 
@@ -30,11 +33,19 @@ Dữ liệu được cô lập theo `organization_id` ngay từ đầu và **lu�
 
 ## Live Demo
 
-| Mục               | Đường dẫn                |
+<<<<<<< HEAD
+| Mục | Đường dẫn |
 | ----------------- | ------------------------ |
-| Landing page      | https://vietops.site     |
+| Landing page | https://vietops.site |
 | Ứng dụng quản trị | https://app.vietops.site |
-| Health check      | https://vietops.site/api/health |
+=======
+| Mục | Đường dẫn |
+| ----------------- | ------------------------------- |
+| Landing page | https://vietops.site |
+| Ứng dụng quản trị | https://app.vietops.site |
+
+> > > > > > > ui/landing
+> > > > > > > | Health check | https://vietops.site/api/health |
 
 Tài khoản demo local sau khi chạy `client/e2e/support/provision.sh`:
 

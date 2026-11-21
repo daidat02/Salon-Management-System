@@ -1,7 +1,8 @@
 'use client';
 
 import * as React from 'react';
-import { AlertTriangle, Bell, CircleQuestionMark, Plus, Scissors, Sparkles } from 'lucide-react';
+import { AlertTriangle, Bell, CircleQuestionMark, Plus, Sparkles } from 'lucide-react';
+import Logo, { LogoMark } from '@/components/brand/Logo';
 import { Button } from '@/components/ui/button';
 import { DashDialog } from '@/components/dashboard/DashDialog';
 import { toast } from '@/components/ui/toast';
@@ -67,19 +68,7 @@ export default function DashHeader({
       <header className="z-30 flex h-16 shrink-0 items-center justify-between border-b border-border bg-surface px-6 select-none">
         {/* Brand Title */}
         <div className="flex min-w-0 items-center gap-6">
-          <div className="flex w-56 shrink-0 items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand text-lg font-bold text-white shadow-sm">
-              <Scissors className="h-5 w-5" />
-            </div>
-            <div>
-              <span className="block text-base leading-tight font-bold tracking-tight text-slate-900">
-                SALON OS
-              </span>
-              <span className="text-[11px] leading-none font-medium text-slate-400">
-                {branchName}
-              </span>
-            </div>
-          </div>
+          <Logo subtitle={'Service Operations'} />
 
           {isDemo && (
             <div className="hidden items-center gap-2 rounded-full border border-amber-200 bg-amber-50 py-1 pr-1 pl-3 text-amber-800 lg:flex">
@@ -195,8 +184,8 @@ export default function DashHeader({
           </div>
         </div>
         <p className="text-xs leading-relaxed text-slate-600">
-          Cấu hình salon, tài khoản người dùng và số dư đầu kỳ của quỹ sẽ được giữ lại. Sau khi
-          xác nhận, salon sẽ bắt đầu với dữ liệu trống.
+          Cấu hình salon, tài khoản người dùng và số dư đầu kỳ của quỹ sẽ được giữ lại. Sau khi xác
+          nhận, salon sẽ bắt đầu với dữ liệu trống.
         </p>
       </DashDialog>
     </>

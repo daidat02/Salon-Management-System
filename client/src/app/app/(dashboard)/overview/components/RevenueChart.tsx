@@ -69,10 +69,15 @@ export default function RevenueChart({ points }: RevenueChartProps) {
 
   const average = useMemo(() => {
     if (points.length === 0) return 0;
-    return Math.round(
-      points.reduce((sum, point) => sum + point.revenue, 0) / points.length,
-    );
+    return Math.round(points.reduce((sum, point) => sum + point.revenue, 0) / points.length);
   }, [points]);
+
+  // Trục Y tự scale theo doanh thu thực tế; khi cả 7 ngày = 0 thì giữ mốc 0–1M
+  // để trục vẫn đọc được thay vì lặp 0M.
+  const isEmpty = useMemo(
+    () => chartData.every((point) => point.value === 0),
+    [chartData],
+  );
 
   return (
     <div className="flex flex-col justify-between rounded-xl border border-outline bg-surface p-6 shadow-sm lg:col-span-2">
@@ -90,10 +95,7 @@ export default function RevenueChart({ points }: RevenueChartProps) {
 
       <div className="h-[260px] w-full">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart
-            data={chartData}
-            margin={{ top: 16, right: 8, left: -18, bottom: 0 }}
-          >
+          <AreaChart data={chartData} margin={{ top: 16, right: 8, left: -18, bottom: 0 }}>
             <defs>
               <linearGradient id="overviewRevenueGradient" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="#4F7CAC" stopOpacity={0.28} />
@@ -108,8 +110,7 @@ export default function RevenueChart({ points }: RevenueChartProps) {
               axisLine={{ stroke: '#E2E8F0' }}
             />
             <YAxis
-              ticks={[0, 10, 20, 30, 40]}
-              domain={[0, 40]}
+              domain={isEmpty ? [0, 1] : undefined}
               tick={{ fontSize: 10, fill: '#94A3B8' }}
               tickLine={false}
               axisLine={false}

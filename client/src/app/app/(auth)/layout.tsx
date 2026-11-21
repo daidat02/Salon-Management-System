@@ -1,20 +1,16 @@
-import { CircleCheck, Scissors } from "lucide-react";
+import { CircleCheck, Scissors } from 'lucide-react';
 
 // Layout dùng chung cho các trang auth (login / register / forgot-password).
 // Route group (auth) không ảnh hưởng URL: vẫn là /app/login, /app/register...
 // Không dùng DashHeader/DashSidebar — full màn hình split-screen theo
 // design system SALON ADMIN (primary #4F7CAC, Inter).
 const HIGHLIGHTS = [
-  "Lịch hẹn & nhắc lịch tự động",
-  "Thu ngân, đơn hàng, tồn kho",
-  "Báo cáo doanh thu theo thời gian thực",
+  'Lịch hẹn & nhắc lịch tự động',
+  'Thu ngân, đơn hàng, tồn kho',
+  'Báo cáo doanh thu theo thời gian thực',
 ];
 
-export default function AuthLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="theme-app grid min-h-screen bg-background font-sans text-body lg:grid-cols-[1.1fr_1fr]">
       {/* Panel thương hiệu */}
@@ -23,7 +19,7 @@ export default function AuthLayout({
           className="pointer-events-none absolute inset-0"
           style={{
             background:
-              "radial-gradient(600px 300px at 20% 10%, rgba(255,255,255,0.18), transparent 60%), radial-gradient(500px 400px at 90% 90%, rgba(0,0,0,0.25), transparent 60%)",
+              'radial-gradient(600px 300px at 20% 10%, rgba(255,255,255,0.18), transparent 60%), radial-gradient(500px 400px at 90% 90%, rgba(0,0,0,0.25), transparent 60%)',
           }}
         />
         <div className="relative flex items-center gap-3">
@@ -31,9 +27,7 @@ export default function AuthLayout({
             <Scissors className="h-5 w-5" />
           </div>
           <div>
-            <p className="text-base leading-tight font-bold tracking-tight">
-              SALON ADMIN
-            </p>
+            <p className="text-base leading-tight font-bold tracking-tight">SALON ADMIN</p>
             <p className="text-xs text-white/70">Chi nhánh Trung tâm</p>
           </div>
         </div>

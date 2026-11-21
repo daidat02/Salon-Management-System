@@ -1,21 +1,35 @@
-import Link from "next/link";
+import FaqSection from './components/FaqSection';
+import FeaturesSection from './components/FeaturesSection';
+import FinalCtaSection from './components/FinalCtaSection';
+import HeroSection from './components/HeroSection';
+import HowItWorksSection from './components/HowItWorksSection';
+import ImpactSection from './components/ImpactSection';
+import LandingFooter from './components/LandingFooter';
+import LandingHeader from './components/LandingHeader';
+import MetricsSection from './components/MetricsSection';
+import PricingSection from './components/PricingSection';
+import ProblemSolutionSection from './components/ProblemSolutionSection';
+import ShowcaseSection from './components/ShowcaseSection';
+import TestimonialsSection from './components/TestimonialsSection';
 
-// Home của website landing — route `/landing`.
 export default function LandingPage() {
   return (
-    <main className="mx-auto flex min-h-[70vh] max-w-5xl flex-col items-center justify-center gap-6 p-8 text-center">
-      <h1 className="text-3xl font-bold text-gray-800">
-        Salon Project — Landing Page
-      </h1>
-      <p className="text-gray-600">
-        Đây là trang chủ của website landing tại <code>/landing</code>.
-      </p>
-      <Link
-        href={process.env.NEXT_PUBLIC_APP_URL ?? 'http://app.localhost:3000'}
-        className="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700"
-      >
-        Vào Dashboard
-      </Link>
-    </main>
+    <>
+      <LandingHeader />
+      <main id="top">
+        <HeroSection />
+        <MetricsSection />
+        <ProblemSolutionSection />
+        <FeaturesSection />
+        <HowItWorksSection />
+        <ShowcaseSection />
+        <ImpactSection />
+        <TestimonialsSection />
+        <PricingSection />
+        <FaqSection />
+        <FinalCtaSection />
+      </main>
+      <LandingFooter />
+    </>
   );
 }
