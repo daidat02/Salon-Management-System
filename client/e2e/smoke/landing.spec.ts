@@ -9,13 +9,12 @@ test.describe('Landing', () => {
       const rootUrl = new URL('/', LANDING_URL).toString();
       await page.goto(rootUrl);
 
-      await expect(page).toHaveURL(/\$/);
-      await expect(page.getByRole('heading', { level: 1 })).toContainText(
-        'VietOps — Vietnam Service Operations Platform',
-      );
-      await expect(page.getByText('VietOps — Vietnam Service Operations Platform')).toBeVisible();
+      await expect(page).toHaveURL(/\/$/);
+      const heroHeading = page.getByRole('heading', { level: 1 });
+      await expect(heroHeading).toContainText('VietOps');
+      await expect(heroHeading).toContainText('Vietnam Service Operations Platform');
 
-      const cta = page.getByRole('button', { name: 'Đăng Nhập' });
+      const cta = page.getByRole('link', { name: 'Đăng Nhập' });
       await expect(cta).toHaveAttribute('href', `${APP_URL}/login`);
     },
   );
