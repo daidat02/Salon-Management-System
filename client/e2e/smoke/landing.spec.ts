@@ -16,7 +16,7 @@ test.describe('Landing', () => {
       await expect(page.getByText('VietOps — Vietnam Service Operations Platform')).toBeVisible();
 
       const cta = page.getByRole('button', { name: 'Đăng Nhập' });
-      await expect(cta).toHaveAttribute('href', APP_URL);
+      await expect(cta).toHaveAttribute('href', `${APP_URL}/login`);
     },
   );
 });
