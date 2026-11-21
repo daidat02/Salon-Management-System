@@ -1,34 +1,15 @@
-// Layout riêng của website landing — header/footer marketing nằm ở đây.
-// Không ảnh hưởng dashboard /app.
-export default function LandingLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'VietOps — Vietnam Service Operations Platform',
+  description:
+    'VietOps là nền tảng vận hành dịch vụ Việt Nam: gom lịch hẹn, thu ngân, kho hàng, thu chi và báo cáo về một nền tảng duy nhất cho salon & spa.',
+};
+
+export default function LandingLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="theme-landing min-h-screen bg-background font-sans text-on-surface">
-      <header className="border-b border-border bg-white">
-        <div className="mx-auto flex max-w-5xl items-center justify-between p-4">
-          <span className="font-display text-lg font-bold text-on-surface">Salon</span>
-          <nav className="flex gap-4 text-sm font-medium text-on-surface-variant">
-            <a href="/landing" className="hover:text-primary">
-              Trang chủ
-            </a>
-            <a
-              href={process.env.NEXT_PUBLIC_APP_URL ?? 'http://app.localhost:3000'}
-              className="hover:text-primary"
-            >
-              Dashboard
-            </a>
-          </nav>
-        </div>
-      </header>
+    <div className="theme-landing min-h-screen bg-canvas font-sans text-ink antialiased">
       {children}
-      <footer className="border-t border-border bg-white">
-        <div className="mx-auto max-w-5xl p-4 text-center text-sm text-on-surface-variant">
-          © 2026 Salon Project
-        </div>
-      </footer>
     </div>
   );
 }

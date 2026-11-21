@@ -102,7 +102,14 @@ export function proxy(req: NextRequest) {
     if (isLegacyAppPath(pathname)) {
       return redirectTo(req, appHost, stripLegacyPrefix(pathname), search);
     }
-    return NextResponse.next();
+    // Nếu người dùng gõ thẳng /landing thì đá về / cho đẹp URL (không bị trùng lặp nội dung)
+    if (pathname === '/landing' || pathname.startsWith('/landing/')) {
+      const cleanPath = pathname.replace(/^\/landing/, '') || '/';
+      return redirectTo(req, host, cleanPath, search);
+    }
+    // Ánh xạ ngầm: http://localhost:3000/ -> src/app/landing
+    const target = `/landing${pathname === '/' ? '' : pathname}${search}`;
+    return NextResponse.rewrite(new URL(target, req.url));
   }
 
   // 3. Subdomain cố định khác (api/admin/...): không phục vụ trên Next.
